@@ -1,0 +1,6 @@
+# IDE / tooling state — not project content
+.idea/
+.omc/
+
+# macOS
+.DS_Store
