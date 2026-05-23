@@ -41,83 +41,84 @@ It also resolves T2-packaging's first open question (manifest format) by forcing
 
 ## 4. Steps
 
-### Step 1 — Discover Claude Code plugin manifest format
+### Step 1 — Discover Claude Code plugin manifest format ✓ (resolved)
 
-Investigate the canonical plugin spec:
-- Check Anthropic docs (`docs.anthropic.com/claude/docs/claude-code`).
-- Look for example plugins in the wild — official Anthropic plugins, or `oh-my-claudecode` style projects, which have visible structure.
-- Note required vs optional fields. Document findings as a brief note inside the plugin's `README.md` or in a Step-1 commit message.
+**Investigation outcome** (via the `plugin-dev:plugin-structure` skill, May 23 2026):
 
-If the spec genuinely doesn't exist publicly, derive from observable patterns: examine the `.claude/` directory of an installed plugin, or fall back to a minimal sensible JSON manifest and let Claude Code surface errors.
+Claude Code plugin structure is well-specified. Key requirements:
+- Manifest at `.claude-plugin/plugin.json` (NOT bare `plugin.json` at plugin root).
+- Skills must be `skills/<name>/SKILL.md` (subdirectory per skill, not flat `.md`).
+- Hooks declared in `hooks/hooks.json` (event-handler config), with hook scripts referenced via `${CLAUDE_PLUGIN_ROOT}`.
+- Auto-discovered component dirs: `commands/`, `agents/`, `skills/`, `hooks/`. Custom dirs (e.g. `view/`, `schemas/`) supported but not auto-loaded — referenced from commands/hooks/skills via `${CLAUDE_PLUGIN_ROOT}`.
+- `${CLAUDE_PLUGIN_ROOT}` is the canonical portable-path env var.
+- Naming: kebab-case throughout.
 
-**HITL gate**: if the investigation surfaces a significantly different structure than T1 §4.11 anticipates, pause and reconcile before proceeding.
+T1 §4.11 has been updated to reflect this. Deltas vs the original T1 §4.11: (a) added `.claude-plugin/plugin.json`, (b) skills became `skills/<name>/SKILL.md`, (c) hooks restructured to `hooks/hooks.json` + `hooks/scripts/`, (d) renamed `bin/` → `scripts/` for Claude-convention consistency, (e) added `agents/` slot.
 
 ### Step 2 — Create the directory structure
 
-At repo root:
+At repo root, mirroring T1 §4.11:
 
 ```
 agent-plan-tracker/
-  plugin.json                       # or whatever Claude expects (resolved in Step 1)
+  .claude-plugin/
+    plugin.json
   README.md
-  skills/
-    .keep
-  cheatsheet/
-    .keep
-    worked-examples/
-      .keep
-  bin/
-    .keep
-  view/
-    .keep
-  schemas/
-    .keep
-  philosophies/
-    .keep
-  hooks/
-    .keep
-  commands/
-    .keep
+  commands/.keep
+  agents/.keep
+  skills/.keep
+  hooks/.keep
+  scripts/.keep
+  schemas/.keep
+  view/.keep
+  cheatsheet/.keep
+  philosophies/.keep
 ```
 
-`.keep` is a 0-byte placeholder convention. Alternative: README.md in each subdirectory with a one-liner about what content will land there. Lean `.keep` for now; promote to README.md per-subdir as content lands.
+`.keep` is a 0-byte placeholder convention. Subdirectory contents (e.g. `skills/using-agent-plan-tracker/SKILL.md`, `cheatsheet/worked-examples/`) land via later T3s.
 
-### Step 3 — Write the plugin manifest
+### Step 3 — Write the plugin manifest at `.claude-plugin/plugin.json`
 
-Minimal manifest (exact field names TBD by Step 1). Likely fields:
+```json
+{
+  "name": "agent-plan-tracker",
+  "version": "0.1.0-pre-m1",
+  "description": "Event-sourced planning methodology with git-history extraction and projection.",
+  "author": { "name": "Alastair Brayne" },
+  "keywords": ["planning", "event-sourcing", "git", "audit", "methodology"]
+}
+```
 
-- `name`: `agent-plan-tracker`
-- `version`: `0.1.0-pre-m1` (semver pre-release; bumps to `0.1.0` when M1 is complete)
-- `description`: "Event-sourced planning methodology with git-history extraction and projection."
-- (whatever else Claude expects)
+Version `0.1.0-pre-m1` (semver pre-release; bumps to `0.1.0` when M1 is complete).
 
 ### Step 4 — Write README.md at plugin root
 
 Short. Covers:
-- One-line purpose (1–2 sentences).
+- One-line purpose.
 - Status: pre-M1, work in progress, not installable on other projects yet.
-- Pointer: see `../planning/T1-top-level.md` for the full design, `../planning/M1-bootstrap.md` for the current milestone.
-- License / authorship placeholders if needed.
+- Pointers: `../planning/T1-top-level.md` for full design, `../planning/M1-bootstrap.md` for current milestone.
+- License placeholder.
 
 ### Step 5 — Verify load
 
-- Run any available `claude` CLI plugin-validation command in this directory.
-- If no validation tooling exists, smoke test: open Claude Code in this repo and confirm no plugin-loading errors surface.
-- If validation fails, fix and re-test; if it can't be made to validate, raise as HITL Q1 below and pause.
+- `cat agent-plan-tracker/.claude-plugin/plugin.json | python3 -m json.tool` — JSON parses.
+- `ls -la agent-plan-tracker/` confirms full structure.
+- Open Claude Code in this repo (or restart current session) → no plugin-loading errors.
+- Defer formal CLI validation to `T3-build-loop` (which will provide a `bin/repack-validate.sh`).
 
 ## 5. Files to create
 
-- `agent-plan-tracker/plugin.json` (or equivalent manifest)
+- `agent-plan-tracker/.claude-plugin/plugin.json`
 - `agent-plan-tracker/README.md`
-- `agent-plan-tracker/skills/.keep`
-- `agent-plan-tracker/cheatsheet/.keep`
-- `agent-plan-tracker/cheatsheet/worked-examples/.keep`
-- `agent-plan-tracker/bin/.keep`
-- `agent-plan-tracker/view/.keep`
-- `agent-plan-tracker/schemas/.keep`
-- `agent-plan-tracker/philosophies/.keep`
-- `agent-plan-tracker/hooks/.keep`
 - `agent-plan-tracker/commands/.keep`
+- `agent-plan-tracker/agents/.keep`
+- `agent-plan-tracker/skills/.keep`
+- `agent-plan-tracker/hooks/.keep`
+- `agent-plan-tracker/scripts/.keep`
+- `agent-plan-tracker/schemas/.keep`
+- `agent-plan-tracker/view/.keep`
+- `agent-plan-tracker/cheatsheet/.keep`
+- `agent-plan-tracker/philosophies/.keep`
 
 ## 6. Decisions to log
 
@@ -135,8 +136,8 @@ Once steps complete:
 
 ## 8. HITL questions
 
-- **Q1**: Does the Claude Code plugin format match T1 §4.11's anticipated layout? If not, what reconciliation is needed before proceeding with the M1 plan as written?
-- **Q2**: Should the plugin manifest live at `plugin.json` (most common) or somewhere else (e.g. `claude-plugin.json`, `.claude/plugin.json`)? Resolved by Step 1 investigation; no a-priori answer.
+- **Q1** (resolved): Claude Code plugin format differs from the original T1 §4.11 in five ways (manifest path, skill nesting, hook config format, dir name convention, agents slot). Reconciliation: T1 §4.11 updated in this same change to match the discovered spec. Plugin layout corrected before any plugin content lands, so no migration cost.
+- **Q2** (resolved): Manifest lives at `.claude-plugin/plugin.json` per the Claude Code spec.
 
 ## 9. Events this T3 will emit
 

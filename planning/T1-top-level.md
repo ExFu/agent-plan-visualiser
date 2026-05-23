@@ -514,25 +514,41 @@ Annotated places where the design intentionally accepts a specific tradeoff that
 
 ### 4.11 Plugin structure
 
+The plugin follows Claude Code's standard plugin layout (manifest in `.claude-plugin/`, auto-discovered component directories at plugin root) plus custom directories for this project's tracker-specific content.
+
 ```
-agent-plan-tracker/                 # the plugin itself
+agent-plan-tracker/                          # plugin root (at repo root)
+  .claude-plugin/
+    plugin.json                              # manifest — required location
+  README.md
+  commands/
+    <slash command .md files>                # auto-discovered (e.g. /apt-extract)
+  agents/
+    <subagent .md files>                     # auto-discovered (e.g. M2 extraction agent)
   skills/
-    using-agent-plan-tracker.md     # formal spec, full ontology, full schema
+    using-agent-plan-tracker/
+      SKILL.md                               # formal spec, full ontology, full schema
+  hooks/
+    hooks.json                               # event-handler configuration
+    scripts/
+      pre-commit                             # installed into target's .git/hooks/
+      pre-push                               # installed into target's .git/hooks/
+  scripts/
+    <utility scripts the plugin invokes via Claude's Bash tool>
+  schemas/
+    events.schema.json
+    plan-frontmatter.schema.json
+  view/
+    index.html                               # HTML view template
+    app.js                                   # JS that loads projection.json
+    style.css
   cheatsheet/
-    cheatsheet.md                   # common operations, one-liners
+    cheatsheet.md                            # common operations, one-liners
     worked-examples/
       find-stalled-plans.md
       audit-verification-gaps.md
       trace-decision-history.md
       pre-merge-cleanliness-check.md
-  commands/
-    <slash commands — install-into-project, extract, audit, snapshot, etc.>
-  bin/
-    <scripts the plugin invokes via Claude's Bash tool>
-  view/
-    index.html                      # HTML view template
-    app.js                          # JS that loads projection.json
-    style.css
   philosophies/
     3-tier-rationale.md
     golden-circle-grounding.md
@@ -541,17 +557,16 @@ agent-plan-tracker/                 # the plugin itself
     swap-out-surfaces.md
     empirical-prompt-architecture.md
     tracker-as-agent-memory.md
-  hooks/
-    pre-commit                      # installed by install-into-project
-    pre-push                        # installed by install-into-project
 ```
+
+**Conformance vs custom directories.** `.claude-plugin/`, `commands/`, `agents/`, `skills/`, `hooks/` follow Claude Code's plugin spec and use its auto-discovery conventions (e.g. skills must be `skills/<name>/SKILL.md`, hooks declared in `hooks/hooks.json`). The remaining directories (`scripts/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`) are this project's own content surfaces, referenced by the plugin's commands/hooks/skills via `${CLAUDE_PLUGIN_ROOT}` (the Claude-supplied env var pointing at the plugin's install root).
 
 **Plugin instruction shape**
 
 The skill tells downstream agents:
 
-- Prefer `bin/<script>` over generating SQL from scratch — major token saving.
-- If you find yourself generating a useful query repeatedly, save it to `bin/local/<descriptive-name>.sql` for future agents and humans. Lookup order: `bin/` → `bin/local/` → generate-from-scratch-and-save.
+- Prefer `scripts/<script>` over generating SQL from scratch — major token saving.
+- If you find yourself generating a useful query repeatedly, save it to `scripts/local/<descriptive-name>.sql` for future agents and humans. Lookup order: `scripts/` → `scripts/local/` → generate-from-scratch-and-save.
 - For ontology/schema questions, go to `skills/using-agent-plan-tracker.md`. For common operations, `cheatsheet/cheatsheet.md`. For worked scenarios, `cheatsheet/worked-examples/`. The formal spec is the floor, not the everyday surface.
 - The plugin's `philosophies/` content grounds judgement calls when instructions don't anticipate something.
 
