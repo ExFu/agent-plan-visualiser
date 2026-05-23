@@ -326,7 +326,9 @@ The graph contains three different things:
    - `plan_kind: thematic` (per §2.2–2.3) — plans on the thematic axis. Carries `tier` (`0 | 1 | 2 | 3`) plus optional `tier_prefix` (single capital letter — omitted for the main spine, `"X"` for crosscut, any other letter for a side quest).
    - `plan_kind: milestone` (per §2.4) — plans on the sequence axis. No `tier` or `tier_prefix`; carries a sequential `milestone_index` (1, 2, 3, …) instead.
 
-   Identity declared in plan frontmatter as a stable `id` field; filename is descriptive convention.
+   Identity declared in plan frontmatter as a stable `id` field; **filename is load-bearing** (must equal `<id>.md` — see §4.6).
+
+   **T3 thematic plans additionally carry** `t2_parent: <T2-id>` (their thematic parent on the planning tree) and `milestone: <Mn-id>` (their scheduling target on the sequence axis). T1 and T2 plans don't need `t2_parent` (they sit at the top of the thematic spine or directly under T1); milestone plans don't need either (they sit on the orthogonal axis). XT/PT/etc. lettered workstream T3s also use `t2_parent` (pointing to their lettered T2) and `milestone` like regular T3s.
 2. **`blocker`** — an external dependency (per §2.6). Slug-identified.
 3. **`hitl-question`** — a human-in-the-loop question (per §2.6). Identifier: parent plan id + question number.
 4. **`implicit-work`** — work that shipped without a plan (per §2.7). Identifier auto-generated from short commit hash + message-slug.
