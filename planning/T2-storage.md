@@ -2,54 +2,75 @@
 id: T2-storage
 plan_kind: thematic
 tier: 2
-status: draft
+status: active
 ---
 
 # T2-storage — Event log, cache, projection storage
 
-**Status**: Draft. First T3s scheduled into M1.
-**Theme**: The data layer — events.jsonl (canonical), SQLite cache (queryable), projection.json (view-friendly), snapshots (later).
+**Status**: Active. M1 T3s scheduled.
+**Theme**: The data layer — events.jsonl (canonical), SQLite cache (queryable derived view), projection.json (view-friendly derived snapshot), snapshots (later, M2/M3). **This T2 is the architectural source of truth for storage**; T1 only summarises.
 
 ---
 
 ## 1. Why this T2 exists
 
-T1 §4.7 sketches the three-tier storage. T2-storage turns sketch into a working layer: schema decisions, build scripts, and the conventions downstream layers depend on.
+This is the hinge between events (raw evidence) and projections (consumed views). Get it wrong here and every downstream view inherits the pain.
 
-This is the hinge between events (raw evidence) and projections (consumed views). Mistakes here propagate into every view.
+Storage decisions also encode trust assumptions: what gets committed (canonical), what's regenerable (derived), what bridges Git-aware and Git-less consumers (event metadata), what amortises cost (snapshots).
 
 ## 2. What lives in this theme
 
-- **`.agent-plan-tracker/events.jsonl`** — canonical, append-only. Schema and format conventions detailed here.
-- **`.agent-plan-tracker/cache.sqlite`** — derived. Schema, indexes, regeneration script.
-- **`.agent-plan-tracker/projection.json`** — derived. Structure + emitter logic (emitter itself lives in T2-projection).
-- **`.agent-plan-tracker/snapshots/<date>/`** — later (M2/M3); not M1 scope.
+- **`.agent-plan-tracker/events.jsonl`** — canonical, append-only event log. Format conventions, write discipline.
+- **`.agent-plan-tracker/cache.sqlite`** — SQLite cache, rebuildable from events.jsonl. Schema, indexes, build script.
+- **`.agent-plan-tracker/projection.json`** — current projection emitted from the cache. Shape defined here; emitter lives in T2-projection.
+- **`.agent-plan-tracker/snapshots/<YYYY-MM-DD>-<label>/`** — materialised state checkpoints. Format, triggers, agent-orientation role. Later (M2/M3); not M1 scope.
+- **`.agent-plan-tracker/schema-version.txt`** — marker file for the currently-active schema version.
+- **Commit-ref resolution** — git-blame-based attribution of events.jsonl lines to commit hashes (since events don't carry hashes inline).
 
-## 3. Approach
+## 3. Architecture
 
-### events.jsonl format
+### 3.1 Three-tier storage
+
+```
+.agent-plan-tracker/
+  events.jsonl              # primary, append-only, source of truth
+  cache.sqlite              # derived, regenerable, committed for read-performance
+  projection.json           # derived, view-friendly
+  snapshots/
+    <YYYY-MM-DD>-<label>/
+      snapshot.json
+      projection.json
+      summary.md
+  schema-version.txt
+```
+
+**Trust hierarchy:** events.jsonl is canonical. SQLite and projection.json are rebuildable; their corruption is recoverable by re-running the build. The log itself gets all the integrity discipline (append-only, never manually edited, blame-attributable).
+
+### 3.2 events.jsonl format
+
 - One event per line, valid JSON.
-- Fields per T1 §4.2 (event_id, type, entity_type, entity_id, commit_meta, actor, confidence, schema_version, attributes).
+- Fields per T2-ontology §3.1 (event_id, type, entity_type, entity_id, actor, confidence, schema_version, attributes; plus commit.recorded events terminating each commit's group with author/date/message_first_line in attributes).
 - No trailing whitespace, UTF-8, LF line endings.
-- Append-only. Manual edits break git-blame attribution — discipline enforced by hook ownership (M2 onward); M1 we hand-roll carefully.
+- **Append-only.** Manual edits break git-blame attribution. Discipline enforced by hook ownership in M2 onward; during M1 we hand-roll carefully.
+- Schema versioning per event allows ontology evolution without history rewrites. During T1 active authoring, `0.0.0-prehistoric` permits retro-migration; subsequent versions are migration-aware.
 
-### SQLite cache schema (v0.1)
-
-**Tables**:
+### 3.3 SQLite cache schema (v0.1)
 
 ```sql
 CREATE TABLE events (
   event_id        TEXT PRIMARY KEY,
   type            TEXT NOT NULL,
-  entity_type     TEXT NOT NULL,
-  entity_id       TEXT NOT NULL,
-  commit_meta     TEXT NOT NULL,        -- JSON
+  entity_type     TEXT,                 -- nullable for meta events (commit.recorded)
+  entity_id       TEXT,                 -- nullable for meta events
   actor           TEXT NOT NULL,
   confidence      TEXT NOT NULL,
   schema_version  TEXT NOT NULL,
   attributes      TEXT NOT NULL,        -- JSON
   line_no         INTEGER NOT NULL,     -- position in events.jsonl
-  commit_ref      TEXT                  -- resolved via git blame, NULL pre-resolve
+  commit_ref      TEXT,                 -- resolved via git blame, NULL pre-resolve
+  commit_author   TEXT,                 -- denormalised from terminal commit.recorded
+  commit_date     TEXT,                 -- denormalised
+  commit_message_first_line TEXT        -- denormalised
 );
 
 CREATE TABLE entities (
@@ -77,14 +98,26 @@ CREATE TABLE decisions (
   text                  TEXT NOT NULL,
   referenced_event_ids  TEXT NOT NULL    -- JSON array
 );
+
+CREATE TABLE commits (
+  commit_ref            TEXT PRIMARY KEY,
+  author                TEXT NOT NULL,
+  date                  TEXT NOT NULL,
+  message_first_line    TEXT NOT NULL,
+  commit_recorded_event_id  TEXT NOT NULL,
+  first_event_line_no   INTEGER NOT NULL,
+  last_event_line_no    INTEGER NOT NULL
+);
 ```
 
-**Indexes**:
-- `events`: `(entity_type, entity_id)`, `(type)`, `(commit_ref)`.
+The `commits` table denormalises commit groups for fast lookup and reverse navigation (commit_ref → events). The `events.commit_*` columns are denormalised for query convenience; canonical commit data lives in `commits`.
+
+**Indexes:**
+- `events`: `(entity_type, entity_id)`, `(type)`, `(commit_ref)`, `(commit_date)`.
 - `entities`: `(derived_state)`.
 - `relationships`: `(from_entity_type, from_entity_id)`, `(to_entity_type, to_entity_id)`, `(relationship_type)`.
 
-### projection.json shape
+### 3.4 projection.json shape
 
 ```json
 {
@@ -101,19 +134,10 @@ CREATE TABLE decisions (
     }
   },
   "relationships": [
-    {
-      "from": "plan:T1-top-level",
-      "to": "plan:T2-ontology",
-      "type": "spawns",
-      "source_event_id": "..."
-    }
+    { "from": "plan:T1-top-level", "to": "plan:T2-ontology", "type": "spawns", "source_event_id": "..." }
   ],
   "decisions": [
-    {
-      "event_id": "...",
-      "text": "...",
-      "explains_arcs": ["...", "..."]
-    }
+    { "event_id": "...", "text": "...", "explains_arcs": ["...", "..."] }
   ],
   "summary_stats": {
     "total_events": 0,
@@ -133,39 +157,80 @@ CREATE TABLE decisions (
 }
 ```
 
-Exact shape may evolve in M1 as the HTML view dictates what it actually wants to render — projection-shape and view-needs co-design.
+Shape may evolve in M1 as the HTML view drives concrete needs. Shape and view-needs co-design.
 
-### commit_ref derivation via git blame
-- `git blame --line-porcelain .agent-plan-tracker/events.jsonl` → per-line commit hash.
-- Populate `events.commit_ref` during cache build.
-- Bootstrap events get a real `commit_ref` once the bootstrap commit lands.
+### 3.5 commit_ref derivation via git blame
 
-## 4. T3 candidates
+The git commit hash is unknown pre-commit (computed from the tree which includes events.jsonl — chicken-and-egg). Resolution flow:
+
+1. Events in `events.jsonl` do **not** carry `commit_ref` directly.
+2. Cache builder runs `git blame --line-porcelain .agent-plan-tracker/events.jsonl` to attribute each line to its source commit.
+3. SQLite `events.commit_ref` populated this way.
+4. Git-less consumers identify events by `commit_meta` (carried on the terminal `commit.recorded` event of each commit's group) — always populated.
+5. Rebase/amend handled naturally: blame always reports the current history's hash.
+
+**Discipline:** `events.jsonl` is only appended to via the pre-commit hook (M2) or the manual extract path (M1 hand-roll). Manual edits break blame attribution.
+
+### 3.6 Snapshots — materialised state + frozen events with commit_refs
+
+(Out of scope for M1; designed here for forward compatibility.)
+
+Three purposes:
+1. **Agent orientation.** Session-start agents read the latest snapshot for current state rather than parsing the full event log. Bounded token cost.
+2. **Cache rebuild acceleration.** Cache builder reads frozen events (commit_refs already resolved) from the snapshot and only blames the delta since.
+3. **Team-readable status milestone.** Committed snapshots give humans a stable reference for "where things were at this point".
+
+Triggers: major plan completions, project milestones, on demand, or auto-rolling every N events (off by default during early use).
+
+Each snapshot directory contains:
+- `snapshot.json` — full state at snapshot time, including each entity's event-type sequence and the frozen events with their `commit_refs`.
+- `projection.json` — frozen projection for the HTML view to read when exploring history.
+- `summary.md` — human-readable digest: open/in-progress, just-closed since last snapshot, blocked, active relationships, quick stats. Notable sequence patterns highlighted (flapping closure, long-running blockers).
+
+### 3.7 Cache rebuild flow (M1)
+
+1. Read `events.jsonl` linewise (preserve line_no).
+2. For each line: parse JSON → validate against `schemas/<schema_version>/events.schema.json` from T2-ontology → insert into `events` table.
+3. Walk events in order, applying state-machine logic per T2-ontology §3.10 to materialise `entities`, `relationships`, `decisions`, `commits` tables.
+4. Run `git blame --line-porcelain events.jsonl` (if in a git repo) → populate `commit_ref` and denormalised commit columns.
+5. Verify integrity: every `commit.recorded` event accounted for; every event has a commit_ref (unless tail-pending); no fulcrum events without paired decisions (warn but don't fail — that's the M3 gate's job).
+
+In M3+ this becomes incremental (delta-from-snapshot).
+
+## 4. Swap-out points
+
+- **SQLite as cache backend.** Universal, file-based, sufficient for projected scale (thousands to low tens of thousands of events). Trigger to revisit: >30% of projection queries require multi-hop traversal (depth ≥ 3), or relationship-pattern matching becomes primary projection surface. Then evaluate embedded graph engines with GQL/Cypher support (KuzuDB, Cozo). GQL standardisation reduces historical lock-in risk.
+- **JSONL events as primary storage.** Append-only text, blame-friendly. Trigger to revisit: events become large or numerous enough that append-only text scanning becomes slow. Unlikely within this project's scale.
+
+## 5. T3 candidates
 
 ### M1-scheduled
-- `T3-cache-sqlite-schema` — write `CREATE TABLE` statements + the cache-build script (reads events.jsonl, validates against schema from T2-ontology, inserts into tables, materialises `entities` and `relationships`).
-- `T3-projection-json-shape` — finalise structure and write the emitter (SQL queries → JSON).
-- `T3-git-blame-commit-ref` — implement git-blame-based commit_ref resolution as part of (or alongside) cache build.
+- `T3-cache-sqlite-schema` — write `CREATE TABLE` statements + the cache-build script (reads events.jsonl, validates against T2-ontology schemas, populates all tables).
+- `T3-projection-json-shape` — finalise structure of projection.json (emitter logic lives in T2-projection; shape spec lives here).
+- `T3-git-blame-commit-ref` — implement git-blame-based commit_ref resolution as part of cache build.
 
 ### Later
-- `T3-snapshots-format` — M2/M3.
-- `T3-cache-incremental-rebuild` — performance optimisation, M3+.
-- `T3-projection-incremental-emit` — M3+ once full-rebuild becomes slow.
+- `T3-snapshots-format` (M2/M3) — snapshot JSON schema + generation script.
+- `T3-cache-incremental-rebuild` (M3+) — performance optimisation.
+- `T3-projection-incremental-emit` (M3+) — once full-rebuild becomes slow.
 
-## 5. Dependencies
+## 6. Dependencies
 
 - Depends on T2-ontology (schemas validate events before cache insertion).
 - Feeds T2-projection (cache is the projection source; projection.json shape defined here, emitter lives there).
+- Feeds T2-extraction (M2) — extraction appends to events.jsonl using this format.
 
-## 6. Open questions
+## 7. Open questions
 
-1. **JSON storage in SQLite.** Use JSON1 (`json_extract`) for ad-hoc queries vs pre-extract attributes into typed columns for indexing? Probably JSON1 for flexibility, with a few key fields promoted to typed columns if profiling demands.
-2. **commit_ref resolution timing.** Run git blame at every cache build (simple, slower) or cache blame results (faster, more state)? M1: naive every-build, profile if it bites.
+1. **JSON storage in SQLite.** JSON1 (`json_extract`) for flexible ad-hoc queries vs pre-extract attributes into typed columns for indexing? Probably JSON1 with key fields promoted to typed columns if profiling demands.
+2. **commit_ref resolution timing.** Naive `git blame` at every cache build (simple, slower) vs cache blame results (faster, more state)? M1 chooses naive; profile if it bites.
 3. **Cache regeneration cost.** O(N) in event count. For M1 (<100 events) trivial. Revisit when snapshots arrive.
-4. **Bootstrap event commit_meta correction.** When the bootstrap commit lands, the predicted commit_meta.message_first_line may not match the actual commit message. Either retroactively update the bootstrap events (allowed under 0.0.0-prehistoric) or commit with the message we predicted.
+4. **Bootstrap event commit_meta correction.** Bootstrap events predicted a commit message that may not exactly match what actually landed. Either retroactively update commit_meta on the relevant `commit.recorded` events (allowed under 0.0.0-prehistoric) or rely on git-blame to authoritatively resolve commit_ref + denormalise actual commit data into the cache.
+5. **Bootstrap line_no stability.** If the log is ever manually rewritten (e.g. retro-migration to 0.1.0 schema), line numbers shift. The `events.event_id` is stable; line_no is a cache implementation detail. Document this.
 
-## 7. Out of scope for this T2
+## 8. Out of scope for this T2
 
 - Snapshot format and snapshot-aware cache rebuild — M2/M3.
-- Concurrent-write safety (multiple agents appending simultaneously) — not relevant; pre-commit hook serialises.
+- Concurrent-write safety (multiple agents appending simultaneously) — pre-commit hook serialises.
 - Cache replication / multi-machine sync — out of scope; one repo, one log, one cache.
+- Encryption / compression of the event log — not relevant at projected scale.

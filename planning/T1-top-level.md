@@ -229,361 +229,47 @@ This project uses the methodology it captures. Plans live in `planning/`. Once w
 
 ## 4. What — concrete design
 
-### 4.1 Approach: sequential per-commit extraction
+Detailed architectural design lives in the **T2 thematic plans**. T1 keeps a high-level overview only — sufficient for an agent or human to orient on the project's shape, with pointers to the T2 plan owning each theme. Migration of architectural detail from T1 §4 into the T2 plans was performed as a methodology-conformance pass; see the philosophies on tier separation (`3-tier-rationale.md`, `golden-circle-grounding.md`) for the underlying discipline.
 
-One agent per commit. Each agent reads the existing reconciled event log (via the latest snapshot + delta since) before extracting events from its target commit's primary evidence (diff, message, file states via `git show`).
+### 4.1 Themes overview
 
-Reference resolution happens at extraction time because prior history is canonical when the agent runs. No best-guess IDs, no post-hoc reconciliation pass.
-
-For commits whose evidence is too large for one agent's context, the per-commit agent spawns sub-agents that handle parts of the diff. Each sub-agent returns its events to the parent; the parent composes and emits a consolidated report.
-
-Once a per-commit agent's report is appended to the log, the agent's working context is discarded. Only the structured events propagate forward — the master log never grows by the size of the diffs themselves.
-
-The very first extraction agent on a project has no prior log. Its output is the bootstrap state.
-
-Extraction is idempotent within an ontology version: re-running on the same commit produces the same events.
-
-### 4.2 Event ontology — 23 event types in 6 categories
-
-Each event carries common fields:
-
-- `event_id` — unique ID for this event (UUID or similar). Lets decisions reference arcs unambiguously; lets relationships point to specific events.
-- `type` — the event type (e.g. `entity.completed`).
-- `entity_type` — the kind of node it acts on (e.g. `plan`). Required for all events except meta events (`commit.recorded`).
-- `entity_id` — the canonical id within that type (e.g. `T2-ontology`). Required wherever `entity_type` is.
-- `actor` — value identifying the actor (github handle or canonical name slug). Persons are field values, not graph nodes.
-- `confidence` — `explicit` (stated in commit message or plan) or `derived` (inferred from diff + context).
-- `schema_version` — the ontology version this event was extracted against.
-- `attributes` — event-type-specific extras.
-
-**Commit metadata is carried once per commit, not on every event.** A single `commit.recorded` event terminates each commit's event group, carrying `author`, `date`, and `message_first_line` in its attributes. All events between the previous `commit.recorded` (or the start of the log) and the next `commit.recorded` belong to the closing one (**positional rollup**). This eliminates per-event redundancy when a commit emits many events.
-
-Notably **no `commit_ref` field in the JSONL** — see §4.7 for why and how commit hash is derived.
-
-**Entity lifecycle (9)**:
-- `entity.created` — first appearance.
-- `entity.extended` — content added (file grew with new section, addendum, line at end). Includes non-additive plan edits, since the methodology treats plan changes as inherently additive.
-- `entity.renamed` — filename/canonical name moved; identity preserved. **Fulcrum event** — decision required.
-- `entity.progressed` — work was done but didn't reach closure.
-- `entity.completed` — all per-file changes landed; verification claimed.
-- `entity.parked` — explicitly deferred. **Fulcrum event** — decision required.
-- `entity.cancelled` — won't be done. **Fulcrum event** — decision required.
-- `entity.superseded` — replaced by another entity (link required; takes `entity_ids[]` for one-to-many fork). **Fulcrum event** — decision required.
-- `entity.reopened` — previously closed, active again. **Fulcrum event** — decision required.
-
-**Decision (1)**:
-- `decision` — text annotation with a list of `event_ids` it explains. Required as a paired event for each of the 5 fulcrum events in the same commit; optional on any other event when justification is worth capturing structurally.
-
-**Blockers (3)**:
-- `blocker.raised` — external dependency flagged.
-- `blocker.progressed` — partial info received from external party.
-- `blocker.closed` — external dep resolved.
-
-**Verification (4) — flagged for ontology review (see §5)**:
-- `verification.claimed` — commit message or plan asserts completion.
-- `verification.tested` — tests written/ran, or a smoke recorded.
-- `verification.skipped` — plan's verification step never executed. Carries a `reason` attribute.
-- `verification.failed` — audit found gap; entity status reverts toward partial.
-
-**Relationships (5)**:
-- `relationship.spawns` — entity A's existence/completion led to entity B.
-- `relationship.depends-on` — A blocks B's progress.
-- `relationship.addendum-to` — A is an addendum within B.
-- `relationship.alongside` — co-evolving without dependency.
-- `relationship.reattached` — child moved from old parent to new parent (used in supersession cascade resolution).
-
-**Meta (1)**:
-- `commit.recorded` — emitted once per commit as the terminal event of that commit's group. Carries `author`, `date`, and `message_first_line` in its attributes. All preceding events back to the previous `commit.recorded` (or the start of the log) belong to this commit by positional rollup — no explicit event-id list required. Does not carry `entity_type` / `entity_id` (it has no subject entity; it's a boundary marker, not an action on a node). An incomplete trailing run of events with no closing `commit.recorded` represents in-progress extraction not yet sealed into a commit.
-
-Total: 9 + 1 + 3 + 4 + 5 + 1 = **23 events**.
-
-### 4.3 Fulcrum events and decisions
-
-Five events are **fulcrum events** — state-changes that deviate from natural progression and need explaining:
-
-1. `entity.renamed`
-2. `entity.parked`
-3. `entity.cancelled`
-4. `entity.superseded`
-5. `entity.reopened`
-
-Each fulcrum event requires a paired `decision` event in the same commit, listing the fulcrum event's `event_id` in its `event_ids` array. The decision carries the text annotation explaining the pivot.
-
-Decisions can also be attached optionally to any non-fulcrum event when the justification is worth capturing structurally rather than only in prose. One decision can list multiple `event_ids` when a single rationale explains several related arcs (e.g. a T2 supersession that spawns two replacement T2s — one decision, three arcs).
-
-Why this matters: every other event is **self-documenting** by nature.
-- Decisions, blockers, verifications, and relationships carry their meaning intrinsically — their type and attributes describe what happened and why.
-- Natural lifecycle progressions (created, extended, progressed, completed) describe themselves through the diff.
-- Fulcrum events alone need external annotation to make sense — they are the bends in an entity's trajectory.
-
-### 4.4 Graph node taxonomy — 5 entity types + arc metadata + actor field
-
-The graph contains three different things:
-
-**Entities (5)** — things with real lifecycles, subjects of work:
-
-1. **`plan`** — a planning artefact (per §2.2–2.4). Discriminated by a `plan_kind` attribute:
-   - `plan_kind: thematic` (per §2.2–2.3) — plans on the thematic axis. Carries `tier` (`0 | 1 | 2 | 3`) plus optional `tier_prefix` (single capital letter — omitted for the main spine, `"X"` for crosscut, any other letter for a side quest).
-   - `plan_kind: milestone` (per §2.4) — plans on the sequence axis. No `tier` or `tier_prefix`; carries a sequential `milestone_index` (1, 2, 3, …) instead.
-
-   Identity declared in plan frontmatter as a stable `id` field; **filename is load-bearing** (must equal `<id>.md` — see §4.6).
-
-   **T3 thematic plans additionally carry** `t2_parent: <T2-id>` (their thematic parent on the planning tree) and `milestone: <Mn-id>` (their scheduling target on the sequence axis). T1 and T2 plans don't need `t2_parent` (they sit at the top of the thematic spine or directly under T1); milestone plans don't need either (they sit on the orthogonal axis). XT/PT/etc. lettered workstream T3s also use `t2_parent` (pointing to their lettered T2) and `milestone` like regular T3s.
-2. **`blocker`** — an external dependency (per §2.6). Slug-identified.
-3. **`hitl-question`** — a human-in-the-loop question (per §2.6). Identifier: parent plan id + question number.
-4. **`implicit-work`** — work that shipped without a plan (per §2.7). Identifier auto-generated from short commit hash + message-slug.
-5. **`inbox-item`** — captured but not picked up (per §2.6). Identifier: date + slug from the inbox heading.
-
-**Arc metadata** — text annotations on events, not graph nodes:
-
-- **decisions** — see §4.3. Live in `events.jsonl` as `decision` events; each carries its own `event_id`, the text content, and a list of `event_ids` it explains. Many arcs can reference the same decision.
-
-**Field values** — not graphed:
-
-- **persons** — actors are referenced by handle or slug in the `actor` field on every event. Searchable as values; not nodes with edges, not entities. A person is just a fact stored in a register, not a thing being worked on.
-
-### 4.5 Derived entity states
-
-Five states an entity can be in, derived from its event history:
-
-- **live** — actively in scope, work continues or is ready to continue (after: created, extended, progressed, reopened).
-- **dormant** — explicitly deferred, may return (after: parked).
-- **dead** — terminally closed (after: completed, cancelled, superseded).
-- **orphaned** — parent died, awaiting resolution. Derived from graph state, not directly emitted.
-- **unknown** — ambiguous event chain, needs human review.
-
-**Orphan derivation**: when an entity's parent is superseded and the child has no subsequent `relationship.reattached`, `entity.cancelled`, or `entity.superseded` event, the child is derived as orphaned. Resolution comes via one of those events; the orphaned status then clears.
-
-### 4.6 ID scheme
-
-Events store `entity_type` and `entity_id` as separate fields. The composite `entity_type:entity_id` can be materialised for display.
-
-Per-type id derivation:
-
-| Type | Derivation | Illustrative example |
+| T2 plan | Theme | Key surfaces |
 |---|---|---|
-| `plan` (`plan_kind: thematic`) | Frontmatter `id` field declared at plan creation. Form: `<tier_prefix>T<tier>-<slug>` where `tier_prefix` is optional (omitted for the main spine, `X` for crosscut, any other capital letter for a side quest). Slug is semantic; optional shortid suffix for collision resolution. Stable across renames. **Filename is load-bearing: must match `entity_id` + `.md`.** | `T1-top-level`, `T2-ontology`, `XT2-analytics`, `PT3-client-editor` |
-| `plan` (`plan_kind: milestone`) | `M<n>-<slug>` — sequential milestone index plus descriptive slug. | `M1-bootstrap`, `M2-auto-extract` |
-| `blocker` | Hand-authored slug from blocker description. | `legal-review`, `vendor-api-access` |
-| `hitl-question` | Parent plan id + `.q<n>`. | `T2-ontology.q3`, `M1-bootstrap.q1` |
-| `implicit-work` | `impl.<short-commit-hash>.<message-slug>` — auto-generated. | `impl.a1b2c3d.silence-typecheck` |
-| `inbox-item` | `<date>.<title-slug>` — derived from the inbox heading. | `2026-04-15.handoff-form-textarea` |
+| [T2-ontology](T2-ontology.md) | Formal event + entity ontology | `events.schema.json`, `plan-frontmatter.schema.json`; 23 event types in 6 categories; 5 entity types + arc-metadata (decisions) + field values (persons); 5 derived states; fulcrum events; ID scheme; positional rollup |
+| [T2-storage](T2-storage.md) | Event log + cache + projection storage | `.agent-plan-tracker/events.jsonl` (canonical), `cache.sqlite` (queryable), `projection.json` (view-friendly), snapshots (later); git-blame commit_ref resolution |
+| [T2-projection](T2-projection.md) | Views and queries | projection.json emitter; markdown summary; HTML view (dynamic-from-data, vanilla JS); SQL query catalogue; cleanliness gate composite (M3) |
+| [T2-packaging](T2-packaging.md) | Plugin scaffold + distribution | Plugin directory layout; `.claude-plugin/plugin.json` manifest; repack-and-validate loop; (M4) npm bundle + project-init install flow |
+| [T2-extraction](T2-extraction.md) | Per-commit extraction + merge lifecycle | Pre-commit hook (M2); sequential per-commit extractor; sub-agent recursion; ambiguity halting; pre-merge-to-main cleanliness gate (M3); merge conflict handling |
+| [T2-ingest](T2-ingest.md) | Backfill + retrospective mapping | One-shot opt-in backfill workflow (M5); retrospective mapping note for non-native projects; resumability; archived after completion |
 
-Decisions and persons don't follow this scheme. Decisions have only their `event_id` like any event. Persons are handle/slug values in the `actor` field.
+Each T2 owns the architectural detail for its theme. T1 evolves only when the overall project shape changes (intent, themes, audience, methodology). Architectural shifts within a theme update the relevant T2.
 
-Renames: canonical ID is established at `entity.created` and persists across `entity.renamed` events. The rename event records the filename/name change as metadata, but the entity ID does not change. Enforced by frontmatter-declared `id` on plans — moving the file doesn't change the id inside.
+### 4.2 Cross-cutting principles
 
-Sequential task numbering (e.g. `task-1`, `task-2`) is avoided in favour of semantic slugs to prevent parallel-branch collisions.
+Captured as standalone documents in `agent-plan-tracker/philosophies/`:
 
-### 4.7 Storage architecture
+- [3-tier-rationale.md](../agent-plan-tracker/philosophies/3-tier-rationale.md) — why T1/T2/T3 (and Mn) with strict separation.
+- [golden-circle-grounding.md](../agent-plan-tracker/philosophies/golden-circle-grounding.md) — Why → How → What for downstream agents.
+- [top-down-from-job.md](../agent-plan-tracker/philosophies/top-down-from-job.md) — architectural choices trace to concrete jobs.
+- [disposable-etl.md](../agent-plan-tracker/philosophies/disposable-etl.md) — bridge code is throwaway by design.
+- [swap-out-surfaces.md](../agent-plan-tracker/philosophies/swap-out-surfaces.md) — every framework choice annotated with swap-out triggers.
+- [empirical-prompt-architecture.md](../agent-plan-tracker/philosophies/empirical-prompt-architecture.md) — start static, iterate from real failures.
+- [tracker-as-agent-memory.md](../agent-plan-tracker/philosophies/tracker-as-agent-memory.md) — the event log substitutes for agent memory across sessions.
 
-Three-tier storage. Text primary + binary derived cache + materialized snapshots + JSON projection.
+The plugin's skills surface these to downstream agents for judgement-call grounding.
 
-**Repo layout** in any project using the plugin:
+### 4.3 Methodology surfaces (recap from §2)
 
-```
-.agent-plan-tracker/
-  events.jsonl              # primary, append-only, source of truth
-  cache.sqlite              # derived from events.jsonl, regenerable
-  projection.json           # current projection for HTML view
-  snapshots/
-    <YYYY-MM-DD>-<label>/
-      snapshot.json
-      projection.json
-      summary.md
-  schema-version.txt
-```
+The methodology produces these tracked artefacts:
 
-**Primary: JSONL events log**
+- **Plans** — `T<n>-<slug>.md`, `M<n>-<slug>.md`, `XT<n>-<slug>.md` (crosscut), `<L>T<n>-<slug>.md` (lettered side quests). Filename load-bearing; equals `entity_id + .md`.
+- **Decisions** — text annotations on events, not nodes. Required as paired events for the 5 fulcrum events. See T2-ontology §3.3.
+- **Blockers** — external dependencies with raised / progressed / closed lifecycle. See T2-ontology §3.4.
+- **HITL questions** — inline in plans; trackable entities. See T2-ontology §3.9.
+- **Inbox** — append-only capture surface for ideas not yet earning a plan, at `.agent-plan-tracker/inbox/`. Prehistoric implementation; full lifecycle per T1 §2.6.
+- **Implicit work** — catch-all for commits with no corresponding plan. See T2-ontology §3.9.
 
-- Append-only, line-delimited JSON. One event per line.
-- Per-commit extraction (the pre-commit hook) appends to `events.jsonl` and stages it for inclusion in the commit being made.
-- Diff-friendly (text), merge-friendly (append-only), commit-able.
-- Schema versioning per event so the ontology can evolve without rewriting history. During T1 active authoring, schema `0.0.0-prehistoric` is used; retroactive migration of these events into a stable schema is acceptable when one ships — it won't remove information, only adjust representation.
-
-**Cache: SQLite**
-
-- Rebuilt from `events.jsonl` on demand. Committed for read-performance but not source of truth.
-- Tables: `events` (raw rows, with `commit_ref` populated via `git blame`), `entities` (materialized current state per entity), `decisions` (denormalised text + referenced `event_ids[]`), `relationships` (graph edges).
-- Indexes on `entity_type`, `entity_id`, `event_type`, `commit_date`, `event_id`.
-
-Why SQLite (vs alternatives): universal, embeddable, file-based, mature tooling. Sufficient for projected scale. Swap-out trigger documented in §4.10.
-
-**Projection: projection.json**
-
-A derived snapshot of current state in JSON form. The HTML view layer reads this. Generated on demand from the SQLite cache. Includes per-entity event-type sequence (just type names, no full payloads) — the sequence itself is a signal of how complex an entity's backstory is.
-
-**Commit-ref derivation via git blame**
-
-The git commit hash is unknown pre-commit (computed from the tree which includes the events file — chicken-and-egg). Resolution:
-
-- JSONL events do *not* carry `commit_ref` directly.
-- The cache builder runs `git blame --line-porcelain .agent-plan-tracker/events.jsonl` to attribute each event line to its source commit.
-- Cache's `events` table includes `commit_ref` as a column populated this way.
-- Git-less consumers identify events by `commit_meta` (author + date + message-first-line) which is always populated.
-- Rebase/amend handled naturally: blame always reports the current history's hash.
-
-Discipline: `events.jsonl` is only appended to via the pre-commit hook (or the manual extract path). Manual edits break blame attribution.
-
-**Snapshots — materialized state + frozen events with commit_refs**
-
-Snapshots serve three purposes:
-1. **Agent orientation**: session-start agents read the latest snapshot for current state rather than parsing the full event log. Bounded token cost.
-2. **Cache rebuild acceleration**: the cache builder reads frozen events (commit_refs already resolved) from the snapshot and only blames the delta since.
-3. **Team-readable status milestone**: committed snapshots give humans a stable reference for "where things were at this point".
-
-Triggers: major plan completions, project milestones, on demand, or auto-rolling every N events (off by default during early use).
-
-Each snapshot directory contains:
-- `snapshot.json` — full state at snapshot time, including each entity's event-type sequence and the frozen events with their `commit_refs`.
-- `projection.json` — frozen projection for the HTML view to read when exploring history.
-- `summary.md` — human-readable digest: open/in-progress entities, just-closed since last snapshot, blocked, active relationships, quick stats. Notable sequence patterns highlighted (flapping closure, long-running blockers, etc.).
-
-### 4.8 Extraction and merge lifecycle
-
-**Pre-commit hook — extract events, never gates on cleanliness**
-
-- Runs the extraction agent before each commit is finalised. Installed via the plugin's project-init command.
-- Reads staged diff + commit message file, extracts events, appends to `events.jsonl`, stages the updated log.
-- **Happy path**: commit proceeds, capturing substantive changes + their events atomically in one commit.
-- **Ambiguity halt**: hook exits non-zero, commit blocked, recommendation written to `.agent-plan-tracker/needs-review/<staged-summary>.md`, human resolves, retries.
-- **Alternative for hook-averse setups**: manual extract invocation before manual commit.
-
-The pre-commit hook deliberately does **not** enforce projection cleanliness (no orphan checks, no fulcrum-without-decision checks). Sub-agents commit freely on work branches; mess is allowed locally.
-
-**Pre-merge-to-main gate — projection-must-be-clean**
-
-Methodology cleanliness is enforced at the merge-to-main boundary, not at every commit. Work trees can carry orphans, unclosed verification claims, and other in-progress mess. Main cannot.
-
-Implementation:
-- **Local hook (convenience)**: pre-push hook on the developer's machine refuses pushes to main if the projection isn't clean.
-- **Server-side hook (enforcement)**: CI check on PRs targeting main that runs the projection-clean check and fails the PR if any of: orphans exist, fulcrum events without paired decisions, configurable verification smells, or other defined smells.
-- **Override path**: human can override with an explicit decision event recording why the mess was acknowledged-and-deferred.
-
-This split — extraction at commit, cleanliness gate at merge — accommodates sub-agents committing freely on branches while keeping main canonical.
-
-**Merge conflicts**
-
-Merge commits run through extraction like any other. When two branches' event logs produce contradictions on merge (one branch closed a plan, the other extended it; competing renames for one entity), the hook:
-
-1. Refuses the merge commit; recommendation written to `.agent-plan-tracker/merge-conflicts/<merge-id>.md`.
-2. Asks the human. Human reviews, approves the recommendation or supplies a different resolution.
-3. Re-attempts the commit with the resolved event log.
-
-The 9-in-10 case: human reads the recommendation, says "looks good", merge proceeds. The 1-in-10 case: human knows context the agent doesn't, redirects. No silent drift past the commit boundary.
-
-**Backfill is opt-in, never automatic**
-
-If an agent in an interactive session notices that extraction is behind (commits exist with no events — project pre-dates the plugin, someone used `--no-verify`), it does **not** auto-backfill. It surfaces:
-
-> "There are N commits without extracted events. Recommend backfilling all N (~X min estimated). Approve?"
-
-…and waits. Agent recommends; human gates.
-
-For projects with planning conventions that don't natively match this methodology, the backfill workflow produces a **retrospective mapping note** — a one-shot translation artefact that explains how the project's existing planning artefacts correspond to this methodology's vocabulary. The per-commit extraction agent uses it as a brief. After backfill, it's archived but not actively referenced; the extracted events are canonical from then on.
-
-### 4.9 HTML view — dynamic from projection.json
-
-The plugin ships an HTML template that reads `projection.json` at load time and renders the project's current state. Templated, debuggable, no hosting needed. Claude can open the HTML directly for the user.
-
-**Why dynamic, not static-per-event:**
-
-1. Data and presentation change at different cadences — events arrive continuously, rendering logic is stable.
-2. Interactivity (filter, expand, snapshot-switch) falls out for free with JS-against-data; static rebuild forces JS anyway for any interaction.
-3. Time-travel is trivial: pointing the loader at `snapshots/<date>/projection.json` instead of the live `projection.json` is a one-line change.
-4. Debuggability: fix the template once, refresh, done. No regeneration cycle.
-5. Token cost: generating fresh JSON is mechanical SQL→JSON. Generating fresh HTML burns tokens.
-6. The data layer becomes a first-class API consumable by other clients too.
-
-Implementation shape:
-- Pure HTML + vanilla JS + JSON data file. No build step.
-- JS fetches `projection.json`, renders entity state, event sequences, relationships, and fulcrum-with-decision arcs as clickable nodes/edges.
-- Clicking a fulcrum arc reveals the attached decision text.
-
-Two views to prioritise:
-1. **Entity state board** — entities grouped by derived state (live / dormant / dead / orphaned / unknown), each entity's event-type sequence visible.
-2. **Plan hierarchy tree** — T1 at root, T2s under it, T3s under those, lettered workstreams as siblings of the main T1. Each node shows derived state.
-
-### 4.10 Swap-out points
-
-Annotated places where the design intentionally accepts a specific tradeoff that we may revisit:
-
-- **SQLite as cache backend.** Universal, file-based, sufficient for projected scale. Trigger to revisit: more than ~30% of projection queries require multi-hop traversal (depth ≥ 3), or relationship-pattern matching becomes a primary projection surface. Then evaluate embedded graph engines with GQL/Cypher support (KuzuDB, Cozo). GQL stabilising as a standard reduces the historical lock-in risk of graph engines.
-- **Pure HTML + vanilla JS for the view layer.** Zero dependencies. Trigger to revisit: views need significant interactive complexity that vanilla JS makes painful. Then consider a minimal framework (lit-html, Preact) — but avoid a build-step-required SPA.
-- **JSONL events as primary storage.** Append-only text, blame-friendly. Trigger to revisit: events become large or numerous enough that append-only text scanning becomes slow. Unlikely within this project's scale.
-
-### 4.11 Plugin structure
-
-The plugin follows Claude Code's standard plugin layout (manifest in `.claude-plugin/`, auto-discovered component directories at plugin root) plus custom directories for this project's tracker-specific content.
-
-```
-agent-plan-tracker/                          # plugin root (at repo root)
-  .claude-plugin/
-    plugin.json                              # manifest — required location
-  README.md
-  commands/
-    <slash command .md files>                # auto-discovered (e.g. /apt-extract)
-  agents/
-    <subagent .md files>                     # auto-discovered (e.g. M2 extraction agent)
-  skills/
-    using-agent-plan-tracker/
-      SKILL.md                               # formal spec, full ontology, full schema
-  hooks/
-    hooks.json                               # event-handler configuration
-    scripts/
-      pre-commit                             # installed into target's .git/hooks/
-      pre-push                               # installed into target's .git/hooks/
-  scripts/
-    <utility scripts the plugin invokes via Claude's Bash tool>
-  schemas/
-    events.schema.json
-    plan-frontmatter.schema.json
-  view/
-    index.html                               # HTML view template
-    app.js                                   # JS that loads projection.json
-    style.css
-  cheatsheet/
-    cheatsheet.md                            # common operations, one-liners
-    worked-examples/
-      find-stalled-plans.md
-      audit-verification-gaps.md
-      trace-decision-history.md
-      pre-merge-cleanliness-check.md
-  philosophies/
-    3-tier-rationale.md
-    golden-circle-grounding.md
-    top-down-from-job.md
-    disposable-etl.md
-    swap-out-surfaces.md
-    empirical-prompt-architecture.md
-    tracker-as-agent-memory.md
-```
-
-**Conformance vs custom directories.** `.claude-plugin/`, `commands/`, `agents/`, `skills/`, `hooks/` follow Claude Code's plugin spec and use its auto-discovery conventions (e.g. skills must be `skills/<name>/SKILL.md`, hooks declared in `hooks/hooks.json`). The remaining directories (`scripts/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`) are this project's own content surfaces, referenced by the plugin's commands/hooks/skills via `${CLAUDE_PLUGIN_ROOT}` (the Claude-supplied env var pointing at the plugin's install root).
-
-**Plugin instruction shape**
-
-The skill tells downstream agents:
-
-- Prefer `scripts/<script>` over generating SQL from scratch — major token saving.
-- If you find yourself generating a useful query repeatedly, save it to `scripts/local/<descriptive-name>.sql` for future agents and humans. Lookup order: `scripts/` → `scripts/local/` → generate-from-scratch-and-save.
-- For ontology/schema questions, go to `skills/using-agent-plan-tracker.md`. For common operations, `cheatsheet/cheatsheet.md`. For worked scenarios, `cheatsheet/worked-examples/`. The formal spec is the floor, not the everyday surface.
-- The plugin's `philosophies/` content grounds judgement calls when instructions don't anticipate something.
-
-### 4.12 Artefact strategy
-
-The plugin is aimed at **developers**, with the caveat that it also needs to be usable in **Claude Cowork** (Cowork is filesystem-accessing, not browser-only — it's Claude Code with reduced jargon for less-technical users). Cowork is particularly useful when a user wants to work at the T1/T2 (project-management) altitude rather than the T3 (execution) altitude.
-
-The artefact strategy (suggestion — T2 to confirm details):
-
-- A **developer-installed package** (likely npm) that bundles:
-  - CLI scripts installed to the user's PATH.
-  - Claude plugin files (skills, commands, hooks, view template, philosophies) installed to the user's Claude config directory.
-- One install command sets up both.
-- The Claude plugin works in both Claude Code and Claude Cowork automatically.
-- The plugin's project-init command writes git hooks into the target project's `.git/hooks/`.
-
-Naming TBD — `apt` was rejected due to namespace collision with Debian/Ubuntu's package manager.
+The tracker (T2-storage + T2-projection) enforces visibility on each.
 
 ---
 
