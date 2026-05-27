@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T18:45:45Z
+# Project state — generated 2026-05-27T18:49:48Z
 
-**Total events:** 146  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Dead:** 12  ·  **Orphaned:** 0
+**Total events:** 150  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 13  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -15,7 +15,7 @@
   - `T2-ingest` (2 events): entity.created → relationship.spawns
   - `T2-ontology` (4 events): relationship.spawns → entity.extended → entity.progressed
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
-  - `T2-projection` (10 events): entity.progressed → analysis.live-summary → entity.progressed
+  - `T2-projection` (11 events): analysis.live-summary → entity.progressed → entity.progressed
   - `T2-storage` (6 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(milestone)**
@@ -35,9 +35,6 @@
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
 
-- **T2-projection**
-  - `T3-flow-view-density` (2 events): entity.created → relationship.spawns
-
 - **T2-storage**
   - `T3-cache-build` (3 events): entity.completed → verification.tested → entity.progressed
 
@@ -51,7 +48,6 @@
 
 - **M1-bootstrap**
   - `T3-cache-build`
-  - `T3-flow-view-density`
 
 ## Blocked
 
@@ -69,10 +65,10 @@ _No orphaned entities._
 - `T3-analyser-phase-c-flow-rendering` (plan)
 - `T3-build-loop` (plan)
 - `T3-events-schema-json` (plan)
+- `T3-flow-view-density` (plan)
 - `T3-html-view` (plan)
 - `T3-markdown-summary` (plan)
 - `T3-plan-frontmatter-schema` (plan)
-- `T3-plugin-scaffold` (plan)
 
 ## Notable patterns
 
@@ -80,7 +76,7 @@ _No flapping closures._
 
 ## Milestone progress
 
-- **M1-bootstrap**: 8/10 T3 complete (80%); 2 live
+- **M1-bootstrap**: 9/10 T3 complete (90%); 1 live
 - **M6-analyser**: 3/3 T3 complete (100%); 0 live
 
 ---
