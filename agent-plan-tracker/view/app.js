@@ -187,7 +187,7 @@ function renderFlow(projection, events, content) {
   legend.className = "flow-legend";
   legend.innerHTML = `
     <strong>Legend:</strong>
-    <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#c2185b"/></svg> created</span>
+    <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#e91e63"/></svg> created</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#1565c0"/></svg> extended</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#ef6c00"/></svg> progressed</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#1b5e20"/></svg> completed</span>
@@ -207,8 +207,24 @@ function renderFlow(projection, events, content) {
 
   const svgWrap = document.createElement("div");
   svgWrap.className = "flow-svg-wrap";
+
+  // Task A: sticky HTML gutter overlaying the SVG's left margin. Contains
+  // swimlane labels + per-entity labels as absolutely-positioned rows that
+  // share y-coordinates with the SVG underneath. position:sticky;left:0
+  // pins it during horizontal scroll. SVG keeps drawing swimlane bgs.
+  const gutter = document.createElement("div");
+  gutter.className = "flow-gutter";
+  gutter.style.setProperty("--gutter-width", "220px");
+  gutter.style.height = layout.totalHeight + "px";
+  renderFlowGutter(layout, gutter);
+  svgWrap.appendChild(gutter);
+
   svgWrap.appendChild(renderFlowSVG(layout));
   split.appendChild(svgWrap);
+
+  // Wire the gutter resize handle.
+  const gHandle = gutter.querySelector(".flow-gutter-drag-handle");
+  if (gHandle) makeGutterResizable(gHandle, gutter);
 
   const handle = document.createElement("div");
   handle.className = "flow-drag-handle";
@@ -229,10 +245,17 @@ function renderFlow(projection, events, content) {
 }
 
 function computeFlowLayout(projection, events, mode) {
-  const LEFT_MARGIN = 230;
-  const TOP_MARGIN = 110;
-  const COMMIT_WIDTH = 150;
-  const NOW_COLUMN_WIDTH = 180;
+  // LEFT_MARGIN now small — the sticky HTML gutter (Task A) holds entity +
+  // swimlane labels, so the SVG no longer needs to reserve space for them.
+  // TOP_MARGIN larger to give vertical commit labels (Task B, rotate -90)
+  // room to breathe.
+  const LEFT_MARGIN = 16;
+  const TOP_MARGIN = 170;
+  // Commit columns shrunk dramatically (Task B). Vertical labels need only
+  // ~font-height of horizontal space per column; previous 150 was to fit
+  // a -28° rotated label's wedge.
+  const COMMIT_WIDTH = 44;
+  const NOW_COLUMN_WIDTH = 110;
   const ROW_HEIGHT = 22;
   const SWIMLANE_PADDING = 18;
   const NODE_RADIUS = 6;
@@ -450,7 +473,7 @@ function computeFlowLayout(projection, events, mode) {
 
   return {
     nodes, entityNodes, relEdges, continuations, nowBadges, summaryNodes,
-    swimlaneSpans, commits, commitMap,
+    swimlaneSpans, commits, commitMap, entityRow, eventToCommit,
     LEFT_MARGIN, TOP_MARGIN, COMMIT_WIDTH, NOW_COLUMN_WIDTH, ROW_HEIGHT, NODE_RADIUS,
     nowX, totalWidth, totalHeight,
   };
@@ -500,7 +523,7 @@ function dominantEventColor(eventList) {
   if (types.has("entity.completed")) return "#1b5e20";
   if (types.has("verification.failed")) return "#d32f2f";
   // Birth (pink/magenta — distinct from any green).
-  if (types.has("entity.created")) return "#c2185b";
+  if (types.has("entity.created")) return "#e91e63";
   if (types.has("entity.progressed")) return "#ef6c00";
   if (types.has("entity.extended")) return "#1565c0";
   if (types.has("blocker.raised")) return "#d32f2f";
@@ -534,7 +557,9 @@ function renderFlowSVG(layout) {
   svg.setAttribute("width", layout.totalWidth);
   svg.setAttribute("height", layout.totalHeight);
 
-  // Swimlane backgrounds
+  // Swimlane backgrounds. (Labels moved to the sticky HTML gutter — Task A.)
+  // SVG still draws full-width banded rects underneath the gutter so banding
+  // remains visible in the right-hand commit area where the gutter doesn't reach.
   const swG = createNS("g", { class: "swimlanes" });
   layout.swimlaneSpans.forEach((sl, i) => {
     swG.appendChild(createNS("rect", {
@@ -543,34 +568,13 @@ function renderFlowSVG(layout) {
       width: layout.totalWidth,
       height: sl.bottom - sl.top,
     }));
-    swG.appendChild(textNS({
-      class: "swimlane-label",
-      x: 12, y: sl.top + 22,
-    }, sl.label));
-    // Per-entity sub-label
-    for (const ek of sl.entities) {
-      const yMid = layout.entityNodes[ek]?.[0]?.y;
-      if (yMid === undefined) {
-        // Compute from entityRow approximation: skip if unknown
-        continue;
-      }
-      // entity short label on the left, full id available via <title>
-      const entity = state.projection.entities[ek];
-      const short = entity.entity_id.length > 28 ? entity.entity_id.slice(0, 26) + "…" : entity.entity_id;
-      const labelEl = textNS({
-        class: "entity-label",
-        x: 28, y: yMid + 3,
-      }, short);
-      const titleEl = createNS("title");
-      titleEl.textContent = entity.entity_id + " (click to open)";
-      labelEl.appendChild(titleEl);
-      labelEl.addEventListener("click", () => showPlanMarkdown(entity));
-      swG.appendChild(labelEl);
-    }
   });
   svg.appendChild(swG);
 
-  // Commit column guides + rotated labels at top
+  // Commit column guides + VERTICAL labels at top (Task B).
+  // Labels rotate -90° (bottom-to-top) so columns can shrink to ~44px wide.
+  // Each commit gets a transparent hit-rect overlay so hover+click are easy
+  // to target (the rotated text itself would be a slim hit target).
   const colG = createNS("g", { class: "columns" });
   for (const c of layout.commits) {
     const x = layout.LEFT_MARGIN + c.idx * layout.COMMIT_WIDTH + layout.COMMIT_WIDTH / 2;
@@ -579,16 +583,41 @@ function renderFlowSVG(layout) {
       x1: x, y1: layout.TOP_MARGIN - 5,
       x2: x, y2: layout.totalHeight - 10,
     }));
+    // Vertical label group anchored at the bottom of the label band, rotated
+    // -90° so text reads upward. text-anchor:end on the underlying tspan
+    // keeps the truncated string flush against the column.
+    const labelY = layout.TOP_MARGIN - 8;
     const g = createNS("g", {
-      transform: `translate(${x},${layout.TOP_MARGIN - 12}) rotate(-28)`,
+      transform: `translate(${x},${labelY}) rotate(-90)`,
     });
-    const truncated = c.message.length > 42 ? c.message.slice(0, 42) + "…" : c.message;
-    g.appendChild(textNS({
-      class: "commit-label",
-      x: 0, y: 0,
+    const truncated = c.message.length > 32 ? c.message.slice(0, 30) + "…" : c.message;
+    const textEl = textNS({
+      class: "commit-label commit-label-vertical",
+      x: 0, y: 4,
       "text-anchor": "start",
-    }, truncated));
+    }, truncated);
+    g.appendChild(textEl);
     colG.appendChild(g);
+
+    // Transparent hit-rect covering the label column area for hover/click.
+    // Sits in unrotated space; spans from top of svg down to the swimlanes.
+    const hit = createNS("rect", {
+      class: "commit-hit",
+      x: x - layout.COMMIT_WIDTH / 2 + 1,
+      y: 2,
+      width: layout.COMMIT_WIDTH - 2,
+      height: layout.TOP_MARGIN - 4,
+      fill: "transparent",
+      style: "cursor: pointer;",
+    });
+    const titleEl = createNS("title");
+    titleEl.textContent = `${c.message}\n${c.date}`;
+    hit.appendChild(titleEl);
+    hit.addEventListener("mouseenter", (e) => showCommitTooltip(e, c));
+    hit.addEventListener("mousemove", (e) => moveTooltip(e));
+    hit.addEventListener("mouseleave", hideTooltip);
+    hit.addEventListener("click", () => showCommitDetail(c, layout));
+    colG.appendChild(hit);
   }
   // "Now" guide
   colG.appendChild(createNS("line", {
@@ -736,6 +765,85 @@ function renderFlowSVG(layout) {
 }
 
 // ---------------------------------------------------------------------------
+// Flow gutter (Task A — sticky entity-name column)
+// ---------------------------------------------------------------------------
+//
+// The gutter is a position:sticky HTML overlay that lives inside the
+// horizontally-scrolling .flow-svg-wrap. It renders swimlane labels and
+// per-entity labels at the same y-coordinates as the SVG underneath, so
+// when the user scrolls horizontally the labels stay pinned at the left
+// edge while the SVG's commit columns scroll past.
+
+function renderFlowGutter(layout, gutter) {
+  // Drag handle on right edge.
+  const handle = document.createElement("div");
+  handle.className = "flow-gutter-drag-handle";
+  handle.title = "Drag to resize the entity-name column";
+  gutter.appendChild(handle);
+
+  // Swimlane label headers — one per band, at the swimlane's top.
+  for (const sl of layout.swimlaneSpans) {
+    const div = document.createElement("div");
+    div.className = "flow-gutter-swimlane";
+    div.style.top = (sl.top + 4) + "px";
+    div.textContent = sl.label;
+    gutter.appendChild(div);
+  }
+
+  // Per-entity rows.
+  for (const sl of layout.swimlaneSpans) {
+    for (const ek of sl.entities) {
+      // Prefer entityRow (set even for entities without nodes); fall back
+      // to first node's y for defensive resilience.
+      const yMid = (layout.entityRow && layout.entityRow[ek] !== undefined)
+        ? layout.entityRow[ek]
+        : layout.entityNodes[ek]?.[0]?.y;
+      if (yMid === undefined) continue;
+      const entity = state.projection.entities[ek];
+      if (!entity) continue;
+      const row = document.createElement("div");
+      row.className = "flow-gutter-row";
+      row.style.top = (yMid - 9) + "px";  // center on the lifeline (height=18)
+      row.textContent = entity.entity_id;
+      row.title = entity.entity_id + " (click to open)";
+      row.addEventListener("click", () => showPlanMarkdown(entity));
+      gutter.appendChild(row);
+    }
+  }
+}
+
+function makeGutterResizable(handle, gutter) {
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 220;
+  handle.addEventListener("mousedown", (e) => {
+    dragging = true;
+    startX = e.clientX;
+    const cur = parseInt(getComputedStyle(gutter).getPropertyValue("width"), 10);
+    startWidth = isNaN(cur) ? 220 : cur;
+    handle.classList.add("dragging");
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const delta = e.clientX - startX;
+    const newWidth = Math.min(360, Math.max(80, startWidth + delta));
+    gutter.style.setProperty("--gutter-width", newWidth + "px");
+  });
+  document.addEventListener("mouseup", () => {
+    if (dragging) {
+      dragging = false;
+      handle.classList.remove("dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Tooltip + detail
 // ---------------------------------------------------------------------------
 
@@ -781,6 +889,58 @@ function hideTooltip() {
   if (tooltipEl) tooltipEl.style.display = "none";
 }
 
+// Commit-label hover tooltip. Re-uses the existing #flow-tooltip element
+// but populates a commit-shaped payload instead of an entity-node one.
+function showCommitTooltip(e, c) {
+  const t = getTooltip();
+  t.innerHTML = `
+    <div class="tt-id">commit #${c.idx + 1}</div>
+    <div class="tt-commit">${escapeHtml(c.message || "")}</div>
+    <div class="tt-types">${escapeHtml(c.date || "")} · ${escapeHtml(c.author || "")}</div>
+  `;
+  moveTooltip(e);
+  t.style.display = "block";
+}
+
+// Per-commit detail panel in the sidebar (Task B). Lists all events
+// bracketed by this commit, grouped by entity, with event-pills + summaries.
+function showCommitDetail(commit, layout) {
+  const panel = document.getElementById("flow-detail");
+  if (!panel) return;
+  // Walk events.jsonl and collect everything whose bracketing commit matches.
+  const e2c = layout.eventToCommit;
+  const bracketed = state.events.filter(ev =>
+    ev.type !== "commit.recorded" && e2c.get(ev.event_id) === commit.id
+  );
+  // Group by entity for readability.
+  const byEntity = {};
+  for (const ev of bracketed) {
+    const key = ev.entity_id ? `${ev.entity_type}:${ev.entity_id}` : "(no-entity)";
+    (byEntity[key] ||= []).push(ev);
+  }
+  const parts = [];
+  parts.push(`<h3 class="md-title">Commit #${commit.idx + 1}</h3>`);
+  parts.push(`<p class="detail-commit"><strong>${escapeHtml(commit.message || "")}</strong><br>`);
+  parts.push(`<span class="detail-date">${escapeHtml(commit.date || "")} · ${escapeHtml(commit.author || "")}</span></p>`);
+  parts.push(`<p class="meta-line">${bracketed.length} event${bracketed.length === 1 ? '' : 's'} in this commit across ${Object.keys(byEntity).length} entit${Object.keys(byEntity).length === 1 ? 'y' : 'ies'}.</p>`);
+  if (!bracketed.length) {
+    parts.push("<p class='hint'>(no events bracketed by this commit — meta-only commit, e.g. tooling/docs without a tracked plan)</p>");
+  } else {
+    for (const [ekey, evs] of Object.entries(byEntity)) {
+      const entity = state.projection.entities[ekey];
+      const entityLabel = entity
+        ? `<span class="badge ${entity.derived_state}">${entity.derived_state}</span> <strong>${escapeHtml(entity.entity_id)}</strong>`
+        : `<em>${escapeHtml(ekey)}</em>`;
+      parts.push(`<div style="margin: 0.6rem 0 0.3rem;">${entityLabel}</div>`);
+      parts.push("<ul class='event-list'>");
+      for (const ev of evs) parts.push(renderEventLi(ev));
+      parts.push("</ul>");
+    }
+  }
+  panel.innerHTML = parts.join("");
+  attachReadMoreToggles(panel);
+}
+
 function showDetail(n) {
   const panel = document.getElementById("flow-detail");
   if (!panel) return;
@@ -793,8 +953,69 @@ function showDetail(n) {
     parts.push(renderEventLi(ev));
   }
   parts.push("</ul>");
+  // Task C: spawn-relationships navigation.
+  parts.push(spawnRelationshipsSection(n.entity));
   panel.innerHTML = parts.join("");
   attachReadMoreToggles(panel);
+  attachSpawnRelClickHandlers(panel);
+}
+
+// Task C — return an HTML string listing the entity's spawn parents and
+// children, plus tags distinguishing event-sourced vs frontmatter-derived
+// edges. Empty string if neither direction has any rows (caller appends
+// unconditionally; an empty string is a no-op insert).
+function spawnRelationshipsSection(entity) {
+  if (!entity || !state.projection) return "";
+  const ekey = `${entity.entity_type}:${entity.entity_id}`;
+  const rels = state.projection.relationships || [];
+  const parents = [];
+  const children = [];
+  for (const r of rels) {
+    if (r.type !== "spawns") continue;
+    if (r.to === ekey) parents.push(r);
+    else if (r.from === ekey) children.push(r);
+  }
+  if (!parents.length && !children.length) return "";
+  const parts = [];
+  parts.push(`<div class="spawn-rel-section">`);
+  parts.push(`<h4 class="spawn-rel-header">Spawn relationships</h4>`);
+  if (parents.length) {
+    parts.push(`<div class="spawn-rel-group"><div class="spawn-rel-label">spawned by</div>`);
+    for (const r of parents) parts.push(renderSpawnRow(r, r.from));
+    parts.push(`</div>`);
+  }
+  if (children.length) {
+    parts.push(`<div class="spawn-rel-group"><div class="spawn-rel-label">spawns</div>`);
+    for (const r of children) parts.push(renderSpawnRow(r, r.to));
+    parts.push(`</div>`);
+  }
+  parts.push(`</div>`);
+  return parts.join("");
+}
+
+function renderSpawnRow(rel, targetKey) {
+  const target = state.projection.entities[targetKey];
+  if (!target) {
+    return `<div class="spawn-rel-row spawn-rel-missing"><em>${escapeHtml(targetKey)}</em> <span class="hint">(not in projection)</span></div>`;
+  }
+  const sourceTag = rel.source === "frontmatter"
+    ? `<span class="spawn-rel-source spawn-rel-source-fm" title="Derived from plan frontmatter, not from a relationship.spawns event">fm</span>`
+    : `<span class="spawn-rel-source spawn-rel-source-ev" title="Sourced from a relationship.spawns event in events.jsonl">ev</span>`;
+  return `<div class="spawn-rel-row" data-target-key="${escapeHtml(targetKey)}" title="Click to open ${escapeHtml(target.entity_id)}">
+    <span class="badge ${target.derived_state}">${target.derived_state}</span>
+    <span class="spawn-rel-id">${escapeHtml(target.entity_id)}</span>
+    ${sourceTag}
+  </div>`;
+}
+
+function attachSpawnRelClickHandlers(root) {
+  root.querySelectorAll(".spawn-rel-row[data-target-key]").forEach(row => {
+    row.addEventListener("click", () => {
+      const key = row.dataset.targetKey;
+      const target = state.projection.entities[key];
+      if (target) showLiveStatus(target);
+    });
+  });
 }
 
 function renderEventLi(ev) {
@@ -861,12 +1082,15 @@ async function showLiveStatus(entity) {
     parts.push(renderEventLi(ev));
   }
   parts.push("</ul>");
+  // Task C: spawn-relationships navigation.
+  parts.push(spawnRelationshipsSection(entity));
   // Plus a "see full plan" affordance
   if (entity.entity_type === "plan" || entity.entity_type === "inbox-item") {
     parts.push(`<p class="hint"><a href="#" id="open-plan-from-live">→ Open the full plan/inbox markdown</a></p>`);
   }
   panel.innerHTML = parts.join("");
   attachReadMoreToggles(panel);
+  attachSpawnRelClickHandlers(panel);
 
   const linkEl = document.getElementById("open-plan-from-live");
   if (linkEl) {
@@ -1622,7 +1846,11 @@ const SavedSummary = {
       <button class="btn-secondary" id="btn-saved-show-summary-event" style="font-size:0.78rem">View event id</button>
     </div>`);
 
+    // Task C: spawn-relationships navigation, after the actions row.
+    parts.push(spawnRelationshipsSection(entity));
+
     panel.innerHTML = parts.join("");
+    attachSpawnRelClickHandlers(panel);
 
     // Toggle wiring
     panel.querySelectorAll(".analyser-toggle-row [data-show]").forEach(btn => {
