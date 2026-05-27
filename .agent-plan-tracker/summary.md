@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T18:33:03Z
+# Project state — generated 2026-05-27T18:39:14Z
 
-**Total events:** 143  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 12  ·  **Orphaned:** 0
+**Total events:** 146  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Dead:** 12  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -35,6 +35,9 @@
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
 
+- **T2-projection**
+  - `T3-flow-view-density` (2 events): entity.created → relationship.spawns
+
 - **T2-storage**
   - `T3-cache-build` (3 events): entity.completed → verification.tested → entity.progressed
 
@@ -48,6 +51,7 @@
 
 - **M1-bootstrap**
   - `T3-cache-build`
+  - `T3-flow-view-density`
 
 ## Blocked
 
@@ -76,8 +80,8 @@ _No flapping closures._
 
 ## Milestone progress
 
-- **M1-bootstrap**: 8/9 T3 complete (88%); 1 live
+- **M1-bootstrap**: 8/10 T3 complete (80%); 2 live
 - **M6-analyser**: 3/3 T3 complete (100%); 0 live
 
 ---
-_34 entities · 33 relationships · 1 decisions._
+_35 entities · 35 relationships · 1 decisions._
