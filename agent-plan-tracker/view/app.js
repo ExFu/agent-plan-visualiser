@@ -17,6 +17,7 @@ const state = {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  initAnalyser();
   try {
     const [pRes, eRes] = await Promise.all([
       fetch(PROJECTION_PATH),
@@ -743,12 +744,26 @@ async function showLiveStatus(entity) {
   const myEvents = state.events.filter(
     ev => ev.entity_type === entity.entity_type && ev.entity_id === entity.entity_id
   );
-  const last = myEvents[myEvents.length - 1];
 
   const parts = [];
   parts.push(`<h3 class="md-title">${escapeHtml(entity.entity_id)}</h3>`);
   parts.push(`<p class="meta-line"><span class="badge ${entity.derived_state}">${entity.derived_state}</span> · ${escapeHtml(entity.entity_type)} · ${myEvents.length} event${myEvents.length === 1 ? '' : 's'} total</p>`);
-  parts.push(`<p class="hint">Showing the entity's full event timeline. For deep "what's outstanding?" analysis, see the proposed Claude-backed endpoint in the inbox (<code>2026-05-27.outstanding-work-analyser-endpoint</code>).</p>`);
+
+  // Analyser actions row — only on plan / inbox-item; only enabled when an API key is configured.
+  if (entity.entity_type === "plan" || entity.entity_type === "inbox-item") {
+    const hasKey = Settings.hasKey();
+    parts.push(`<div class="analyser-actions">`);
+    parts.push(
+      `<button class="btn-analyse" id="btn-analyse-outstanding" ${hasKey ? "" : "disabled"} ` +
+      `title="${hasKey ? "Run a Claude-backed outstanding-work analysis on this entity" : "Configure API key in settings (gear pill, top-right)"}">` +
+      `<span class="spark">✦</span>Analyse outstanding</button>`
+    );
+    if (!hasKey) {
+      parts.push(`<button class="btn-secondary" id="btn-open-settings-from-live" style="font-size:0.78rem">Configure API key</button>`);
+    }
+    parts.push(`</div>`);
+  }
+
   parts.push("<h4>Timeline</h4>");
   parts.push("<ul class='event-list'>");
   for (const ev of myEvents) {
@@ -761,12 +776,21 @@ async function showLiveStatus(entity) {
   }
   panel.innerHTML = parts.join("");
   attachReadMoreToggles(panel);
+
   const linkEl = document.getElementById("open-plan-from-live");
   if (linkEl) {
     linkEl.addEventListener("click", (e) => {
       e.preventDefault();
       showPlanMarkdown(entity);
     });
+  }
+  const analyseBtn = document.getElementById("btn-analyse-outstanding");
+  if (analyseBtn) {
+    analyseBtn.addEventListener("click", () => SidebarAnalyser.startAnalysis(entity));
+  }
+  const openSettings = document.getElementById("btn-open-settings-from-live");
+  if (openSettings) {
+    openSettings.addEventListener("click", () => Settings.openModal());
   }
 }
 
@@ -859,5 +883,757 @@ function escapeHtml(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[c]);
 }
+
+// ===========================================================================
+// === Analyser modules (Phase A — T3-analyser-phase-a-ephemeral) ============
+// ===========================================================================
+// Five small modules implementing the on-demand "what's outstanding?" loop:
+//
+//   Settings        — read/write API key + default model in localStorage
+//   Estimator       — char-count token proxy + dollar cost per model
+//   ContextBuilder  — pre-assembles the per-entity context bundle (§3.12)
+//   AnalyseClient   — wraps fetch() to Anthropic; parses structured response
+//   SidebarAnalyser — UI controller (analyse button → dialog → loading → result)
+//
+// No persistence in this phase. Closing the tab discards the summary.
+// ===========================================================================
+
+// --- Settings ---------------------------------------------------------------
+
+const Settings = {
+  KEY_LS_KEY: "apt_anthropic_api_key",
+  MODEL_LS_KEY: "apt_default_model",
+
+  get apiKey() {
+    return localStorage.getItem(this.KEY_LS_KEY) || "";
+  },
+  set apiKey(v) {
+    if (v && v.trim()) localStorage.setItem(this.KEY_LS_KEY, v.trim());
+    else localStorage.removeItem(this.KEY_LS_KEY);
+  },
+  get defaultModel() {
+    return localStorage.getItem(this.MODEL_LS_KEY) || "";
+  },
+  set defaultModel(v) {
+    if (v) localStorage.setItem(this.MODEL_LS_KEY, v);
+    else localStorage.removeItem(this.MODEL_LS_KEY);
+  },
+  hasKey() {
+    return !!this.apiKey;
+  },
+
+  initToolbarPill() {
+    const pill = document.getElementById("api-key-pill");
+    if (!pill) return;
+    pill.addEventListener("click", () => this.openModal());
+    this.refreshPill();
+  },
+  refreshPill() {
+    const pill = document.getElementById("api-key-pill");
+    if (!pill) return;
+    if (this.hasKey()) {
+      pill.classList.remove("api-key-pill-missing");
+      pill.classList.add("api-key-pill-ok");
+      pill.title = `API key configured · default model: ${this.defaultModel || "(none — pick at call time)"}`;
+    } else {
+      pill.classList.add("api-key-pill-missing");
+      pill.classList.remove("api-key-pill-ok");
+      pill.title = "Configure Anthropic API key";
+    }
+  },
+
+  openModal() {
+    const modal = document.getElementById("settings-modal");
+    if (!modal) return;
+    document.getElementById("settings-api-key").value = this.apiKey;
+    document.getElementById("settings-default-model").value = this.defaultModel;
+    modal.hidden = false;
+  },
+  closeModal() {
+    const modal = document.getElementById("settings-modal");
+    if (modal) modal.hidden = true;
+  },
+
+  initModal() {
+    const saveBtn = document.getElementById("settings-save");
+    const clearBtn = document.getElementById("settings-clear");
+    if (saveBtn) saveBtn.addEventListener("click", () => {
+      this.apiKey = document.getElementById("settings-api-key").value;
+      this.defaultModel = document.getElementById("settings-default-model").value;
+      this.refreshPill();
+      this.closeModal();
+      // If we have a live-status sidebar open, re-render to enable the button.
+      const sidebar = document.getElementById("flow-detail");
+      const btn = document.getElementById("btn-analyse-outstanding");
+      if (sidebar && btn && btn.disabled && this.hasKey()) {
+        // Crude refresh: trigger flow re-render. Simpler than precise state plumb.
+        btn.disabled = false;
+        btn.title = "Run a Claude-backed outstanding-work analysis on this entity";
+      }
+    });
+    if (clearBtn) clearBtn.addEventListener("click", () => {
+      document.getElementById("settings-api-key").value = "";
+      this.apiKey = "";
+      this.refreshPill();
+    });
+  },
+};
+
+// --- Estimator --------------------------------------------------------------
+// Char-count proxy: ~4 chars/token (English-heavy text). ±15-25% accuracy.
+// Pricing baked in for v1; verify against Anthropic public pricing periodically.
+
+const Estimator = {
+  // USD per million tokens — keep in sync with anthropic.com/pricing.
+  PRICING: {
+    "claude-sonnet-4-20250514":    { in:  3, out: 15 },
+    "claude-opus-4-20250514":      { in: 15, out: 75 },
+    "claude-3-5-sonnet-20241022":  { in:  3, out: 15 },
+    "claude-3-5-haiku-20241022":   { in: 0.80, out: 4 },
+  },
+  DEFAULT_MAX_OUTPUT: 2048,
+  CHARS_PER_TOKEN: 4,
+
+  estimateTokensFromText(text) {
+    return Math.ceil((text || "").length / this.CHARS_PER_TOKEN);
+  },
+  estimateCallCost({ promptText, model, maxOutput }) {
+    const inputTokens = this.estimateTokensFromText(promptText);
+    const outputTokens = maxOutput || this.DEFAULT_MAX_OUTPUT;
+    const p = this.PRICING[model] || { in: 3, out: 15 };
+    const dollars = (inputTokens * p.in + outputTokens * p.out) / 1_000_000;
+    return { inputTokens, outputTokens, dollars };
+  },
+  formatCost(dollars) {
+    if (dollars < 0.01) return `$${dollars.toFixed(4)}`;
+    if (dollars < 1) return `$${dollars.toFixed(3)}`;
+    return `$${dollars.toFixed(2)}`;
+  },
+};
+
+// --- ContextBuilder ---------------------------------------------------------
+// Assembles the bundle described in T2-analyser §3.12.
+// Programmatic — no agent does discovery. We pre-fetch plan markdown and walk
+// the relationship graph in the projection.
+
+const ContextBuilder = {
+  async buildPerEntityBundle(entity) {
+    const projection = state.projection;
+    const ekey = `${entity.entity_type}:${entity.entity_id}`;
+
+    // Focal events (full timeline, in event-log order).
+    const focalEvents = state.events.filter(
+      ev => ev.entity_type === entity.entity_type && ev.entity_id === entity.entity_id
+    );
+
+    // Focal plan markdown body (or inbox-item md).
+    let focalMd = "";
+    try {
+      focalMd = await this._fetchEntityMarkdown(entity);
+    } catch (e) {
+      focalMd = `(could not load markdown: ${e.message})`;
+    }
+
+    // 1-hop graph via relationships in projection.
+    const related = this._related1Hop(ekey, projection);
+
+    // Open blockers + open HITL referencing the focal id by event subject or 1-hop link.
+    const openBlockers = this._openByType(projection, "blocker", ekey, related);
+    const openHitl = this._openByType(projection, "hitl-question", ekey, related);
+
+    // Inbox items referencing the focal entity_id — string match against the
+    // inbox-item entity summaries available in the projection (cheap pre-pass).
+    // Phase A: don't fetch every inbox md file (would be ~13 extra fetches);
+    // rely on the summary text the projection already carries. TODO Phase B:
+    // pre-computed inbox-index per T2-analyser §7 Q12.
+    const inboxRefs = Object.values(projection.entities)
+      .filter(e => e.entity_type === "inbox-item")
+      .filter(e => {
+        const summary = (e.attributes && e.attributes.summary) || "";
+        const title = (e.attributes && e.attributes.title) || "";
+        return (summary + title).includes(entity.entity_id);
+      })
+      .map(e => ({
+        id: e.entity_id,
+        title: (e.attributes && e.attributes.title) || "",
+        summary: (e.attributes && e.attributes.summary) || "",
+        derived_state: e.derived_state,
+      }));
+
+    return {
+      focal: {
+        id: entity.entity_id,
+        type: entity.entity_type,
+        plan_kind: entity.attributes?.plan_kind,
+        tier: entity.attributes?.tier,
+        derived_state: entity.derived_state,
+        plan_md: focalMd,
+        events: focalEvents.map(this._eventForBundle),
+      },
+      related_1hop: related,
+      open_blockers: openBlockers,
+      open_hitl: openHitl,
+      inbox_refs: inboxRefs,
+      prior_summary: null, // Phase A: no persistence
+    };
+  },
+
+  _related1Hop(ekey, projection) {
+    const rels = projection.relationships || [];
+    const out = [];
+    const seen = new Set();
+    const push = (entity, relType, direction) => {
+      const k = `${entity.entity_type}:${entity.entity_id}`;
+      if (k === ekey || seen.has(k)) return;
+      seen.add(k);
+      out.push(this._relSummary(entity, relType, direction));
+    };
+
+    // (a) Explicit relationship edges from events.
+    for (const r of rels) {
+      if (r.from === ekey) {
+        const e = projection.entities[r.to];
+        if (e) push(e, r.type, "outgoing");
+      } else if (r.to === ekey) {
+        const e = projection.entities[r.from];
+        if (e) push(e, r.type, "incoming");
+      }
+    }
+
+    // (b) Frontmatter-implied parent/child edges for plans.
+    //     The projection's relationships table only carries event-sourced
+    //     relationships. T3-to-T2 (t2_parent) and T3-to-Mn (milestone) are
+    //     declared in plan frontmatter and are equally first-class for the
+    //     analyser's context bundle — without them, a T2 sees no T3s.
+    const focal = projection.entities[ekey];
+    if (focal && focal.entity_type === "plan") {
+      const fa = focal.attributes || {};
+      // Focal is a T2 → pull in its T3 children.
+      if (fa.tier === 2) {
+        for (const e of Object.values(projection.entities)) {
+          if (e.entity_type !== "plan") continue;
+          if ((e.attributes || {}).t2_parent === focal.entity_id) {
+            push(e, "t2_parent-child", "outgoing");
+          }
+        }
+      }
+      // Focal is a milestone → pull in plans with this milestone tag.
+      if (fa.plan_kind === "milestone") {
+        for (const e of Object.values(projection.entities)) {
+          if (e.entity_type !== "plan") continue;
+          if ((e.attributes || {}).milestone === focal.entity_id) {
+            push(e, "milestone-member", "outgoing");
+          }
+        }
+      }
+      // Focal is a T3 → pull in its T2 parent + its milestone parent.
+      if (fa.tier === 3) {
+        if (fa.t2_parent) {
+          const parent = projection.entities[`plan:${fa.t2_parent}`];
+          if (parent) push(parent, "t2_parent-of", "incoming");
+        }
+        if (fa.milestone) {
+          const m = projection.entities[`plan:${fa.milestone}`];
+          if (m) push(m, "milestone-of", "incoming");
+        }
+      }
+    }
+    return out;
+  },
+  _relSummary(entity, relType, direction) {
+    const a = entity.attributes || {};
+    const oneLiner = a.summary || a.title || `(${entity.entity_type} ${entity.entity_id})`;
+    return {
+      id: entity.entity_id,
+      kind: entity.entity_type,
+      plan_kind: a.plan_kind,
+      tier: a.tier,
+      derived_state: entity.derived_state,
+      relation: `${relType} (${direction})`,
+      one_liner: oneLiner.slice(0, 240),
+    };
+  },
+  _openByType(projection, etype, focalKey, related) {
+    return Object.values(projection.entities)
+      .filter(e => e.entity_type === etype)
+      .filter(e => e.derived_state === "live" || e.derived_state === "dormant")
+      .filter(e => {
+        const fkey = `${e.entity_type}:${e.entity_id}`;
+        if (related.find(r => r.id === e.entity_id && r.kind === etype)) return true;
+        const summary = (e.attributes && e.attributes.summary) || "";
+        return summary.includes(focalKey.split(":")[1]);
+      })
+      .map(e => ({
+        id: e.entity_id,
+        summary: (e.attributes && e.attributes.summary) || "",
+      }));
+  },
+  _eventForBundle(ev) {
+    // Strip uuids; keep essentials.
+    return {
+      type: ev.type,
+      actor: ev.actor,
+      summary: (ev.attributes && (ev.attributes.summary || ev.attributes.note || ev.attributes.text || ev.attributes.title)) || "",
+    };
+  },
+
+  async _fetchEntityMarkdown(entity) {
+    let path;
+    if (entity.entity_type === "plan") {
+      path = `../../planning/${entity.entity_id}.md`;
+    } else if (entity.entity_type === "inbox-item") {
+      const filename = entity.entity_id.replace(/\./g, "-");
+      path = `../../.agent-plan-tracker/inbox/${filename}.md`;
+    } else {
+      return "";
+    }
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${path}`);
+    const raw = await res.text();
+    return stripFrontmatter(raw).trim();
+  },
+
+  // Serialise the bundle to a single user-message string.
+  bundleToPrompt(bundle) {
+    const lines = [];
+    const f = bundle.focal;
+    lines.push(`# Focal entity: ${f.id}`);
+    lines.push(`- type: ${f.type}${f.plan_kind ? ` (${f.plan_kind})` : ""}${f.tier ? ` · T${f.tier}` : ""}`);
+    lines.push(`- derived state: ${f.derived_state}`);
+    lines.push("");
+    lines.push(`## Plan markdown for ${f.id}`);
+    lines.push("");
+    lines.push(f.plan_md || "(empty)");
+    lines.push("");
+    lines.push(`## Full event timeline for ${f.id} (${f.events.length} events)`);
+    if (!f.events.length) {
+      lines.push("(no events)");
+    } else {
+      for (const ev of f.events) {
+        const sum = (ev.summary || "").slice(0, 500);
+        lines.push(`- **${ev.type}** by ${ev.actor || "?"}: ${sum}`);
+      }
+    }
+    lines.push("");
+    lines.push(`## Related entities (1-hop relationship graph)`);
+    if (!bundle.related_1hop.length) {
+      lines.push("(none)");
+    } else {
+      for (const r of bundle.related_1hop) {
+        lines.push(`- **${r.id}** (${r.kind}${r.plan_kind ? `/${r.plan_kind}` : ""}, ${r.derived_state}) — ${r.relation}: ${r.one_liner}`);
+      }
+    }
+    lines.push("");
+    lines.push(`## Open blockers referencing this entity`);
+    if (!bundle.open_blockers.length) lines.push("(none)");
+    else for (const b of bundle.open_blockers) lines.push(`- ${b.id}: ${b.summary.slice(0, 240)}`);
+    lines.push("");
+    lines.push(`## Open HITL questions referencing this entity`);
+    if (!bundle.open_hitl.length) lines.push("(none)");
+    else for (const h of bundle.open_hitl) lines.push(`- ${h.id}: ${h.summary.slice(0, 240)}`);
+    lines.push("");
+    lines.push(`## Open inbox items referencing this entity`);
+    if (!bundle.inbox_refs.length) lines.push("(none)");
+    else for (const i of bundle.inbox_refs) {
+      lines.push(`- **${i.id}** (${i.derived_state}) — ${i.title}`);
+      if (i.summary) lines.push(`  ${i.summary.slice(0, 300)}`);
+    }
+    lines.push("");
+    lines.push(`## Prior analyser summary`);
+    lines.push(bundle.prior_summary ? bundle.prior_summary : "(none — this is the first analysis for this entity)");
+    return lines.join("\n");
+  },
+
+  buildSystemPrompt() {
+    return [
+      "You are analysing an entity in a planning-driven, event-sourced project.",
+      "Your sole job: answer 'what is outstanding here?' given the pre-fetched plan, full event timeline, related entities, and any prior analyser summary. Do not request more data — you have what you need.",
+      "",
+      "Output format — EXACTLY this shape, in order:",
+      "",
+      "1. A fenced JSON code block tagged ```json with this schema (no extra keys):",
+      "{",
+      '  "outstanding": ["specific items still to do, one short string each"],',
+      '  "blocked": ["items blocked by external dependencies or open HITL"],',
+      '  "recently_changed": ["state changes captured in the most recent events"],',
+      '  "next_move": "single most actionable next step (one sentence)"',
+      "}",
+      "",
+      "2. Immediately after, a '## Freeform analysis' h2 header followed by markdown prose: rationale, callouts of risk or smell, references to specific events or related entities by id. Keep it tight — under 400 words.",
+      "",
+      "Rules:",
+      "- Reference events and entities by id when you can.",
+      "- If the entity is dead/complete, say so and keep outstanding empty.",
+      "- Do not hedge with 'I don't have access to X' — you have everything; reason from what's here.",
+      "- Output JSON before prose, always.",
+    ].join("\n");
+  },
+};
+
+// --- AnalyseClient ----------------------------------------------------------
+// Direct call to api.anthropic.com from the browser. API key from Settings.
+// Phase A: blocking call (no streaming).
+
+const AnalyseClient = {
+  ENDPOINT: "https://api.anthropic.com/v1/messages",
+  API_VERSION: "2023-06-01",
+
+  async run({ apiKey, model, systemPrompt, userPrompt, maxTokens = 2048 }) {
+    const body = {
+      model,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    };
+    let res;
+    try {
+      res = await fetch(this.ENDPOINT, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": this.API_VERSION,
+          "anthropic-dangerous-direct-browser-access": "true",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      throw new AnalyseError("network", `Network error: ${e.message}`, null);
+    }
+    if (!res.ok) {
+      let bodyText = "";
+      try { bodyText = await res.text(); } catch {}
+      const code = res.status === 401 ? "auth"
+                 : res.status === 429 ? "rate-limit"
+                 : res.status >= 500 ? "server"
+                 : "http";
+      throw new AnalyseError(code, `Anthropic API returned HTTP ${res.status}`, bodyText, res.headers);
+    }
+    const data = await res.json();
+    const text = (data.content || []).filter(c => c.type === "text").map(c => c.text).join("\n");
+    const usage = data.usage || {};
+    const parsed = this._parseStructured(text);
+    return {
+      raw: text,
+      structured: parsed.structured,
+      freeform: parsed.freeform,
+      parseFailed: parsed.parseFailed,
+      usage: {
+        inputTokens: usage.input_tokens || 0,
+        outputTokens: usage.output_tokens || 0,
+      },
+      model,
+    };
+  },
+
+  _parseStructured(text) {
+    // Look for ```json ... ``` fenced block.
+    const fence = text.match(/```json\s*\n([\s\S]*?)\n```/);
+    if (!fence) {
+      // Try a bare JSON object at the start.
+      const bare = text.match(/^\s*(\{[\s\S]*?\})\s*\n\n/);
+      if (bare) {
+        try {
+          const structured = JSON.parse(bare[1]);
+          const freeform = text.slice(bare[0].length).trim();
+          return { structured, freeform, parseFailed: false };
+        } catch (e) { /* fallthrough */ }
+      }
+      return { structured: null, freeform: text, parseFailed: true };
+    }
+    let structured;
+    try {
+      structured = JSON.parse(fence[1]);
+    } catch (e) {
+      return { structured: null, freeform: text, parseFailed: true };
+    }
+    // Freeform is whatever comes after the fence.
+    const after = text.slice(fence.index + fence[0].length).trim();
+    return { structured, freeform: after, parseFailed: false };
+  },
+};
+
+class AnalyseError extends Error {
+  constructor(code, message, body, headers) {
+    super(message);
+    this.code = code;
+    this.body = body;
+    this.headers = headers;
+  }
+  userFacing() {
+    if (this.code === "auth") return "API key rejected (401) — check the key in settings.";
+    if (this.code === "rate-limit") {
+      const retry = this.headers && this.headers.get("retry-after");
+      return `Rate limited (429)${retry ? ` — retry in ${retry}s` : ""}.`;
+    }
+    if (this.code === "network") return this.message;
+    if (this.code === "server") return "Anthropic API is unavailable (5xx). Try again shortly.";
+    return this.message;
+  }
+}
+
+// --- SidebarAnalyser --------------------------------------------------------
+// UI controller: analyse button → cost dialog → loading → result.
+// Ephemeral state on the controller; rerunning rebuilds from scratch.
+
+const SidebarAnalyser = {
+  _pendingConfirmHandler: null,
+
+  async startAnalysis(entity) {
+    const panel = document.getElementById("flow-detail");
+    if (!panel) return;
+    if (!Settings.hasKey()) {
+      Settings.openModal();
+      return;
+    }
+    // Build the bundle + prompts, then show the cost dialog.
+    let bundle, userPrompt, systemPrompt;
+    try {
+      panel.innerHTML = `<div class="analyser-loading"><div class="spinner"></div>Assembling context bundle for <code>${escapeHtml(entity.entity_id)}</code>…</div>`;
+      bundle = await ContextBuilder.buildPerEntityBundle(entity);
+      userPrompt = ContextBuilder.bundleToPrompt(bundle);
+      systemPrompt = ContextBuilder.buildSystemPrompt();
+    } catch (e) {
+      this._renderError(panel, entity, "Could not build context bundle", e.message);
+      return;
+    }
+    // Restore the live-status view while the dialog is open.
+    showLiveStatus(entity);
+    this._showCostDialog({ entity, systemPrompt, userPrompt, bundle });
+  },
+
+  _showCostDialog({ entity, systemPrompt, userPrompt, bundle }) {
+    const dialog = document.getElementById("cost-dialog");
+    const body = document.getElementById("cost-dialog-body");
+    if (!dialog || !body) return;
+    const defaultModel = Settings.defaultModel || "claude-sonnet-4-20250514";
+    const fullPromptText = systemPrompt + "\n\n" + userPrompt;
+
+    const renderForModel = (model) => {
+      const cost = Estimator.estimateCallCost({ promptText: fullPromptText, model });
+      body.innerHTML = `
+        <p class="modal-hint">
+          About to analyse <strong>${escapeHtml(entity.entity_id)}</strong> by calling the Anthropic API directly from this browser.
+          Context bundle assembled programmatically (no agent discovery). Estimates use a char-count proxy; actuals will differ ±15-25%.
+        </p>
+        <div class="form-row">
+          <span class="form-label">Model</span>
+          <select id="cost-model-pick">
+            ${Object.keys(Estimator.PRICING).map(m =>
+              `<option value="${m}" ${m === model ? "selected" : ""}>${m}</option>`
+            ).join("")}
+          </select>
+        </div>
+        <div class="cost-line"><span class="cost-label">Input tokens (estimated)</span><span class="cost-value">~${cost.inputTokens.toLocaleString()}</span></div>
+        <div class="cost-line"><span class="cost-label">Output tokens (max)</span><span class="cost-value">~${cost.outputTokens.toLocaleString()}</span></div>
+        <div class="cost-line"><span class="cost-label">Related entities (1-hop)</span><span class="cost-value">${bundle.related_1hop.length}</span></div>
+        <div class="cost-line"><span class="cost-label">Inbox refs</span><span class="cost-value">${bundle.inbox_refs.length}</span></div>
+        <div class="cost-line cost-total"><span class="cost-label">Estimated cost</span><span class="cost-value">${Estimator.formatCost(cost.dollars)}</span></div>
+        ${cost.dollars > 0.20 ? `<div class="cost-warning-banner">Estimated cost above $0.20 — consider the cheaper model or proceed knowingly.</div>` : ""}
+      `;
+      // Re-render on model change
+      document.getElementById("cost-model-pick").addEventListener("change", (e) => {
+        renderForModel(e.target.value);
+      });
+    };
+    renderForModel(defaultModel);
+    dialog.hidden = false;
+
+    // Confirm wiring — replace prior handler if any.
+    const confirm = document.getElementById("cost-confirm");
+    if (this._pendingConfirmHandler) {
+      confirm.removeEventListener("click", this._pendingConfirmHandler);
+    }
+    this._pendingConfirmHandler = async () => {
+      const model = document.getElementById("cost-model-pick").value;
+      dialog.hidden = true;
+      await this._performAnalysis({ entity, systemPrompt, userPrompt, model });
+    };
+    confirm.addEventListener("click", this._pendingConfirmHandler);
+  },
+
+  async _performAnalysis({ entity, systemPrompt, userPrompt, model }) {
+    const panel = document.getElementById("flow-detail");
+    if (!panel) return;
+    panel.innerHTML = `
+      <h3 class="md-title">${escapeHtml(entity.entity_id)}</h3>
+      <p class="meta-line"><span class="badge ${entity.derived_state}">${entity.derived_state}</span> · ${escapeHtml(entity.entity_type)}</p>
+      <div class="analyser-loading"><div class="spinner"></div>Analysing with <code>${escapeHtml(model)}</code>… this can take up to ~30 seconds.</div>
+    `;
+    const startedAt = Date.now();
+    try {
+      const result = await AnalyseClient.run({
+        apiKey: Settings.apiKey,
+        model,
+        systemPrompt,
+        userPrompt,
+      });
+      const elapsedMs = Date.now() - startedAt;
+      this._renderResult(panel, entity, result, elapsedMs, { systemPrompt, userPrompt, model });
+    } catch (e) {
+      const isAnalyseError = e instanceof AnalyseError;
+      const message = isAnalyseError ? e.userFacing() : (e.message || "Unknown error");
+      const body = isAnalyseError && e.body ? e.body : "";
+      this._renderError(panel, entity, message, body, { systemPrompt, userPrompt, model });
+    }
+  },
+
+  _renderResult(panel, entity, result, elapsedMs, retryCtx) {
+    const cost = result.usage.inputTokens || result.usage.outputTokens
+      ? this._actualCostFromUsage(result.usage, result.model)
+      : null;
+    const headerParts = [
+      `<span class="tag">analysed</span>`,
+      `<code>${escapeHtml(result.model)}</code>`,
+      `· ${result.usage.inputTokens.toLocaleString()} in / ${result.usage.outputTokens.toLocaleString()} out tokens`,
+      cost !== null ? `· ${Estimator.formatCost(cost)}` : "",
+      `· ${(elapsedMs / 1000).toFixed(1)}s`,
+      `· <strong>ephemeral</strong> (not saved — Phase A)`,
+    ];
+    const parts = [];
+    parts.push(`<h3 class="md-title">${escapeHtml(entity.entity_id)}</h3>`);
+    parts.push(`<p class="meta-line"><span class="badge ${entity.derived_state}">${entity.derived_state}</span> · ${escapeHtml(entity.entity_type)}</p>`);
+    parts.push(`<div class="analyser-result-header">${headerParts.filter(Boolean).join(" ")}</div>`);
+
+    if (result.parseFailed) {
+      parts.push(`<div class="analyser-error"><strong>Couldn't parse structured response.</strong>The model didn't return a valid JSON block. Freeform output shown below.</div>`);
+    }
+
+    parts.push(`<div class="analyser-toggle-row">
+      <button class="active" data-show="structured">Structured</button>
+      <button data-show="freeform">Freeform</button>
+    </div>`);
+
+    parts.push(`<div id="analyser-pane-structured">`);
+    if (result.structured) {
+      const s = result.structured;
+      parts.push(this._renderSection("Outstanding", "outstanding", s.outstanding || []));
+      parts.push(this._renderSection("Blocked", "blocked", s.blocked || []));
+      parts.push(this._renderSection("Recently changed", "recently_changed", s.recently_changed || []));
+      parts.push(this._renderNextMove(s.next_move || ""));
+    } else {
+      parts.push(`<p class="empty-section">No structured data — see freeform.</p>`);
+    }
+    parts.push(`</div>`);
+
+    parts.push(`<div id="analyser-pane-freeform" hidden>`);
+    const freeformHtml = result.freeform
+      ? (window.marked && window.marked.parse ? window.marked.parse(result.freeform) : `<pre>${escapeHtml(result.freeform)}</pre>`)
+      : `<p class="empty-section">No freeform analysis.</p>`;
+    parts.push(`<div class="analyser-freeform">${freeformHtml}</div>`);
+    parts.push(`</div>`);
+
+    parts.push(`<div class="analyser-toggle-row">
+      <button class="btn-secondary" id="btn-analyser-rerun" style="font-size:0.78rem">↻ Re-analyse</button>
+      <button class="btn-secondary" id="btn-analyser-back" style="font-size:0.78rem">← Back to timeline</button>
+    </div>`);
+
+    panel.innerHTML = parts.join("");
+
+    // Wire toggle + actions.
+    panel.querySelectorAll(".analyser-toggle-row [data-show]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        panel.querySelectorAll(".analyser-toggle-row [data-show]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const show = btn.dataset.show;
+        document.getElementById("analyser-pane-structured").hidden = (show !== "structured");
+        document.getElementById("analyser-pane-freeform").hidden = (show !== "freeform");
+      });
+    });
+    document.getElementById("btn-analyser-rerun")?.addEventListener("click", () => {
+      this.startAnalysis(entity);
+    });
+    document.getElementById("btn-analyser-back")?.addEventListener("click", () => {
+      showLiveStatus(entity);
+    });
+  },
+
+  _actualCostFromUsage(usage, model) {
+    const p = Estimator.PRICING[model] || { in: 3, out: 15 };
+    return (usage.inputTokens * p.in + usage.outputTokens * p.out) / 1_000_000;
+  },
+
+  _renderSection(label, key, items) {
+    if (!items.length) {
+      return `<div class="summary-card section-${key}"><h4>${escapeHtml(label)}</h4><p class="empty-section">(none)</p></div>`;
+    }
+    const lis = items.map(it => `<li>${escapeHtml(String(it))}</li>`).join("");
+    return `<div class="summary-card section-${key}"><h4>${escapeHtml(label)}</h4><ul>${lis}</ul></div>`;
+  },
+  _renderNextMove(text) {
+    if (!text) {
+      return `<div class="summary-card section-next_move"><h4>Next move</h4><p class="empty-section">(none — entity may be complete or dormant)</p></div>`;
+    }
+    return `<div class="summary-card section-next_move"><h4>Next move</h4><p class="next-move-text">${escapeHtml(text)}</p></div>`;
+  },
+
+  _renderError(panel, entity, message, body, retryCtx) {
+    const parts = [];
+    parts.push(`<h3 class="md-title">${escapeHtml(entity.entity_id)}</h3>`);
+    parts.push(`<p class="meta-line"><span class="badge ${entity.derived_state}">${entity.derived_state}</span> · ${escapeHtml(entity.entity_type)}</p>`);
+    parts.push(`<div class="analyser-error">`);
+    parts.push(`<strong>Analysis failed</strong>${escapeHtml(message)}`);
+    if (body) {
+      parts.push(`<pre>${escapeHtml(body.slice(0, 1500))}</pre>`);
+    }
+    parts.push(`<div class="retry-row">`);
+    if (retryCtx) {
+      parts.push(`<button class="btn-primary" id="btn-analyser-retry" style="font-size:0.78rem">Retry</button> `);
+    }
+    parts.push(`<button class="btn-secondary" id="btn-analyser-back" style="font-size:0.78rem">Back to timeline</button>`);
+    parts.push(`</div></div>`);
+    panel.innerHTML = parts.join("");
+    document.getElementById("btn-analyser-retry")?.addEventListener("click", () => {
+      this._performAnalysis({ ...retryCtx, entity });
+    });
+    document.getElementById("btn-analyser-back")?.addEventListener("click", () => {
+      showLiveStatus(entity);
+    });
+  },
+};
+
+// --- Modal close wiring (Esc + backdrop + × button) -------------------------
+
+function initModalCloseHandlers() {
+  document.querySelectorAll(".modal-close").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.close;
+      const m = document.getElementById(id);
+      if (m) m.hidden = true;
+    });
+  });
+  // Click backdrop (outside .modal) closes
+  document.querySelectorAll(".modal-backdrop").forEach(bd => {
+    bd.addEventListener("click", (e) => {
+      if (e.target === bd) bd.hidden = true;
+    });
+  });
+  // Esc closes any open modal
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      document.querySelectorAll(".modal-backdrop").forEach(bd => {
+        if (!bd.hidden) bd.hidden = true;
+      });
+    }
+  });
+  // Cost dialog cancel button is just a close.
+  document.getElementById("cost-cancel")?.addEventListener("click", () => {
+    document.getElementById("cost-dialog").hidden = true;
+  });
+}
+
+// ===========================================================================
+// === End analyser modules ==================================================
+// ===========================================================================
+
+// Initialise analyser surfaces once DOM is parsed.
+function initAnalyser() {
+  Settings.initToolbarPill();
+  Settings.initModal();
+  initModalCloseHandlers();
+}
+
+// main() is defined at the top of the file; it calls initAnalyser() before
+// loading projection/events.
 
 main();
