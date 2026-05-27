@@ -360,6 +360,29 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   font-size: 0.82rem;
   line-height: 1.4;
 }
+/* Read-more affordance for long event summaries */
+#flow-detail .event-summary.expandable {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+#flow-detail .event-summary.expandable.expanded {
+  -webkit-line-clamp: unset;
+  display: block;
+  overflow: visible;
+}
+#flow-detail .read-more-toggle {
+  display: inline-block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #1565c0;
+  cursor: pointer;
+  text-decoration: none;
+}
+#flow-detail .read-more-toggle:hover {
+  text-decoration: underline;
+}
 /* Event pills — colored backgrounds per event category */
 .event-pill {
   display: inline-block;

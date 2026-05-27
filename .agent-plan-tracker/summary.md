@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T15:54:11Z
+# Project state — generated 2026-05-27T16:28:22Z
 
-**Total events:** 98  ·  **Live:** 20  ·  **Dormant:** 0  ·  **Dead:** 9  ·  **Orphaned:** 0
+**Total events:** 100  ·  **Live:** 20  ·  **Dormant:** 0  ·  **Dead:** 9  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -14,7 +14,7 @@
   - `T2-ingest` (2 events): entity.created → relationship.spawns
   - `T2-ontology` (4 events): relationship.spawns → entity.extended → entity.progressed
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
-  - `T2-projection` (6 events): entity.progressed → entity.progressed → entity.progressed
+  - `T2-projection` (7 events): entity.progressed → entity.progressed → entity.progressed
   - `T2-storage` (5 events): entity.extended → entity.progressed → entity.progressed
 
 - **(milestone)**

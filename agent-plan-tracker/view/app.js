@@ -712,13 +712,28 @@ function showDetail(n) {
   }
   parts.push("</ul>");
   panel.innerHTML = parts.join("");
+  attachReadMoreToggles(panel);
 }
 
 function renderEventLi(ev) {
   const kind = eventTypeKind(ev.type);
   const summary = ev.attributes?.summary || ev.attributes?.note || ev.attributes?.text || ev.attributes?.title || "(no summary)";
-  const trunc = summary.length > 320 ? summary.slice(0, 320) + "…" : summary;
-  return `<li><span class="event-pill event-pill-${kind}">${escapeHtml(ev.type)}</span><div class="event-summary">${escapeHtml(trunc)}</div></li>`;
+  const isLong = summary.length > 220;
+  if (!isLong) {
+    return `<li><span class="event-pill event-pill-${kind}">${escapeHtml(ev.type)}</span><div class="event-summary">${escapeHtml(summary)}</div></li>`;
+  }
+  return `<li><span class="event-pill event-pill-${kind}">${escapeHtml(ev.type)}</span><div class="event-summary expandable">${escapeHtml(summary)}</div><a href="#" class="read-more-toggle">read more</a></li>`;
+}
+
+function attachReadMoreToggles(root) {
+  root.querySelectorAll(".read-more-toggle").forEach(a => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const summary = a.previousElementSibling;
+      const expanded = summary.classList.toggle("expanded");
+      a.textContent = expanded ? "read less" : "read more";
+    });
+  });
 }
 
 async function showLiveStatus(entity) {
@@ -745,6 +760,7 @@ async function showLiveStatus(entity) {
     parts.push(`<p class="hint"><a href="#" id="open-plan-from-live">→ Open the full plan/inbox markdown</a></p>`);
   }
   panel.innerHTML = parts.join("");
+  attachReadMoreToggles(panel);
   const linkEl = document.getElementById("open-plan-from-live");
   if (linkEl) {
     linkEl.addEventListener("click", (e) => {
