@@ -86,7 +86,9 @@ def resolve_blame():
         else:
             parts = raw.split(" ")
             if len(parts) >= 3 and len(parts[0]) == 40 and all(c in "0123456789abcdef" for c in parts[0]):
-                cur_commit = parts[0]
+                # All-zeros hash is git's sentinel for working-tree modifications
+                # not yet committed. Render as 'pending' for human-friendly displays.
+                cur_commit = "pending" if parts[0] == "0" * 40 else parts[0]
                 cur_author = cur_date_epoch = cur_summary = None
     return blame
 
