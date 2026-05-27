@@ -13,6 +13,10 @@
   <button id="btn-tree">Plan hierarchy tree</button>
   <button id="btn-flow">Workstreams flow</button>
   <span class="toolbar-spacer"></span>
+  <button id="btn-global-analyse" class="btn-global-analyse" disabled
+          title="Analyse every live entity in one sweep (Anthropic prompt caching). Requires API key.">
+    ✦ Analyse all live
+  </button>
   <button id="api-key-pill" class="api-key-pill api-key-pill-missing" title="Configure Anthropic API key">
     <span class="api-key-dot"></span><span class="api-key-label">API key</span>
   </button>
@@ -67,6 +71,24 @@
     <footer class="modal-footer">
       <button id="cost-cancel" class="btn-secondary">Cancel</button>
       <button id="cost-confirm" class="btn-primary">Confirm and run</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============== Global progress modal (Phase E — T3-analyser-phase-e-global-mode) ============== -->
+<div id="global-modal" class="modal-backdrop" hidden>
+  <div class="modal modal-wide" role="dialog" aria-labelledby="global-modal-title">
+    <header class="modal-header">
+      <h2 id="global-modal-title">Global analysis</h2>
+      <button class="modal-close" data-close="global-modal" aria-label="Close">×</button>
+    </header>
+    <div class="modal-body" id="global-modal-body">
+      <!-- Populated dynamically: progress table + running totals -->
+    </div>
+    <footer class="modal-footer">
+      <span id="global-running-totals" class="hint" style="margin-right:auto;font-size:0.78rem"></span>
+      <button id="global-cancel-run" class="btn-secondary" hidden>Cancel run</button>
+      <button id="global-close" class="btn-secondary" hidden>Close</button>
     </footer>
   </div>
 </div>

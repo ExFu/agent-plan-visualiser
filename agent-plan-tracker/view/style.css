@@ -1053,6 +1053,71 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 }
 
 /* ------------------------------------------------------------------ */
+/* Global analysis mode (Phase E)                                     */
+/* ------------------------------------------------------------------ */
+
+.btn-global-analyse {
+  background: #6a1b9a;
+  color: white;
+  border: 1px solid #6a1b9a;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 16px;
+  cursor: pointer;
+  margin-right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.btn-global-analyse:hover:not(:disabled) { background: #4a148c; }
+.btn-global-analyse:disabled {
+  background: #bbb;
+  border-color: #bbb;
+  cursor: not-allowed;
+}
+
+.modal-wide {
+  max-width: 900px;
+}
+
+.global-progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  font-family: var(--sans);
+}
+.global-progress-table th,
+.global-progress-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #eee;
+}
+.global-progress-table th {
+  font-weight: 600;
+  color: #555;
+  background: #f7f7f7;
+  position: sticky;
+  top: 0;
+}
+.global-progress-table td code {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+.global-row .status-cell {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.global-status-queued  .status-cell { color: #777; }
+.global-status-running .status-cell { color: #1565c0; }
+.global-status-saved   .status-cell { color: #1b5e20; }
+.global-status-failed  .status-cell { color: #b71c1c; }
+.global-status-running td { background: #e3f2fd; }
+.global-status-saved   td { background: #e8f5e9; }
+.global-status-failed  td { background: #ffebee; }
+
+/* ------------------------------------------------------------------ */
 /* Spawn-relationships section in the sidebar (Task C)                */
 /* ------------------------------------------------------------------ */
 

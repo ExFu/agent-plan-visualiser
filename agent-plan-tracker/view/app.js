@@ -2413,6 +2413,408 @@ const SidebarAnalyser = {
   },
 };
 
+// ===========================================================================
+// === Global update mode (Phase E — T3-analyser-phase-e-global-mode) ========
+// ===========================================================================
+// Three modules:
+//   GlobalContextBuilder  — assembles the project-level shared prefix once
+//   GlobalAnalyseClient   — per-entity follow-on call with cache_control
+//   GlobalAnalyser        — UI controller: button → dialog → progress modal
+//
+// Derived-summary emission is suppressed in this mode (every entity gets a
+// primary anyway, no point producing weaker derived shadows of them).
+
+const GlobalContextBuilder = {
+  async buildSharedPrompt(projection, events) {
+    // 1. T1-top-level markdown (project's why/what — the most stable, largest,
+    //    most-cacheable input).
+    let t1md = "";
+    try {
+      const res = await fetch("../../planning/T1-top-level.md");
+      if (res.ok) t1md = stripFrontmatter(await res.text()).trim();
+    } catch { /* tolerate */ }
+
+    // 2. Live entities index.
+    const liveEntities = Object.values(projection.entities)
+      .filter(e => e.derived_state === "live")
+      .sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+    const liveIndex = liveEntities.map(e => {
+      const a = e.attributes || {};
+      const tier = a.tier ? `T${a.tier}` : (a.plan_kind === "milestone" ? `M${a.milestone_index}` : "");
+      const sum = (a.summary || a.title || "").slice(0, 140);
+      return `- ${e.entity_id} (${e.entity_type}${tier ? "/" + tier : ""}, live): ${sum}`;
+    });
+
+    // 3. Project-wide recent event stream (last 50 events, excluding analysis.* +
+    //    commit.recorded which is metadata).
+    const recent = events
+      .filter(ev => !ev.type.startsWith("analysis.") && ev.type !== "commit.recorded")
+      .slice(-50)
+      .map(ev => `- ${ev.type} on ${ev.entity_type}:${ev.entity_id}: ${((ev.attributes && (ev.attributes.summary || ev.attributes.note || ev.attributes.text || ev.attributes.title)) || "").slice(0, 180)}`);
+
+    const lines = [];
+    lines.push("# Shared project context (used for every entity in this global pass)");
+    lines.push("");
+    lines.push("## T1 — top-level plan");
+    lines.push("");
+    lines.push(t1md || "(could not load T1)");
+    lines.push("");
+    lines.push("## Live entities index");
+    lines.push(...liveIndex);
+    lines.push("");
+    lines.push("## Recent project-wide event stream (last 50 events)");
+    lines.push(...recent);
+    return { sharedPrompt: lines.join("\n"), liveEntities };
+  },
+
+  systemPrompt() {
+    return [
+      "You are doing a GLOBAL pass over a planning-driven, event-sourced project.",
+      "For each entity you're focused on in turn, answer: 'what is outstanding here?'",
+      "",
+      "Output format — EXACTLY this shape:",
+      "1. A fenced JSON code block tagged ```json with this schema (no extra keys):",
+      "{",
+      '  "outstanding": ["specific items still to do, one short string each"],',
+      '  "blocked": ["items blocked by external dependencies or open HITL"],',
+      '  "recently_changed": ["state changes captured in the most recent events"],',
+      '  "next_move": "single most actionable next step (one sentence)"',
+      "}",
+      "",
+      "2. Immediately after, a '## Freeform analysis' h2 header followed by markdown prose: under 400 words.",
+      "",
+      "Rules:",
+      "- Reference entities/events by id when relevant.",
+      "- Use the shared context (T1 + live index + recent events) to ground your answer about THE FOCAL entity.",
+      "- Do not hedge with 'I don't have access to X' — you have the shared context plus the focal's own plan + timeline.",
+      "- This is a global pass — DO NOT output `derived_summaries`. Each entity is being analysed as a primary in its own right.",
+      "- Output JSON before prose, always.",
+    ].join("\n");
+  },
+
+  async buildPerEntityTail(entity) {
+    // Per-entity portion — small, varies per call. Plan body + timeline +
+    // 1-hop graph + prior valid summary.
+    const bundle = await ContextBuilder.buildPerEntityBundle(entity);
+    // Reuse the per-entity serialiser but trim its preamble since the shared
+    // context already framed the project.
+    const lines = [];
+    lines.push(`# Now focus on entity: ${entity.entity_id}`);
+    lines.push("");
+    const f = bundle.focal;
+    lines.push(`- type: ${f.type}${f.plan_kind ? ` (${f.plan_kind})` : ""}${f.tier ? ` · T${f.tier}` : ""}`);
+    lines.push(`- derived state: ${f.derived_state}`);
+    lines.push("");
+    lines.push(`## Plan markdown for ${f.id}`);
+    lines.push(f.plan_md || "(empty)");
+    lines.push("");
+    lines.push(`## Full event timeline for ${f.id}`);
+    if (!f.events.length) lines.push("(no events)");
+    else for (const ev of f.events) {
+      lines.push(`- **${ev.type}** by ${ev.actor || "?"}: ${(ev.summary || "").slice(0, 500)}`);
+    }
+    lines.push("");
+    lines.push(`## Related entities (1-hop)`);
+    if (!bundle.related_1hop.length) lines.push("(none)");
+    else for (const r of bundle.related_1hop) {
+      lines.push(`- **${r.id}** (${r.kind}/${r.plan_kind || "?"}, ${r.derived_state}): ${r.one_liner}`);
+    }
+    lines.push("");
+    lines.push(`## Prior analyser summary on ${f.id}`);
+    const ps = bundle.prior_summary;
+    if (!ps) lines.push("(none)");
+    else {
+      const s = ps.structured || {};
+      lines.push(`(${ps.source || "?"}, ${ps.model || "?"})`);
+      lines.push(`Outstanding: ${(s.outstanding || []).join("; ")}`);
+      lines.push(`Blocked: ${(s.blocked || []).join("; ")}`);
+      lines.push(`Recently changed: ${(s.recently_changed || []).join("; ")}`);
+      lines.push(`Next move: ${s.next_move || ""}`);
+    }
+    return lines.join("\n");
+  },
+};
+
+const GlobalAnalyseClient = {
+  async runOne({ apiKey, model, sharedPrompt, perEntityPrompt, systemPrompt, maxTokens = 2048 }) {
+    const body = {
+      model,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{
+        role: "user",
+        content: [
+          // The big shared prefix — marked for ephemeral caching. Anthropic
+          // caches blocks >= 1024 tokens for 5 minutes by default.
+          { type: "text", text: sharedPrompt, cache_control: { type: "ephemeral" } },
+          // Per-entity tail — varies each call.
+          { type: "text", text: perEntityPrompt },
+        ],
+      }],
+    };
+    let res;
+    try {
+      res = await fetch(AnalyseClient.ENDPOINT, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": AnalyseClient.API_VERSION,
+          "anthropic-dangerous-direct-browser-access": "true",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      throw new AnalyseError("network", `Network error: ${e.message}`, null);
+    }
+    if (!res.ok) {
+      let bodyText = "";
+      try { bodyText = await res.text(); } catch {}
+      const code = res.status === 401 ? "auth"
+                 : res.status === 429 ? "rate-limit"
+                 : res.status >= 500 ? "server"
+                 : "http";
+      throw new AnalyseError(code, `Anthropic API HTTP ${res.status}`, bodyText, res.headers);
+    }
+    const data = await res.json();
+    const text = (data.content || []).filter(c => c.type === "text").map(c => c.text).join("\n");
+    const u = data.usage || {};
+    const inputTokens = u.input_tokens || 0;
+    const cacheRead = u.cache_read_input_tokens || 0;
+    const cacheCreate = u.cache_creation_input_tokens || 0;
+    return {
+      raw: text,
+      ...AnalyseClient._parseStructured(text),
+      usage: {
+        inputTokens,
+        outputTokens: u.output_tokens || 0,
+        cacheRead,
+        cacheCreate,
+        cacheHitRatio: inputTokens > 0 ? cacheRead / (inputTokens + cacheRead) : 0,
+      },
+      model,
+    };
+  },
+};
+
+const GlobalAnalyser = {
+  _cancelled: false,
+  _running: false,
+
+  initToolbarButton() {
+    const btn = document.getElementById("btn-global-analyse");
+    if (!btn) return;
+    const refresh = () => {
+      btn.disabled = !Settings.hasKey();
+      btn.title = Settings.hasKey()
+        ? "Analyse every live entity in one sweep (Anthropic prompt caching). Token-heavy."
+        : "Configure API key in settings first";
+    };
+    refresh();
+    btn.addEventListener("click", () => this.start());
+    // Hook into Settings.refreshPill — but simpler: refresh on a small interval.
+    // (No event from Settings; we'd need to wire one. Cheap to refresh on demand.)
+    document.addEventListener("click", refresh);
+  },
+
+  async start() {
+    if (this._running) return;
+    if (!Settings.hasKey()) { Settings.openModal(); return; }
+    const model = Settings.defaultModel || "claude-sonnet-4-20250514";
+
+    // Pre-flight clean tree.
+    try {
+      const cc = await PersistenceClient.cleanCheck();
+      if (!cc.clean) {
+        alert("Working tree dirty — commit or stash before running global analysis.\n\n" + (cc.dirty_files || []).join("\n"));
+        return;
+      }
+    } catch (e) {
+      alert("Clean-check failed: " + (e.message || e));
+      return;
+    }
+
+    // Build shared context.
+    const { sharedPrompt, liveEntities } = await GlobalContextBuilder.buildSharedPrompt(state.projection, state.events);
+    const systemPrompt = GlobalContextBuilder.systemPrompt();
+
+    // Estimate cost: per-entity tail varies but average ~1500 input tokens;
+    // shared block billed once at full rate, then cached-read rate (~10% of full).
+    const sharedTok = Estimator.estimateTokensFromText(systemPrompt + "\n" + sharedPrompt);
+    const perTailEstimate = 1500;
+    const perOutputEstimate = 1500;
+    const p = Estimator.PRICING[model] || { in: 3, out: 15 };
+    const firstCallIn = sharedTok + perTailEstimate;
+    const subsequentCallIn = perTailEstimate + sharedTok * 0.1;  // cache-read rate (~10% rough)
+    const nEnts = liveEntities.length;
+    const inputDollarsApprox =
+      (firstCallIn * p.in + Math.max(0, nEnts - 1) * subsequentCallIn * p.in) / 1_000_000;
+    const outputDollarsApprox = (nEnts * perOutputEstimate * p.out) / 1_000_000;
+    const totalDollars = inputDollarsApprox + outputDollarsApprox;
+
+    // Confirm dialog.
+    const dialog = document.getElementById("cost-dialog");
+    const body = document.getElementById("cost-dialog-body");
+    document.getElementById("cost-dialog-title").textContent = "Confirm GLOBAL analysis";
+    body.innerHTML = `
+      <p class="modal-hint" style="background:#fff3cd;color:#5d4400">
+        <strong>This will analyse every live entity in one sweep.</strong>
+        It's token-heavy. The shared project context is cached after the first call,
+        so calls 2..N cost ~10% of input on the shared portion. Estimates assume an
+        80% cache-hit ratio on input.
+      </p>
+      <div class="cost-line"><span class="cost-label">Live entities</span><span class="cost-value">${nEnts}</span></div>
+      <div class="cost-line"><span class="cost-label">Model</span><span class="cost-value"><code>${escapeHtml(model)}</code></span></div>
+      <div class="cost-line"><span class="cost-label">Shared prefix tokens</span><span class="cost-value">~${sharedTok.toLocaleString()}</span></div>
+      <div class="cost-line"><span class="cost-label">Estimated input cost</span><span class="cost-value">${Estimator.formatCost(inputDollarsApprox)}</span></div>
+      <div class="cost-line"><span class="cost-label">Estimated output cost</span><span class="cost-value">${Estimator.formatCost(outputDollarsApprox)}</span></div>
+      <div class="cost-line cost-total"><span class="cost-label">Estimated total</span><span class="cost-value">${Estimator.formatCost(totalDollars)}</span></div>
+      <div class="cost-warning-banner">Click "Confirm and run" to start. Each per-entity result saves to events.jsonl + a markdown file. Cancel mid-run is supported.</div>
+    `;
+    const confirmBtn = document.getElementById("cost-confirm");
+    confirmBtn.textContent = "Confirm and run global";
+    confirmBtn.classList.remove("btn-primary");
+    confirmBtn.classList.add("btn-danger");
+
+    // Wire confirm once.
+    const handler = async () => {
+      dialog.hidden = true;
+      confirmBtn.textContent = "Confirm and run";
+      confirmBtn.classList.remove("btn-danger");
+      confirmBtn.classList.add("btn-primary");
+      confirmBtn.removeEventListener("click", handler);
+      await this._runLoop({ liveEntities, sharedPrompt, systemPrompt, model });
+    };
+    confirmBtn.addEventListener("click", handler);
+    dialog.hidden = false;
+  },
+
+  async _runLoop({ liveEntities, sharedPrompt, systemPrompt, model }) {
+    this._running = true;
+    this._cancelled = false;
+    const modal = document.getElementById("global-modal");
+    const body = document.getElementById("global-modal-body");
+    const totalsEl = document.getElementById("global-running-totals");
+    const cancelBtn = document.getElementById("global-cancel-run");
+    const closeBtn = document.getElementById("global-close");
+
+    cancelBtn.hidden = false;
+    closeBtn.hidden = true;
+    cancelBtn.onclick = () => { this._cancelled = true; };
+
+    // Render initial progress table.
+    const rows = liveEntities.map(e => ({
+      entity: e,
+      status: "queued",
+      cost: null,
+      cacheHit: null,
+      eventId: null,
+      error: null,
+    }));
+    const renderTable = () => {
+      body.innerHTML = `
+        <table class="global-progress-table">
+          <thead>
+            <tr><th>Entity</th><th>Status</th><th>Cost</th><th>Cache hit</th><th>Result</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr class="global-row global-status-${r.status}">
+                <td><code>${escapeHtml(r.entity.entity_id)}</code></td>
+                <td class="status-cell">${r.status}</td>
+                <td>${r.cost != null ? Estimator.formatCost(r.cost) : "—"}</td>
+                <td>${r.cacheHit != null ? `${(r.cacheHit * 100).toFixed(0)}%` : "—"}</td>
+                <td>${r.eventId ? `<code>${escapeHtml(r.eventId.slice(0, 8))}…</code>` : r.error ? `<span style="color:#b71c1c">${escapeHtml(r.error)}</span>` : "—"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    };
+    const updateTotals = () => {
+      const saved = rows.filter(r => r.status === "saved").length;
+      const failed = rows.filter(r => r.status === "failed").length;
+      const total = rows.reduce((s, r) => s + (r.cost || 0), 0);
+      const avgCache = rows.filter(r => r.cacheHit != null).reduce((s, r, _, a) => s + r.cacheHit / a.length, 0);
+      totalsEl.textContent = `${saved}/${rows.length} saved · ${failed} failed · cost so far ${Estimator.formatCost(total)} · avg cache-hit ${(avgCache * 100).toFixed(0)}%`;
+    };
+    renderTable();
+    updateTotals();
+    modal.hidden = false;
+
+    for (let i = 0; i < rows.length; i++) {
+      if (this._cancelled) break;
+      const row = rows[i];
+      row.status = "running";
+      renderTable(); updateTotals();
+
+      // Clean-tree re-check (skip on first iteration since we already did pre-flight).
+      if (i > 0) {
+        try {
+          const cc = await PersistenceClient.cleanCheck();
+          if (!cc.clean) {
+            row.status = "failed";
+            row.error = "tree went dirty mid-run";
+            renderTable(); updateTotals();
+            break;
+          }
+        } catch { /* tolerate, proceed */ }
+      }
+
+      try {
+        const perEntityPrompt = await GlobalContextBuilder.buildPerEntityTail(row.entity);
+        const result = await GlobalAnalyseClient.runOne({
+          apiKey: Settings.apiKey,
+          model,
+          sharedPrompt,
+          perEntityPrompt,
+          systemPrompt,
+        });
+        if (!result.structured) throw new Error("model didn't return parseable JSON");
+
+        const primaryEvent = {
+          entity_type: row.entity.entity_type,
+          entity_id: row.entity.entity_id,
+          attributes: {
+            model,
+            structured: result.structured,
+            actual_input_tokens: result.usage.inputTokens,
+            actual_output_tokens: result.usage.outputTokens,
+            prompt_cache_hit_ratio: result.usage.cacheHitRatio,
+            cache_read_input_tokens: result.usage.cacheRead,
+            cache_creation_input_tokens: result.usage.cacheCreate,
+          },
+        };
+        const md = result.freeform || result.raw;
+        const resp = await PersistenceClient.saveSummary({
+          primary: { event: primaryEvent, freeform_md: md },
+          derived: [],  // Phase E: derived suppressed.
+        });
+        row.status = "saved";
+        row.eventId = resp.primary_event_id;
+        row.cost = (result.usage.inputTokens * (Estimator.PRICING[model]?.in || 3) +
+                    result.usage.outputTokens * (Estimator.PRICING[model]?.out || 15)) / 1_000_000;
+        row.cacheHit = result.usage.cacheHitRatio;
+      } catch (e) {
+        row.status = "failed";
+        row.error = e instanceof AnalyseError ? e.userFacing()
+                  : e instanceof PersistenceError ? e.userFacing()
+                  : (e.message || "unknown");
+      }
+      renderTable(); updateTotals();
+    }
+
+    this._running = false;
+    cancelBtn.hidden = true;
+    closeBtn.hidden = false;
+    closeBtn.onclick = () => { modal.hidden = true; };
+  },
+};
+
+// ===========================================================================
+// === End Phase E ===========================================================
+// ===========================================================================
+
 // --- Modal close wiring (Esc + backdrop + × button) -------------------------
 
 function initModalCloseHandlers() {
@@ -2452,6 +2854,7 @@ function initAnalyser() {
   Settings.initToolbarPill();
   Settings.initModal();
   initModalCloseHandlers();
+  GlobalAnalyser.initToolbarButton();
 }
 
 // main() is defined at the top of the file; it calls initAnalyser() before
