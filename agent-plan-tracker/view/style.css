@@ -7,7 +7,7 @@
   --color-orphaned: #c62828;   /* red */
   --color-unknown: #6a1b9a;    /* purple */
   /* event-pill base colours (match dominantEventColor in app.js) */
-  --pill-created: #c2185b;     /* pink/magenta — birth */
+  --pill-created: #e91e63;     /* vivid pink — birth (distinct from fulcrum reds) */
   --pill-extended: #1565c0;
   --pill-progressed: #ef6c00;
   --pill-completed: #1b5e20;   /* the only green — unambiguous done */
@@ -152,10 +152,104 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 .flow-svg-wrap {
   flex: 1 1 auto;
   overflow: auto;
-  padding: 0.5rem;
+  padding: 0;
   min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
 }
-.flow-svg { display: block; }
+.flow-svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Sticky entity gutter (Task A) — overlays the SVG's left margin and stays
+   pinned during horizontal scroll. Contains swimlane labels + per-entity
+   labels as HTML rows positioned absolutely against the SVG's y-coordinates.
+   The SVG itself still draws full-width swimlane background rects underneath. */
+.flow-gutter {
+  position: sticky;
+  left: 0;
+  top: 0;
+  width: var(--gutter-width, 220px);
+  z-index: 5;
+  background: var(--card-bg);
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+  /* Sit on top of the SVG's left edge; height matches via JS-set inline style. */
+}
+.flow-gutter-row {
+  position: absolute;
+  left: 0;
+  right: 6px; /* leave room for the drag handle */
+  height: 18px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #333;
+  padding: 0 6px 0 14px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 2px;
+}
+.flow-gutter-row:hover {
+  background: #f0f4ff;
+  color: #1565c0;
+  text-decoration: underline;
+}
+.flow-gutter-swimlane {
+  position: absolute;
+  left: 0;
+  right: 6px;
+  height: 22px;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 12px;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0 6px 0 8px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(246,246,246,0.92);
+}
+.flow-gutter-drag-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.flow-gutter-drag-handle:hover,
+.flow-gutter-drag-handle.dragging {
+  background: rgba(100, 100, 100, 0.18);
+}
+.flow-gutter-drag-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 2px;
+  height: 22px;
+  margin-top: -11px;
+  border-left: 1px dotted #aaa;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.flow-gutter-drag-handle:hover::after,
+.flow-gutter-drag-handle.dragging::after {
+  opacity: 1;
+}
 .flow-drag-handle {
   flex: 0 0 6px;
   background: var(--border);
@@ -920,5 +1014,92 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   stroke: #b71c1c;
   stroke-width: 1.5;
   pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Spawn-relationships section in the sidebar (Task C)                */
+/* ------------------------------------------------------------------ */
+
+.spawn-rel-section {
+  margin: 0.9rem 0 0.4rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.spawn-rel-header {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #555;
+}
+.spawn-rel-group {
+  margin-bottom: 0.5rem;
+}
+.spawn-rel-label {
+  font-size: 0.7rem;
+  color: #777;
+  text-transform: lowercase;
+  margin: 0.2rem 0 0.2rem;
+  letter-spacing: 0.3px;
+}
+.spawn-rel-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.4rem;
+  margin: 0.15rem 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+.spawn-rel-row:hover {
+  background: #f4f8ff;
+  border-color: #cfd8dc;
+}
+.spawn-rel-id {
+  flex: 1 1 auto;
+  word-break: break-all;
+  color: #222;
+}
+.spawn-rel-source {
+  font-size: 0.62rem;
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 0.05rem 0.32rem;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+.spawn-rel-source-ev {
+  background: #1565c0;
+  color: white;
+}
+.spawn-rel-source-fm {
+  background: white;
+  color: #6a1b9a;
+  border: 1px dashed #6a1b9a;
+  padding: 0 0.28rem;
+}
+.spawn-rel-missing {
+  color: #888;
+  font-style: italic;
+}
+
+/* Vertical commit labels (Task B). Sit in the top band so they read
+   upward from the column. text-anchor:start keeps them flush with the
+   column origin once rotated. */
+.commit-label-vertical {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: #333;
+}
+.commit-hit:hover + .commit-column,
+.commit-hit:hover ~ .commit-label-vertical {
+  /* If we wanted highlight on hover we could style here — keep minimal. */
+}
+.commit-hit:hover {
+  fill: rgba(21,101,192,0.06) !important;
 }
 
