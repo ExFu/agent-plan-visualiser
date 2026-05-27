@@ -831,3 +831,60 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   margin: 0.4rem 0 0;
 }
 .analyser-error .retry-row { margin-top: 0.5rem; }
+
+/* ------------------------------------------------------------------ */
+/* Saved summary view (Phase B — T3-analyser-phase-b-persistence)     */
+/* ------------------------------------------------------------------ */
+
+.analyser-saved-banner {
+  background: #e8f5e9;
+  border: 1px solid #2e7d32;
+  color: #1b5e20;
+  padding: 0.55rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  margin: 0.5rem 0;
+  line-height: 1.5;
+}
+.analyser-saved-banner code {
+  background: rgba(255,255,255,0.6);
+  padding: 0.05rem 0.3rem;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+.analyser-saved-banner .hint {
+  display: block;
+  color: #555;
+  font-size: 0.72rem;
+  margin-top: 0.2rem;
+}
+
+.tag.saved-tag {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  background: #2e7d32;
+  color: white;
+  font-weight: 600;
+  font-size: 0.7rem;
+  margin: 0 0.2rem;
+}
+.tag.derived-tag {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  background: #ef6c00;
+  color: white;
+  font-weight: 600;
+  font-size: 0.7rem;
+  margin: 0 0.2rem;
+}
+.model-tag {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: #666;
+}
+
+#analyser-save-feedback:empty { display: none; }
+
