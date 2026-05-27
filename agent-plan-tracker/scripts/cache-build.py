@@ -97,18 +97,40 @@ def main():
     init_db(conn)
     blame = resolve_blame()
 
+    # Build commit-boundaries lookup for positional rollup.
+    # Each entry: (line_no_of_commit_recorded, commit.recorded event_id, attributes dict)
+    commit_boundaries = [
+        (ev["_line_no"], ev["event_id"], ev.get("attributes", {}))
+        for ev in events
+        if ev["type"] == "commit.recorded"
+    ]
+
+    def find_commit_for(line_no):
+        """Positional rollup: return (commit_recorded_event_id, author, date, msg_first_line)
+        for the FIRST commit.recorded event with line_no >= the given line. Trailing
+        events with no closing commit.recorded return all None."""
+        for b_line, b_event_id, b_attrs in commit_boundaries:
+            if b_line >= line_no:
+                return (b_event_id,
+                        b_attrs.get("author"),
+                        b_attrs.get("date"),
+                        b_attrs.get("message_first_line"))
+        return (None, None, None, None)
+
     for ev in events:
         line_no = ev["_line_no"]
-        cref, cauthor, cdate, csum = blame.get(line_no, (None, None, None, None))
+        cref = blame.get(line_no, (None,))[0]  # commit_ref only — blame is unreliable post-rewrite for commit_meta
+        cre_id, cauthor, cdate, csum = find_commit_for(line_no)
         conn.execute(
             """INSERT INTO events (event_id, type, entity_type, entity_id, actor, confidence,
                 schema_version, attributes, line_no, commit_ref, commit_author, commit_date,
-                commit_message_first_line) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                commit_message_first_line, commit_recorded_event_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 ev["event_id"], ev["type"], ev.get("entity_type"), ev.get("entity_id"),
                 ev["actor"], ev["confidence"], ev["schema_version"],
                 json.dumps(ev.get("attributes", {}), separators=(",", ":")),
-                line_no, cref, cauthor, cdate, csum,
+                line_no, cref, cauthor, cdate, csum, cre_id,
             ),
         )
 
@@ -178,28 +200,29 @@ def main():
             ),
         )
 
-    # Materialise commits from commit.recorded events
+    # Materialise commits from commit.recorded events.
+    # Keyed by commit_recorded_event_id (unique per commit.recorded event),
+    # not commit_ref (which may collide post-rewrite — e.g. after a schema
+    # migration touches every line of events.jsonl).
     last_boundary = 0
     for ev in events:
         if ev["type"] == "commit.recorded":
             attrs = ev.get("attributes", {})
             cref = blame.get(ev["_line_no"], (None,))[0]
-            if cref:
-                conn.execute(
-                    """INSERT OR REPLACE INTO commits (commit_ref, author, date,
-                        message_first_line, commit_recorded_event_id,
-                        first_event_line_no, last_event_line_no)
-                        VALUES (?,?,?,?,?,?,?)""",
-                    (
-                        cref,
-                        attrs.get("author", ""),
-                        attrs.get("date", ""),
-                        attrs.get("message_first_line", ""),
-                        ev["event_id"],
-                        last_boundary + 1,
-                        ev["_line_no"],
-                    ),
-                )
+            conn.execute(
+                """INSERT OR REPLACE INTO commits (commit_recorded_event_id, commit_ref,
+                    author, date, message_first_line,
+                    first_event_line_no, last_event_line_no)
+                    VALUES (?,?,?,?,?,?,?)""",
+                (
+                    ev["event_id"], cref,
+                    attrs.get("author", ""),
+                    attrs.get("date", ""),
+                    attrs.get("message_first_line", ""),
+                    last_boundary + 1,
+                    ev["_line_no"],
+                ),
+            )
             last_boundary = ev["_line_no"]
 
     conn.commit()

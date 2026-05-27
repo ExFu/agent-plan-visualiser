@@ -1,6 +1,10 @@
 -- audit-fulcrum-without-decision.sql
 -- Fulcrum events (renamed/parked/cancelled/superseded/reopened) NOT paired
 -- with a decision event in the same commit.
+-- Pairs via commit_recorded_event_id (positional rollup) rather than
+-- commit_ref, because commit_ref can collide across events after a bulk
+-- rewrite (e.g. schema migration touches every line). commit_recorded_event_id
+-- is the canonical commit-membership identifier.
 .headers on
 .mode column
 
@@ -13,14 +17,14 @@ decision_pairings AS (
   SELECT e.event_id AS fulcrum_event_id, d.event_id AS decision_event_id
   FROM fulcrum e
   JOIN events d ON d.type = 'decision'
-  WHERE d.commit_ref = e.commit_ref
+  WHERE d.commit_recorded_event_id = e.commit_recorded_event_id
     AND d.attributes LIKE '%' || e.event_id || '%'
 )
 SELECT
   f.event_id AS fulcrum_event_id,
   f.type AS fulcrum_type,
   f.entity_type, f.entity_id,
-  f.commit_ref,
+  f.commit_recorded_event_id,
   f.commit_message_first_line
 FROM fulcrum f
 LEFT JOIN decision_pairings p ON p.fulcrum_event_id = f.event_id

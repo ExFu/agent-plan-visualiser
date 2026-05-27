@@ -14,12 +14,14 @@ CREATE TABLE IF NOT EXISTS events (
   commit_ref      TEXT,
   commit_author   TEXT,
   commit_date     TEXT,
-  commit_message_first_line TEXT
+  commit_message_first_line TEXT,
+  commit_recorded_event_id  TEXT  -- event_id of the bracketing commit.recorded event; NULL for trailing in-progress events
 );
 CREATE INDEX IF NOT EXISTS idx_events_entity ON events(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 CREATE INDEX IF NOT EXISTS idx_events_commit_ref ON events(commit_ref);
 CREATE INDEX IF NOT EXISTS idx_events_commit_date ON events(commit_date);
+CREATE INDEX IF NOT EXISTS idx_events_commit_recorded ON events(commit_recorded_event_id);
 
 CREATE TABLE IF NOT EXISTS entities (
   entity_type           TEXT NOT NULL,
@@ -52,11 +54,12 @@ CREATE TABLE IF NOT EXISTS decisions (
 );
 
 CREATE TABLE IF NOT EXISTS commits (
-  commit_ref            TEXT PRIMARY KEY,
+  commit_recorded_event_id  TEXT PRIMARY KEY,
+  commit_ref            TEXT,  -- nullable: post-rewrite (e.g. schema migration) multiple commit.recorded events may share a ref
   author                TEXT NOT NULL,
   date                  TEXT NOT NULL,
   message_first_line    TEXT NOT NULL,
-  commit_recorded_event_id  TEXT NOT NULL,
   first_event_line_no   INTEGER NOT NULL,
   last_event_line_no    INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_commits_ref ON commits(commit_ref);
