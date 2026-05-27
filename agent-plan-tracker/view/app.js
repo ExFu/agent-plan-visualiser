@@ -860,7 +860,11 @@ function makeResizable(handle, sidebar) {
     if (!dragging) return;
     const delta = startX - e.clientX;
     const newWidth = Math.min(900, Math.max(280, startWidth + delta));
+    // The sidebar lives inside a flex container with `flex: 0 0 380px`,
+    // which pins flex-basis. Updating only `width` is overridden by the
+    // basis; we have to set both for the drag to actually resize.
     sidebar.style.width = newWidth + "px";
+    sidebar.style.flexBasis = newWidth + "px";
   });
   document.addEventListener("mouseup", () => {
     if (dragging) {
