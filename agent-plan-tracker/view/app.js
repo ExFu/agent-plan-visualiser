@@ -1836,6 +1836,17 @@ const SavedSummary = {
       parts.push(`<p class="hint">This summary was generated as a side-effect of a primary analysis on another entity. Run primary analysis here for precision.</p>`);
     }
 
+    // Invalidation banner (Phase D) — shown HERE, right at the top, so the
+    // operator sees the stale-state warning before reading the content below.
+    const isInvalid = summary.valid === false;
+    if (isInvalid) {
+      parts.push(`<div class="invalidation-banner">
+        <strong>⚠ This summary has been invalidated.</strong>
+        ${summary.invalidated_by_event_id ? `<div class="hint">invalidated by event <code>${escapeHtml(summary.invalidated_by_event_id)}</code></div>` : ""}
+        <div class="hint">Regenerate to replace.</div>
+      </div>`);
+    }
+
     parts.push(`<div class="analyser-toggle-row">
       <button class="active" data-show="structured">Structured</button>
       <button data-show="freeform">Freeform</button>
@@ -1863,19 +1874,7 @@ const SavedSummary = {
     // Timeline pane (lazy-populated)
     parts.push(`<div id="analyser-pane-timeline" hidden></div>`);
 
-    // Invalidation banner (Phase D — T3-analyser-phase-d-cascade-invalidation).
-    // If the summary has been marked invalid by an analysis.invalidated event,
-    // show a red banner at the top of the panel.
-    const isInvalid = summary.valid === false;
-    if (isInvalid) {
-      parts.push(`<div class="invalidation-banner">
-        <strong>⚠ This summary has been invalidated.</strong>
-        ${summary.invalidated_by_event_id ? `<div class="hint">invalidated by event <code>${escapeHtml(summary.invalidated_by_event_id)}</code></div>` : ""}
-        <div class="hint">Regenerate to replace.</div>
-      </div>`);
-    }
-
-    // Actions
+    // Actions (isInvalid was computed earlier, near the banner placement)
     const hasKey = Settings.hasKey();
     parts.push(`<div class="analyser-toggle-row">
       <button class="btn-primary" id="btn-saved-regenerate" ${hasKey ? "" : "disabled"} style="font-size:0.78rem"
