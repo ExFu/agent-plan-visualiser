@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T18:08:11Z
+# Project state — generated 2026-05-27T18:10:19Z
 
-**Total events:** 122  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 11  ·  **Orphaned:** 0
+**Total events:** 124  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 11  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -36,7 +36,7 @@
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
 
 - **T2-analyser**
-  - `T3-analyser-phase-b-persistence` (3 events): entity.created → relationship.spawns → relationship.spawns
+  - `T3-analyser-phase-b-persistence` (4 events): relationship.spawns → relationship.spawns → entity.progressed
 
 ### By milestone
 

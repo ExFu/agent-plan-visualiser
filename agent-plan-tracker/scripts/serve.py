@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""serve.py — local dev server for the agent-plan-tracker view + analyser endpoints.
+
+Subclass of http.server.SimpleHTTPRequestHandler that:
+- Serves the existing static tree (view/, .agent-plan-tracker/) unchanged.
+- Adds three local-only endpoints under /api/.
+- Binds to 127.0.0.1 only (no external exposure).
+- Holds zero credentials, makes zero outbound calls.
+
+Endpoints (T2-analyser §3.4):
+  GET  /api/clean-check         — returns {clean: bool, dirty_files: [...]}
+  POST /api/save-summary        — appends analysis.live-summary events + writes md files
+  POST /api/invalidate-summary  — Phase D will implement; Phase B returns HTTP 501 stub
+
+Usage:
+  python3 agent-plan-tracker/scripts/serve.py [--port 8765] [--host 127.0.0.1]
+
+Replaces `python3 -m http.server 8765` for any flow that needs save-summary. Plain
+http.server still works for read-only browsing.
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+import uuid
+from http.server import SimpleHTTPRequestHandler, HTTPServer
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+EVENTS = REPO_ROOT / ".agent-plan-tracker/events.jsonl"
+SUMMARIES_DIR = REPO_ROOT / ".agent-plan-tracker/summaries"
+SCHEMA_PATH = REPO_ROOT / "agent-plan-tracker/schemas/0.2.0/events.schema.json"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def git_clean_check():
+    """Return (clean: bool, dirty_files: list[str])."""
+    try:
+        out = subprocess.check_output(
+            ["git", "status", "--porcelain"], cwd=str(REPO_ROOT), text=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        return False, [f"git status failed: {e}"]
+    if not out.strip():
+        return True, []
+    return False, [line.rstrip() for line in out.splitlines()]
+
+
+def load_schema():
+    with open(SCHEMA_PATH) as f:
+        return json.load(f)
+
+
+def validate_event(event, schema):
+    """Returns (ok: bool, error_message: str | None).
+
+    Uses jsonschema if available; else falls back to minimal-shape checks so
+    the server still works without the optional dep. The full repack-validate
+    pipeline catches schema drift on commit even if jsonschema isn't installed
+    on this Python.
+    """
+    try:
+        from jsonschema import validate, ValidationError  # type: ignore
+    except ImportError:
+        required = {"event_id", "type", "actor", "confidence", "schema_version",
+                    "attributes"}
+        missing = required - set(event.keys())
+        if missing:
+            return False, f"missing required keys: {sorted(missing)}"
+        return True, None
+    try:
+        validate(instance=event, schema=schema)
+        return True, None
+    except ValidationError as e:
+        return False, e.message
+
+
+def latest_summary_for(entity_type, entity_id):
+    """Walk events.jsonl; return the most recent analysis.live-summary event
+    matching (entity_type, entity_id), OR None.
+
+    Used server-side to compute supersession links authoritatively, instead of
+    trusting whatever the browser passed in.
+    """
+    if not EVENTS.exists():
+        return None
+    last = None
+    with open(EVENTS) as f:
+        for raw in f:
+            try:
+                ev = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if ev.get("type") != "analysis.live-summary":
+                continue
+            if ev.get("entity_type") != entity_type or ev.get("entity_id") != entity_id:
+                continue
+            last = ev
+    return last
+
+
+# ---------------------------------------------------------------------------
+# Request handler
+# ---------------------------------------------------------------------------
+
+class APTHandler(SimpleHTTPRequestHandler):
+    schema_cache = None
+
+    # --- response helpers -------------------------------------------------
+
+    def _send_json(self, code, body):
+        payload = json.dumps(body).encode("utf-8")
+        self.send_response(code)
+        self.send_header("content-type", "application/json")
+        self.send_header("content-length", str(len(payload)))
+        # No-cache so the browser always gets a fresh clean-check.
+        self.send_header("cache-control", "no-store")
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _read_json_body(self):
+        length = int(self.headers.get("content-length", "0") or "0")
+        if not length:
+            return None, "empty body"
+        raw = self.rfile.read(length)
+        try:
+            return json.loads(raw.decode("utf-8")), None
+        except json.JSONDecodeError as e:
+            return None, f"json parse: {e}"
+
+    # --- routing ----------------------------------------------------------
+
+    def do_GET(self):
+        if self.path == "/api/clean-check":
+            clean, dirty = git_clean_check()
+            self._send_json(200, {"clean": clean, "dirty_files": dirty})
+            return
+        return super().do_GET()
+
+    def do_POST(self):
+        if self.path == "/api/save-summary":
+            return self._handle_save_summary()
+        if self.path == "/api/invalidate-summary":
+            # Phase D will implement. Route reserved.
+            self._send_json(501, {
+                "ok": False,
+                "code": 501,
+                "message": "Not implemented yet; Phase D",
+            })
+            return
+        self._send_json(404, {"ok": False, "message": f"unknown endpoint {self.path}"})
+
+    # --- save-summary -----------------------------------------------------
+
+    def _handle_save_summary(self):
+        clean, dirty = git_clean_check()
+        if not clean:
+            self._send_json(409, {
+                "ok": False,
+                "code": 409,
+                "message": "Working tree dirty — commit or stash before saving summary.",
+                "dirty_files": dirty,
+            })
+            return
+
+        body, err = self._read_json_body()
+        if err or body is None:
+            self._send_json(400, {"ok": False, "message": err or "no body"})
+            return
+
+        primary = body.get("event")
+        primary_md = body.get("freeform_md", "") or ""
+        derived_list = body.get("derived", []) or []
+        if not isinstance(primary, dict):
+            self._send_json(400, {"ok": False, "message": "missing 'event' (primary)"})
+            return
+
+        schema = self._schema()
+
+        # Prepare + validate primary.
+        errs = []
+        if not self._prepare_event(primary, source_required="primary",
+                                   schema=schema, errors_out=errs,
+                                   origin_summary_event_id=None):
+            self._send_json(422, {
+                "ok": False,
+                "code": 422,
+                "message": "primary event failed validation",
+                "errors": errs,
+            })
+            return
+
+        # Prepare + validate each derived (origin = primary's event_id).
+        prepared_derived = []
+        for d in derived_list:
+            if not isinstance(d, dict):
+                self._send_json(400, {"ok": False, "message": "derived item not an object"})
+                return
+            ev = d.get("event")
+            md = d.get("freeform_md", "") or ""
+            if not isinstance(ev, dict):
+                self._send_json(400, {"ok": False, "message": "derived item missing 'event'"})
+                return
+            derrs = []
+            if not self._prepare_event(ev, source_required="derived",
+                                       schema=schema, errors_out=derrs,
+                                       origin_summary_event_id=primary["event_id"]):
+                self._send_json(422, {
+                    "ok": False,
+                    "code": 422,
+                    "message": f"derived event failed validation for {ev.get('entity_id')}",
+                    "errors": derrs,
+                })
+                return
+            prepared_derived.append((ev, md))
+
+        # Write markdown files + append events. Best-effort atomicity: if event
+        # append fails after some md files exist, those files become orphans
+        # (detectable via a future cache audit; manual cleanup for now).
+        SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
+
+        try:
+            self._write_md(primary, primary_md)
+            for ev, md in prepared_derived:
+                self._write_md(ev, md)
+
+            with open(EVENTS, "a") as f:
+                f.write(json.dumps(primary, separators=(",", ":")) + "\n")
+                for ev, _ in prepared_derived:
+                    f.write(json.dumps(ev, separators=(",", ":")) + "\n")
+        except OSError as e:
+            self._send_json(500, {
+                "ok": False,
+                "code": 500,
+                "message": f"filesystem write failed: {e}",
+            })
+            return
+
+        self._send_json(200, {
+            "ok": True,
+            "primary_event_id": primary["event_id"],
+            "derived_event_ids": [ev["event_id"] for ev, _ in prepared_derived],
+            "primary_freeform_path": primary["attributes"]["freeform_path"],
+        })
+
+    def _write_md(self, event, md_text):
+        path = REPO_ROOT / event["attributes"]["freeform_path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(md_text or "(empty)")
+
+    @classmethod
+    def _schema(cls):
+        if cls.schema_cache is None:
+            cls.schema_cache = load_schema()
+        return cls.schema_cache
+
+    def _prepare_event(self, ev, source_required, schema, errors_out,
+                       origin_summary_event_id):
+        """Mutate event in place: fill scaffolding, derive supersession links,
+        compute freeform_path. Validate. Returns True/False; appends to errors_out.
+
+        Supersession rules (T2-analyser §3.13):
+          - primary ALWAYS supersedes the most recent summary on E (primary or derived).
+          - derived ONLY supersedes a prior derived on E. Never primary.
+        Server is authoritative: any client-supplied supersedes_summary_event_id
+        pointing at a primary (when source=derived) is overwritten to null.
+        """
+        # Required scaffolding.
+        ev.setdefault("event_id", str(uuid.uuid4()))
+        ev.setdefault("type", "analysis.live-summary")
+        ev.setdefault("actor", "analyser")
+        ev.setdefault("confidence", "explicit")
+        ev["schema_version"] = "0.2.0"
+        attrs = ev.setdefault("attributes", {})
+
+        # Source — server-enforced.
+        attrs["source"] = source_required
+
+        entity_type = ev.get("entity_type")
+        entity_id = ev.get("entity_id")
+        if not entity_type or not entity_id:
+            errors_out.append("missing entity_type/entity_id")
+            return False
+
+        # Compute freeform_path from event_id. Always overwrite — client can't
+        # be trusted to invent paths that match the storage convention.
+        attrs["freeform_path"] = f".agent-plan-tracker/summaries/{entity_id}-{ev['event_id']}.md"
+
+        # origin_summary_event_id — only meaningful for derived.
+        if source_required == "derived":
+            attrs["origin_summary_event_id"] = origin_summary_event_id
+        else:
+            attrs["origin_summary_event_id"] = None
+
+        # Supersession — re-derived server-side regardless of what client sent.
+        prev = latest_summary_for(entity_type, entity_id)
+        if source_required == "primary":
+            attrs["supersedes_summary_event_id"] = prev["event_id"] if prev else None
+        else:
+            # derived: supersede prior derived only; NEVER primary.
+            if prev and prev.get("attributes", {}).get("source") == "derived":
+                attrs["supersedes_summary_event_id"] = prev["event_id"]
+            else:
+                attrs["supersedes_summary_event_id"] = None
+
+        # Required structured fields — schema will enforce, but a clearer
+        # error for missing fields surfaces faster here.
+        structured = attrs.get("structured")
+        if not isinstance(structured, dict):
+            errors_out.append("missing or non-object 'structured'")
+            return False
+        for k in ("outstanding", "blocked", "recently_changed"):
+            if k not in structured:
+                structured[k] = []
+        structured.setdefault("next_move", "")
+
+        # model required, default to a sentinel if missing (will fail schema).
+        attrs.setdefault("model", "")
+
+        ok, msg = validate_event(ev, schema)
+        if not ok:
+            errors_out.append(msg)
+            return False
+        return True
+
+
+def run(port=8765, host="127.0.0.1"):
+    os.chdir(str(REPO_ROOT))
+    server = HTTPServer((host, port), APTHandler)
+    print(f"serve.py listening on http://{host}:{port}")
+    print(f"  static: serving from {REPO_ROOT}")
+    print(f"  endpoints:")
+    print(f"    GET  /api/clean-check")
+    print(f"    POST /api/save-summary")
+    print(f"    POST /api/invalidate-summary  (Phase D — currently HTTP 501 stub)")
+    sys.stdout.flush()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nshutting down")
+        server.server_close()
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--host", default="127.0.0.1")
+    args = ap.parse_args()
+    run(port=args.port, host=args.host)
