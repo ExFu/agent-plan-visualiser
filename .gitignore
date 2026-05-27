@@ -9,3 +9,6 @@
 # Persistent backfill output should live in target projects' .agent-plan-tracker/,
 # not here.
 _scratch/
+
+# Background-agent worktrees (Claude agent SDK creates these for isolation)
+.claude/worktrees/
