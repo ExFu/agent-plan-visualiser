@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T14:25:00Z
+# Project state — generated 2026-05-27T15:42:55Z
 
-**Total events:** 91  ·  **Live:** 18  ·  **Dormant:** 0  ·  **Dead:** 9  ·  **Orphaned:** 0
+**Total events:** 95  ·  **Live:** 19  ·  **Dormant:** 0  ·  **Dead:** 9  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -14,8 +14,8 @@
   - `T2-ingest` (2 events): entity.created → relationship.spawns
   - `T2-ontology` (4 events): relationship.spawns → entity.extended → entity.progressed
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
-  - `T2-projection` (4 events): relationship.spawns → entity.extended → entity.progressed
-  - `T2-storage` (4 events): relationship.spawns → entity.extended → entity.progressed
+  - `T2-projection` (5 events): entity.extended → entity.progressed → entity.progressed
+  - `T2-storage` (5 events): entity.extended → entity.progressed → entity.progressed
 
 - **(milestone)**
   - `M1-bootstrap` (4 events): relationship.spawns → entity.progressed → entity.progressed
@@ -31,6 +31,7 @@
   - `2026-05-23.side-quest-formalisation` (1 events): entity.created
   - `2026-05-23.snapshot-trigger-config` (1 events): entity.created
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
+  - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
 
 ### By milestone
 
@@ -66,4 +67,4 @@ _No flapping closures._
 - **M1-bootstrap**: 9/9 T3 complete (100%); 0 live
 
 ---
-_27 entities · 8 relationships · 0 decisions._
+_28 entities · 8 relationships · 0 decisions._

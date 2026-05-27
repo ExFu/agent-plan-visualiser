@@ -158,6 +158,34 @@ def main():
         if ev["type"] == "entity.created":
             e["attrs"] = ev.get("attributes", {})
 
+    # Fallback: for plan entities with empty attrs (no entity.created event
+    # in the log), read frontmatter directly from the plan file. The
+    # methodology going forward says agents must emit entity.created for every
+    # plan when first touched, but this masks legacy gaps. See inbox item:
+    # 2026-05-27.agents-emit-entity-created-for-plans.
+    try:
+        import re as _re
+        import yaml as _yaml
+        for (et, eid), e in entities.items():
+            if et != "plan" or e["attrs"]:
+                continue
+            plan_path = REPO_ROOT / "planning" / f"{eid}.md"
+            if not plan_path.exists():
+                continue
+            content = plan_path.read_text()
+            m = _re.match(r"^---\n(.*?)\n---\n", content, _re.DOTALL)
+            if not m:
+                continue
+            try:
+                fm = _yaml.safe_load(m.group(1))
+                if isinstance(fm, dict):
+                    e["attrs"] = fm
+            except _yaml.YAMLError:
+                pass
+    except ImportError:
+        # pyyaml not available; skip fallback. Cache still builds; routing may be poorer.
+        pass
+
     for (et, eid), e in entities.items():
         conn.execute(
             """INSERT INTO entities (entity_type, entity_id, derived_state, attributes,

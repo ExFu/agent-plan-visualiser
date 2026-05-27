@@ -195,18 +195,34 @@ function renderFlow(projection, events, content) {
   `;
   content.appendChild(legend);
 
-  // Compute + render SVG
+  // Compute layout
   const layout = computeFlowLayout(projection, events, state.flowMode);
-  const wrap = document.createElement("div");
-  wrap.className = "flow-svg-wrap";
-  wrap.appendChild(renderFlowSVG(layout));
-  content.appendChild(wrap);
 
-  // Detail panel
+  // Two-pane split: SVG + drag handle + sidebar
+  const split = document.createElement("div");
+  split.className = "flow-split";
+
+  const svgWrap = document.createElement("div");
+  svgWrap.className = "flow-svg-wrap";
+  svgWrap.appendChild(renderFlowSVG(layout));
+  split.appendChild(svgWrap);
+
+  const handle = document.createElement("div");
+  handle.className = "flow-drag-handle";
+  handle.title = "Drag to resize the sidebar";
+  split.appendChild(handle);
+
+  const sidebar = document.createElement("aside");
+  sidebar.id = "flow-sidebar";
   const detail = document.createElement("div");
   detail.id = "flow-detail";
-  detail.innerHTML = "<p class='hint'>Hover a node for a tooltip. Click for full event details below.</p>";
-  content.appendChild(detail);
+  detail.innerHTML = "<p class='hint'>Hover a node for a tooltip. Click a node for event details, or click an entity name on the left for its full markdown content.</p>";
+  sidebar.appendChild(detail);
+  split.appendChild(sidebar);
+
+  content.appendChild(split);
+
+  makeResizable(handle, sidebar);
 }
 
 function computeFlowLayout(projection, events, mode) {
@@ -484,8 +500,9 @@ function renderFlowSVG(layout) {
         x: 28, y: yMid + 3,
       }, short);
       const titleEl = createNS("title");
-      titleEl.textContent = entity.entity_id;
+      titleEl.textContent = entity.entity_id + " (click to open)";
       labelEl.appendChild(titleEl);
+      labelEl.addEventListener("click", () => showPlanMarkdown(entity));
       swG.appendChild(labelEl);
     }
   });
@@ -650,7 +667,7 @@ function showDetail(n) {
   const panel = document.getElementById("flow-detail");
   if (!panel) return;
   const parts = [];
-  parts.push(`<h3>${escapeHtml(n.entity.entity_id)}</h3>`);
+  parts.push(`<h3 class="md-title">${escapeHtml(n.entity.entity_id)}</h3>`);
   parts.push(`<p class="detail-commit"><strong>Commit:</strong> ${escapeHtml(n.commitMessage)}<br><span class="detail-date">${escapeHtml(n.commitDate)}</span></p>`);
   parts.push(`<p>${n.eventCount} event(s) in this commit for this entity:</p>`);
   parts.push("<ul class='event-list'>");
@@ -661,6 +678,73 @@ function showDetail(n) {
   }
   parts.push("</ul>");
   panel.innerHTML = parts.join("");
+}
+
+async function showPlanMarkdown(entity) {
+  const panel = document.getElementById("flow-detail");
+  if (!panel) return;
+  panel.innerHTML = `<p>Loading <code>${escapeHtml(entity.entity_id)}</code>…</p>`;
+
+  let path;
+  if (entity.entity_type === "plan") {
+    path = `../../planning/${entity.entity_id}.md`;
+  } else if (entity.entity_type === "inbox-item") {
+    // Inbox filenames use dashes throughout; entity_id has a dot between date and slug.
+    const filename = entity.entity_id.replace(/\./g, "-");
+    path = `../../.agent-plan-tracker/inbox/${filename}.md`;
+  } else {
+    panel.innerHTML = `<p>No file mapping for entity_type <code>${escapeHtml(entity.entity_type)}</code>.</p>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const md = await res.text();
+    const body = stripFrontmatter(md);
+    const rendered = (window.marked && window.marked.parse)
+      ? window.marked.parse(body)
+      : `<pre>${escapeHtml(body)}</pre>`;
+    panel.innerHTML = `
+      <h3 class="md-title">${escapeHtml(entity.entity_id)}</h3>
+      <p class="meta-line"><span class="badge ${entity.derived_state}">${entity.derived_state}</span> · ${escapeHtml(entity.entity_type)} · <code>${escapeHtml(path)}</code></p>
+      <div class="md-content">${rendered}</div>
+    `;
+  } catch (e) {
+    panel.innerHTML = `<p>Failed to load <code>${escapeHtml(entity.entity_id)}</code>: ${escapeHtml(e.message)}</p><p class="hint">Path tried: <code>${escapeHtml(path)}</code></p>`;
+  }
+}
+
+function stripFrontmatter(md) {
+  const m = md.match(/^---\n[\s\S]*?\n---\n/);
+  return m ? md.slice(m[0].length) : md;
+}
+
+function makeResizable(handle, sidebar) {
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+  handle.addEventListener("mousedown", (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startWidth = sidebar.offsetWidth;
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const delta = startX - e.clientX;
+    const newWidth = Math.min(900, Math.max(280, startWidth + delta));
+    sidebar.style.width = newWidth + "px";
+  });
+  document.addEventListener("mouseup", () => {
+    if (dragging) {
+      dragging = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

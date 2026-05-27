@@ -123,14 +123,57 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 }
 .flow-legend svg { vertical-align: middle; margin-right: 2px; }
 
-.flow-svg-wrap {
-  overflow-x: auto;
+/* Flow view layout — split between SVG (left) and sidebar (right) */
+.flow-split {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  height: 80vh;
+  min-height: 600px;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 4px;
+  overflow: hidden;
+}
+.flow-svg-wrap {
+  flex: 1 1 auto;
+  overflow: auto;
   padding: 0.5rem;
+  min-width: 0;
 }
 .flow-svg { display: block; }
+.flow-drag-handle {
+  flex: 0 0 6px;
+  background: var(--border);
+  cursor: ew-resize;
+  position: relative;
+}
+.flow-drag-handle::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  width: 4px;
+  height: 30px;
+  margin-top: -15px;
+  border-left: 2px dotted #888;
+}
+.flow-drag-handle:hover {
+  background: #b0b0b0;
+}
+#flow-sidebar {
+  flex: 0 0 380px;
+  width: 380px;
+  min-width: 280px;
+  max-width: 900px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem 1.25rem;
+  background: var(--card-bg);
+  border-left: 1px solid var(--border);
+  box-sizing: border-box;
+}
 
 .swimlane-band.even { fill: #f6f6f6; }
 .swimlane-band.odd  { fill: #ffffff; }
@@ -146,10 +189,11 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   font-family: var(--mono);
   font-size: 10px;
   fill: #333;
-  cursor: help;
+  cursor: pointer;
 }
 .entity-label:hover {
   fill: #1565c0;
+  text-decoration: underline;
 }
 
 .commit-column {
@@ -255,16 +299,13 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 }
 
 #flow-detail {
-  margin-top: 1rem;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.75rem 1rem;
+  /* Now inside #flow-sidebar; no extra border/padding needed */
 }
-#flow-detail h3 {
+#flow-detail .md-title {
   font-family: var(--mono);
   font-size: 1rem;
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.4rem;
+  word-break: break-all;
 }
 #flow-detail .detail-commit {
   color: #555;
@@ -274,6 +315,16 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 #flow-detail .detail-date {
   color: #888;
   font-size: 0.75rem;
+}
+#flow-detail .meta-line {
+  font-size: 0.75rem;
+  color: #666;
+  margin: 0 0 0.75rem;
+  word-break: break-all;
+}
+#flow-detail .meta-line code {
+  font-size: 0.7rem;
+  color: #888;
 }
 #flow-detail .event-list {
   font-size: 0.85rem;
@@ -287,4 +338,59 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   font-style: italic;
   font-size: 0.85rem;
   margin: 0;
+}
+/* Markdown rendering inside the sidebar */
+#flow-detail .md-content {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #222;
+}
+#flow-detail .md-content h1 { font-size: 1.15rem; margin: 1rem 0 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.2rem; }
+#flow-detail .md-content h2 { font-size: 1.0rem;  margin: 0.9rem 0 0.4rem; color: #444; }
+#flow-detail .md-content h3 { font-size: 0.9rem;  margin: 0.75rem 0 0.3rem; color: #555; }
+#flow-detail .md-content h4 { font-size: 0.85rem; margin: 0.6rem 0 0.3rem; color: #666; }
+#flow-detail .md-content p { margin: 0.4rem 0; }
+#flow-detail .md-content ul, #flow-detail .md-content ol { padding-left: 1.4rem; margin: 0.4rem 0; }
+#flow-detail .md-content li { margin: 0.15rem 0; }
+#flow-detail .md-content code {
+  background: #f0f0f0;
+  padding: 0.05rem 0.3rem;
+  border-radius: 2px;
+  font-size: 0.78rem;
+  font-family: var(--mono);
+}
+#flow-detail .md-content pre {
+  background: #f5f5f5;
+  padding: 0.6rem;
+  border-radius: 3px;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+#flow-detail .md-content pre code {
+  background: transparent;
+  padding: 0;
+}
+#flow-detail .md-content blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.6rem;
+  margin: 0.4rem 0;
+  color: #555;
+}
+#flow-detail .md-content table {
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin: 0.4rem 0;
+}
+#flow-detail .md-content table th, #flow-detail .md-content table td {
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.4rem;
+  text-align: left;
+}
+#flow-detail .md-content a { color: #1565c0; text-decoration: none; }
+#flow-detail .md-content a:hover { text-decoration: underline; }
+#flow-detail .md-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.8rem 0;
 }
