@@ -44,28 +44,43 @@ After M1:
 
 Keeping these out keeps M1 small enough to land in 1–2 working sessions and prove the model.
 
-## 4. How M1 delivers — T3 work across four themes
+## 4. How M1 delivers — 9 T3 tasks across four themes
+
+All M1 T3s now have drafted plans (filename equals entity_id; see `planning/T3-*.md`).
 
 ### From T2-ontology
-- `T3-events-schema-json` — write `schemas/events.schema.json` defining all 23 event types, attribute requirements, shared fields.
-- `T3-plan-frontmatter-schema` — write `schemas/plan-frontmatter.schema.json` for plan YAML frontmatter validation.
+- `T3-events-schema-json` — JSON Schema for all 23 event types; migration of bootstrap events from `0.0.0-prehistoric` to `0.1.0`; `validate-events.sh` wrapper.
+- `T3-plan-frontmatter-schema` — JSON Schema for plan YAML frontmatter; `validate-plan-frontmatter.sh` enforcing filename-equals-id + schema.
 
 ### From T2-storage
-- `T3-cache-sqlite-schema` — define SQLite tables (`events`, `entities`, `relationships`, `decisions`) and the build-from-jsonl script.
-- `T3-projection-json-shape` — define the projection.json structure (current entity state, event-type sequences per entity, decision arc metadata, milestone rollups).
-- `T3-git-blame-commit-ref` — git-blame-based commit_ref resolution within the cache build.
+- `T3-cache-build` — `cache.schema.sql` + `cache-build.py` (covers original `T3-cache-sqlite-schema` + `T3-projection-json-shape` + `T3-git-blame-commit-ref` consolidated). Builds SQLite cache with 5 tables, populates `commit_ref` via `git blame`, idempotent.
 
 ### From T2-projection
-- `T3-projection-emitter` — SQL → JSON script that reads SQLite cache and emits `projection.json`.
-- `T3-markdown-summary` — projection.json → `summary.md` highlighting open work, blocked items, recently-closed, notable sequence patterns.
-- `T3-html-view-template` — `view/index.html` + `view/app.js` + `view/style.css` rendering entity-state-board + plan-hierarchy-tree views.
-- `T3-projection-queries-v0` — initial SQL catalogue in `bin/`.
+- `T3-projection-emitter` — `projection-emit.py` reads cache → emits `projection.json` per T2-storage §3.4 shape.
+- `T3-markdown-summary` — `summary-emit.py` reads projection.json → emits `summary.md` (Live work / Blocked / Orphaned / Recently closed / Notable patterns / Milestone progress).
+- `T3-html-view` — `view/{index.html, app.js, style.css}` rendering entity-state-board + plan-hierarchy-tree views. Vanilla JS, no build step.
+- `T3-projection-queries-v0` — initial SQL catalogue: `audit-stalled.sql`, `audit-fulcrum-without-decision.sql`, `audit-orphans.sql`, `trace-decision-history.sh`, `timeline-for-entity.sh`.
 
 ### From T2-packaging
-- `T3-plugin-scaffold` — create the plugin directory structure (`skills/`, `bin/`, `view/`, `philosophies/`, `hooks/`, `schemas/`, `commands/`) plus any required manifest.
-- `T3-build-loop` — repack-and-validate cycle to catch plugin format bugs continuously.
+- ~~`T3-plugin-scaffold`~~ — **complete** (commit `5068405`). Created plugin directory layout, `.claude-plugin/plugin.json` manifest, README, placeholder dirs.
+- `T3-build-loop` — `repack-validate.sh` orchestrates the full M1 validation+build pipeline end-to-end. Final T3; depends on every other M1 T3 having landed.
 
-That's ~10 T3 tasks. Each gets its own `T3-<slug>.md` plan when work begins on it (per the methodology — T3 plans are authored just before agents pick up the work).
+### Dependency order (linear path through the 8 remaining T3s)
+
+1. `T3-events-schema-json` (foundation — validates the rest)
+2. `T3-plan-frontmatter-schema` (parallel to #1 if helpful)
+3. `T3-cache-build` (depends on #1)
+4. `T3-projection-emitter` (depends on #3)
+5. `T3-markdown-summary` (depends on #4) — parallelisable with #6, #7
+6. `T3-html-view` (depends on #4)
+7. `T3-projection-queries-v0` (depends on #3)
+8. `T3-build-loop` (depends on all of the above)
+
+Steps 5/6/7 are parallelisable once 4 lands. Everything else is linear.
+
+### Consolidation note
+
+Original M1 listed 10 T3s. Tightened to 9 by merging the storage-related work (`T3-cache-sqlite-schema` + `T3-projection-json-shape` + `T3-git-blame-commit-ref` → one `T3-cache-build`) and renaming `T3-html-view-template` to `T3-html-view`. Conceptual scope unchanged.
 
 ## 5. Definition of done
 
