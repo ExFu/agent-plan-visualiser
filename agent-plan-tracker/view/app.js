@@ -192,6 +192,8 @@ function renderFlow(projection, events, content) {
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#ef6c00"/></svg> progressed</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#1b5e20"/></svg> completed</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#c62828"/></svg> fulcrum (parked/cancelled/etc.)</span>
+    <span><svg width="14" height="14"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" fill="#6a1b9a"/></svg> primary summary</span>
+    <span><svg width="14" height="14"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" fill="white" stroke="#6a1b9a" stroke-width="1.5"/></svg> derived summary</span>
     <span style="margin-left:1rem;color:#666;">solid line = entity spine · dashed = spawns · dotted = live continuation to "now" (click LIVE badge for timeline)</span>
   `;
   content.appendChild(legend);
@@ -267,9 +269,12 @@ function computeFlowLayout(projection, events, mode) {
   // Trailing buffer (in-progress, no closing commit.recorded): no assignment.
 
   // 3. Group events by entity (excluding meta / non-entity events).
+  //    Analysis events are also excluded — they get their own node kind
+  //    (summary nodes) rendered separately (Phase C — T2-analyser §3.10).
   const entityEvents = {};
   for (const ev of events) {
     if (!ev.entity_id || !ev.entity_type) continue;
+    if (ev.type === "analysis.live-summary" || ev.type === "analysis.invalidated") continue;
     const key = `${ev.entity_type}:${ev.entity_id}`;
     (entityEvents[key] ||= []).push(ev);
   }
@@ -379,6 +384,43 @@ function computeFlowLayout(projection, events, mode) {
     entityNodes[ek].sort((a, b) => a.x - b.x);
   }
 
+  // 7.5. Summary nodes (Phase C — T2-analyser §3.10).
+  // One node per analysis.live-summary event, placed on the entity's lifeline
+  // at the x-coordinate of its bracketing commit column. Rendered separately
+  // from event composite nodes to give them distinct visual treatment.
+  const summaryNodes = [];
+  const projectionSummaries = projection.summaries || {};
+  for (const ev of events) {
+    if (ev.type !== "analysis.live-summary") continue;
+    const ekey = `${ev.entity_type}:${ev.entity_id}`;
+    const yCoord = entityRow[ekey];
+    if (yCoord === undefined) continue;  // entity has no lifeline (shouldn't happen)
+    const cId = eventToCommit.get(ev.event_id);
+    let x;
+    if (cId) {
+      const c = commitMap[cId];
+      if (!c) continue;
+      x = LEFT_MARGIN + c.idx * COMMIT_WIDTH + COMMIT_WIDTH / 2;
+    } else {
+      // No bracketing commit — render in the now column. Defensive; clean-tree
+      // guard should prevent this in practice.
+      x = nowX;
+    }
+    const meta = projectionSummaries[ev.event_id] || {};
+    summaryNodes.push({
+      x, y: yCoord,
+      event_id: ev.event_id,
+      entityKey: ekey,
+      entity: entities[ekey],
+      source: ev.attributes?.source || meta.source || "primary",
+      model: ev.attributes?.model || meta.model || "?",
+      valid: meta.valid !== false,  // default true if projection not yet rebuilt
+      invalidated_by_event_id: meta.invalidated_by_event_id || null,
+      origin_summary_event_id: ev.attributes?.origin_summary_event_id || meta.origin_summary_event_id || null,
+      freeform_path: ev.attributes?.freeform_path || meta.freeform_path || "",
+    });
+  }
+
   // 8. Relationship edges (spawns).
   const relEdges = [];
   for (const r of (projection.relationships || []).filter(r => r.type === "spawns")) {
@@ -407,7 +449,7 @@ function computeFlowLayout(projection, events, mode) {
   }
 
   return {
-    nodes, entityNodes, relEdges, continuations, nowBadges,
+    nodes, entityNodes, relEdges, continuations, nowBadges, summaryNodes,
     swimlaneSpans, commits, commitMap,
     LEFT_MARGIN, TOP_MARGIN, COMMIT_WIDTH, NOW_COLUMN_WIDTH, ROW_HEIGHT, NODE_RADIUS,
     nowX, totalWidth, totalHeight,
@@ -650,6 +692,45 @@ function renderFlowSVG(layout) {
     nowG.appendChild(text);
   }
   svg.appendChild(nowG);
+
+  // Summary nodes (Phase C). Squares on entity lifelines, distinct from event
+  // composite circles. Filled purple for primary; outlined purple for derived.
+  // Invalidated summaries are dimmed + struck through (Phase D produces the
+  // invalidation events; Phase C just renders them when present).
+  const SUMMARY_SIDE = 9;
+  const sumG = createNS("g", { class: "summary-nodes" });
+  for (const s of layout.summaryNodes || []) {
+    const classes = ["summary-node", `summary-node-${s.source}`];
+    if (!s.valid) classes.push("summary-node-invalidated");
+    const rect = createNS("rect", {
+      class: classes.join(" "),
+      x: s.x - SUMMARY_SIDE / 2, y: s.y - SUMMARY_SIDE / 2,
+      width: SUMMARY_SIDE, height: SUMMARY_SIDE,
+      rx: 1.5,
+    });
+    const titleEl = createNS("title");
+    const tagText = s.source === "primary" ? "primary" : "derived";
+    const validText = s.valid ? "" : " · INVALIDATED";
+    titleEl.textContent = `Summary · ${tagText}${validText} · ${s.model} · click to open`;
+    rect.appendChild(titleEl);
+    rect.addEventListener("click", () => {
+      if (!s.entity) return;
+      const panel = document.getElementById("flow-detail");
+      if (!panel) return;
+      SavedSummary.renderByEventId(panel, s.entity, s.event_id);
+    });
+    sumG.appendChild(rect);
+    // Strike-through line for invalidated summaries.
+    if (!s.valid) {
+      sumG.appendChild(createNS("line", {
+        class: "summary-strike",
+        x1: s.x - SUMMARY_SIDE / 2 - 1,
+        x2: s.x + SUMMARY_SIDE / 2 + 1,
+        y1: s.y, y2: s.y,
+      }));
+    }
+  }
+  svg.appendChild(sumG);
 
   return svg;
 }
@@ -1456,9 +1537,31 @@ const SavedSummary = {
     return map[`${entity.entity_type}:${entity.entity_id}`] || null;
   },
 
+  byEventId(eventId) {
+    // Phase C: look up an arbitrary summary by event_id (not just the latest
+    // on its entity). Allows the flow view's summary-node click handler to
+    // open whichever summary was clicked, including superseded ones.
+    const proj = state.projection || {};
+    const map = proj.summaries || {};
+    return map[eventId] || null;
+  },
+
+  async renderByEventId(panel, entity, eventId) {
+    const summary = this.byEventId(eventId);
+    if (!summary) {
+      panel.innerHTML = `<p class="analyser-error">Summary <code>${escapeHtml(eventId)}</code> not found in projection. Try refreshing.</p>`;
+      return false;
+    }
+    return this._renderInner(panel, entity, summary);
+  },
+
   async render(panel, entity) {
     const summary = this.forEntity(entity);
     if (!summary) return false;
+    return this._renderInner(panel, entity, summary);
+  },
+
+  async _renderInner(panel, entity, summary) {
 
     // Load freeform markdown lazily.
     let freeform = "";

@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T18:27:51Z
+# Project state — generated 2026-05-27T18:33:03Z
 
-**Total events:** 138  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Dead:** 11  ·  **Orphaned:** 0
+**Total events:** 143  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 12  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -10,7 +10,7 @@
   - `T1-top-level` (29 events): entity.extended → entity.extended → entity.extended
 
 - **(T2 itself)**
-  - `T2-analyser` (6 events): entity.progressed → entity.progressed → entity.progressed
+  - `T2-analyser` (7 events): entity.progressed → entity.progressed → entity.progressed
   - `T2-extraction` (2 events): entity.created → relationship.spawns
   - `T2-ingest` (2 events): entity.created → relationship.spawns
   - `T2-ontology` (4 events): relationship.spawns → entity.extended → entity.progressed
@@ -20,7 +20,7 @@
 
 - **(milestone)**
   - `M1-bootstrap` (4 events): relationship.spawns → entity.progressed → entity.progressed
-  - `M6-analyser` (4 events): relationship.spawns → entity.progressed → entity.progressed
+  - `M6-analyser` (5 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -34,9 +34,6 @@
   - `2026-05-23.snapshot-trigger-config` (1 events): entity.created
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
-
-- **T2-analyser**
-  - `T3-analyser-phase-c-flow-rendering` (2 events): entity.created → relationship.spawns
 
 - **T2-storage**
   - `T3-cache-build` (3 events): entity.completed → verification.tested → entity.progressed
@@ -52,9 +49,6 @@
 - **M1-bootstrap**
   - `T3-cache-build`
 
-- **M6-analyser**
-  - `T3-analyser-phase-c-flow-rendering`
-
 ## Blocked
 
 _No open blockers._
@@ -68,13 +62,13 @@ _No orphaned entities._
 - `2026-05-27.outstanding-work-analyser-endpoint` (inbox-item)
 - `T3-analyser-phase-a-ephemeral` (plan)
 - `T3-analyser-phase-b-persistence` (plan)
+- `T3-analyser-phase-c-flow-rendering` (plan)
 - `T3-build-loop` (plan)
 - `T3-events-schema-json` (plan)
 - `T3-html-view` (plan)
 - `T3-markdown-summary` (plan)
 - `T3-plan-frontmatter-schema` (plan)
 - `T3-plugin-scaffold` (plan)
-- `T3-projection-emitter` (plan)
 
 ## Notable patterns
 
@@ -83,7 +77,7 @@ _No flapping closures._
 ## Milestone progress
 
 - **M1-bootstrap**: 8/9 T3 complete (88%); 1 live
-- **M6-analyser**: 2/3 T3 complete (66%); 1 live
+- **M6-analyser**: 3/3 T3 complete (100%); 0 live
 
 ---
 _34 entities · 33 relationships · 1 decisions._

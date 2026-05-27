@@ -117,6 +117,27 @@ def main():
                 "origin_summary_event_id": row["origin_summary_event_id"],
             }
 
+    # All summaries keyed by event_id (Phase C — flow-view rendering needs
+    # per-event metadata to render each summary as a distinct node, plus
+    # the `valid` flag to apply strike-through to invalidated summaries).
+    # Includes both valid and invalid entries — the renderer decides.
+    summaries = {}
+    for row in conn.execute("SELECT * FROM summaries ORDER BY line_no ASC"):
+        summaries[row["event_id"]] = {
+            "event_id": row["event_id"],
+            "entity_type": row["entity_type"],
+            "entity_id": row["entity_id"],
+            "source": row["source"],
+            "model": row["model"],
+            "freeform_path": row["freeform_path"],
+            "structured": json.loads(row["structured"]),
+            "supersedes_summary_event_id": row["supersedes_summary_event_id"],
+            "origin_summary_event_id": row["origin_summary_event_id"],
+            "valid": bool(row["valid"]),
+            "invalidated_by_event_id": row["invalidated_by_event_id"],
+            "created_commit_recorded_event_id": row["created_commit_recorded_event_id"],
+        }
+
     state_counts = {s: 0 for s in ("live", "dormant", "dead", "orphaned", "unknown")}
     for row in conn.execute("SELECT derived_state, count(*) c FROM entities GROUP BY derived_state"):
         state_counts[row["derived_state"]] = row["c"]
@@ -141,6 +162,7 @@ def main():
         "summary_stats": summary_stats,
         "milestone_progress": milestone_progress,
         "latest_summary_by_entity": latest_summary_by_entity,
+        "summaries": summaries,
     }
 
     tmp = OUT.with_suffix(".tmp")

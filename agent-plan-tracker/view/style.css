@@ -888,3 +888,37 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 
 #analyser-save-feedback:empty { display: none; }
 
+/* ------------------------------------------------------------------ */
+/* Summary nodes on the workstreams flow (Phase C)                    */
+/* ------------------------------------------------------------------ */
+
+.summary-node {
+  cursor: pointer;
+  stroke: #fff;
+  stroke-width: 1;
+  transition: stroke-width 0.12s ease, filter 0.12s ease;
+}
+.summary-node:hover {
+  stroke-width: 2;
+  filter: brightness(1.1);
+}
+.summary-node-primary {
+  fill: #6a1b9a;
+}
+.summary-node-derived {
+  fill: #ffffff;
+  stroke: #6a1b9a;
+  stroke-width: 1.6;
+}
+.summary-node-derived:hover {
+  stroke-width: 2.4;
+}
+.summary-node-invalidated {
+  opacity: 0.35;
+}
+.summary-strike {
+  stroke: #b71c1c;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
