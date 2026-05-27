@@ -1,10 +1,23 @@
 /* Functional baseline — polish is a separate concern. */
 :root {
-  --color-live: #2e7d32;
-  --color-dormant: #f9a825;
-  --color-dead: #757575;
-  --color-orphaned: #c62828;
-  --color-unknown: #6a1b9a;
+  /* derived-state colours */
+  --color-live: #0288d1;       /* blue — active, ongoing (distinct from green/completed) */
+  --color-dormant: #f9a825;    /* amber */
+  --color-dead: #757575;       /* grey */
+  --color-orphaned: #c62828;   /* red */
+  --color-unknown: #6a1b9a;    /* purple */
+  /* event-pill base colours (match dominantEventColor in app.js) */
+  --pill-created: #c2185b;     /* pink/magenta — birth */
+  --pill-extended: #1565c0;
+  --pill-progressed: #ef6c00;
+  --pill-completed: #1b5e20;   /* the only green — unambiguous done */
+  --pill-fulcrum: #c62828;
+  --pill-decision: #fbc02d;
+  --pill-blocker: #d32f2f;
+  --pill-verification: #5e35b2;
+  --pill-relationship: #7e57c2;
+  --pill-meta: #757575;
+  --pill-other: #9e9e9e;
   --bg: #fafafa;
   --fg: #212121;
   --card-bg: #ffffff;
@@ -254,7 +267,8 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   pointer-events: none;
 }
 
-.now-badge { stroke: #fff; stroke-width: 1; }
+.now-badge { stroke: #fff; stroke-width: 1; cursor: pointer; transition: stroke-width 0.12s ease; }
+.now-badge:hover { stroke-width: 2.5; filter: brightness(1.1); }
 .now-badge.live      { fill: var(--color-live); }
 .now-badge.dormant   { fill: var(--color-dormant); }
 .now-badge.dead      { fill: var(--color-dead); }
@@ -265,7 +279,7 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   font-weight: 700;
   font-size: 9px;
   fill: white;
-  pointer-events: none;
+  cursor: pointer;
 }
 
 #flow-tooltip {
@@ -328,11 +342,48 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 }
 #flow-detail .event-list {
   font-size: 0.85rem;
-  padding-left: 1.25rem;
+  list-style: none;
+  padding-left: 0;
+  margin: 0.5rem 0;
 }
 #flow-detail .event-list li {
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
 }
+#flow-detail .event-list li:last-child {
+  border-bottom: none;
+}
+#flow-detail .event-summary {
+  margin-top: 0.25rem;
+  color: #333;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+/* Event pills — colored backgrounds per event category */
+.event-pill {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 11px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.2px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.event-pill-created       { background: var(--pill-created); }
+.event-pill-extended      { background: var(--pill-extended); }
+.event-pill-progressed    { background: var(--pill-progressed); }
+.event-pill-completed     { background: var(--pill-completed); }
+.event-pill-fulcrum       { background: var(--pill-fulcrum); }
+.event-pill-decision      { background: var(--pill-decision); color: #333; }
+.event-pill-blocker       { background: var(--pill-blocker); }
+.event-pill-verification  { background: var(--pill-verification); }
+.event-pill-relationship  { background: var(--pill-relationship); }
+.event-pill-meta          { background: var(--pill-meta); }
+.event-pill-other         { background: var(--pill-other); }
 #flow-detail .hint {
   color: #888;
   font-style: italic;

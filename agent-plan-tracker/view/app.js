@@ -50,7 +50,7 @@ async function main() {
   document.getElementById("btn-tree").addEventListener("click", () => switchView("tree"));
   document.getElementById("btn-flow").addEventListener("click", () => switchView("flow"));
 
-  switchView("board");
+  switchView("flow");
 }
 
 function switchView(view) {
@@ -186,12 +186,12 @@ function renderFlow(projection, events, content) {
   legend.className = "flow-legend";
   legend.innerHTML = `
     <strong>Legend:</strong>
-    <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#2e7d32"/></svg> created</span>
+    <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#c2185b"/></svg> created</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#1565c0"/></svg> extended</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#ef6c00"/></svg> progressed</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#1b5e20"/></svg> completed</span>
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#c62828"/></svg> fulcrum (parked/cancelled/etc.)</span>
-    <span style="margin-left:1rem;color:#666;">solid line = entity spine · dashed = spawns · dotted = live continuation to "now"</span>
+    <span style="margin-left:1rem;color:#666;">solid line = entity spine · dashed = spawns · dotted = live continuation to "now" (click LIVE badge for timeline)</span>
   `;
   content.appendChild(legend);
 
@@ -447,14 +447,17 @@ function swimlaneLabel(key, mode) {
 
 function dominantEventColor(eventList) {
   const types = new Set(eventList.map(e => e.type));
+  // Fulcrum events first (most destructive / decision-needing).
   if (types.has("entity.cancelled")) return "#c62828";
   if (types.has("entity.superseded")) return "#ad1457";
   if (types.has("entity.parked")) return "#f9a825";
   if (types.has("entity.reopened")) return "#8e24aa";
   if (types.has("entity.renamed")) return "#6a1b9a";
+  // Completion (the only green — unambiguous "done" signal).
   if (types.has("entity.completed")) return "#1b5e20";
   if (types.has("verification.failed")) return "#d32f2f";
-  if (types.has("entity.created")) return "#2e7d32";
+  // Birth (pink/magenta — distinct from any green).
+  if (types.has("entity.created")) return "#c2185b";
   if (types.has("entity.progressed")) return "#ef6c00";
   if (types.has("entity.extended")) return "#1565c0";
   if (types.has("blocker.raised")) return "#d32f2f";
@@ -462,6 +465,22 @@ function dominantEventColor(eventList) {
   if (types.has("verification.tested")) return "#00897b";
   if (types.has("relationship.spawns")) return "#7e57c2";
   return "#9e9e9e";
+}
+
+// Maps an event type to a CSS class suffix for pill styling.
+function eventTypeKind(type) {
+  if (type === "decision") return "decision";
+  if (type === "commit.recorded") return "meta";
+  if (type.startsWith("blocker.")) return "blocker";
+  if (type.startsWith("verification.")) return "verification";
+  if (type.startsWith("relationship.")) return "relationship";
+  // entity.* lifecycle
+  if (["entity.cancelled", "entity.superseded", "entity.parked", "entity.reopened", "entity.renamed"].includes(type)) return "fulcrum";
+  if (type === "entity.completed") return "completed";
+  if (type === "entity.created") return "created";
+  if (type === "entity.extended") return "extended";
+  if (type === "entity.progressed") return "progressed";
+  return "other";
 }
 
 function renderFlowSVG(layout) {
@@ -598,19 +617,36 @@ function renderFlowSVG(layout) {
   }
   svg.appendChild(nodeG);
 
-  // "Now" badges on the right
+  // "Now" badges on the right — click to see entity's recent timeline.
   const nowG = createNS("g", { class: "now-badges" });
   for (const b of layout.nowBadges) {
-    nowG.appendChild(createNS("rect", {
+    const entityKey = `plan:${b.entityId}`;
+    // Resolve entity from projection; fall back to scanning all entities for non-plan types.
+    let entity = state.projection.entities[entityKey];
+    if (!entity) {
+      entity = Object.values(state.projection.entities).find(e => e.entity_id === b.entityId);
+    }
+    const rect = createNS("rect", {
       class: `now-badge ${b.state}`,
       x: layout.nowX - 20, y: b.y - 7,
       width: 40, height: 14, rx: 3,
-    }));
-    nowG.appendChild(textNS({
+    });
+    const text = textNS({
       class: "now-badge-text",
       x: layout.nowX, y: b.y + 4,
       "text-anchor": "middle",
-    }, b.state.toUpperCase().slice(0, 4)));
+    }, b.state.toUpperCase().slice(0, 4));
+    // SVG <title> for hover hint
+    const titleEl = createNS("title");
+    titleEl.textContent = `${b.entityId} (${b.state}) — click for recent timeline`;
+    rect.appendChild(titleEl);
+    if (entity) {
+      const handler = () => showLiveStatus(entity);
+      rect.addEventListener("click", handler);
+      text.addEventListener("click", handler);
+    }
+    nowG.appendChild(rect);
+    nowG.appendChild(text);
   }
   svg.appendChild(nowG);
 
@@ -672,12 +708,50 @@ function showDetail(n) {
   parts.push(`<p>${n.eventCount} event(s) in this commit for this entity:</p>`);
   parts.push("<ul class='event-list'>");
   for (const ev of n.events) {
-    const summary = ev.attributes?.summary || ev.attributes?.note || ev.attributes?.text || ev.attributes?.title || "(no summary)";
-    const trunc = summary.length > 280 ? summary.slice(0, 280) + "…" : summary;
-    parts.push(`<li><code>${escapeHtml(ev.type)}</code> · ${escapeHtml(trunc)}</li>`);
+    parts.push(renderEventLi(ev));
   }
   parts.push("</ul>");
   panel.innerHTML = parts.join("");
+}
+
+function renderEventLi(ev) {
+  const kind = eventTypeKind(ev.type);
+  const summary = ev.attributes?.summary || ev.attributes?.note || ev.attributes?.text || ev.attributes?.title || "(no summary)";
+  const trunc = summary.length > 320 ? summary.slice(0, 320) + "…" : summary;
+  return `<li><span class="event-pill event-pill-${kind}">${escapeHtml(ev.type)}</span><div class="event-summary">${escapeHtml(trunc)}</div></li>`;
+}
+
+async function showLiveStatus(entity) {
+  const panel = document.getElementById("flow-detail");
+  if (!panel) return;
+  // Filter events.jsonl for this entity, in order.
+  const myEvents = state.events.filter(
+    ev => ev.entity_type === entity.entity_type && ev.entity_id === entity.entity_id
+  );
+  const last = myEvents[myEvents.length - 1];
+
+  const parts = [];
+  parts.push(`<h3 class="md-title">${escapeHtml(entity.entity_id)}</h3>`);
+  parts.push(`<p class="meta-line"><span class="badge ${entity.derived_state}">${entity.derived_state}</span> · ${escapeHtml(entity.entity_type)} · ${myEvents.length} event${myEvents.length === 1 ? '' : 's'} total</p>`);
+  parts.push(`<p class="hint">Showing the entity's full event timeline. For deep "what's outstanding?" analysis, see the proposed Claude-backed endpoint in the inbox (<code>2026-05-27.outstanding-work-analyser-endpoint</code>).</p>`);
+  parts.push("<h4>Timeline</h4>");
+  parts.push("<ul class='event-list'>");
+  for (const ev of myEvents) {
+    parts.push(renderEventLi(ev));
+  }
+  parts.push("</ul>");
+  // Plus a "see full plan" affordance
+  if (entity.entity_type === "plan" || entity.entity_type === "inbox-item") {
+    parts.push(`<p class="hint"><a href="#" id="open-plan-from-live">→ Open the full plan/inbox markdown</a></p>`);
+  }
+  panel.innerHTML = parts.join("");
+  const linkEl = document.getElementById("open-plan-from-live");
+  if (linkEl) {
+    linkEl.addEventListener("click", (e) => {
+      e.preventDefault();
+      showPlanMarkdown(entity);
+    });
+  }
 }
 
 async function showPlanMarkdown(entity) {
