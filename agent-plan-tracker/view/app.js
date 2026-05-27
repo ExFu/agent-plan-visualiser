@@ -1733,6 +1733,31 @@ const PersistenceClient = {
     }
     return data;
   },
+
+  // Phase D — T3-analyser-phase-d-cascade-invalidation.
+  // Server computes the cascade and emits one analysis.invalidated event
+  // listing the cascade. Returns { ok, invalidation_event_id,
+  // target_event_id, cascades_to_event_ids[], reason }.
+  async invalidateSummary({ target_event_id, reason }) {
+    const res = await fetch("/api/invalidate-summary", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target_event_id, reason }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      const code = res.status === 409 ? "dirty-tree"
+                 : res.status === 404 ? "not-found"
+                 : res.status === 400 ? "bad-request"
+                 : "server";
+      const e = new PersistenceError(code, data.message || `HTTP ${res.status}`);
+      e.status = res.status;
+      e.dirty_files = data.dirty_files;
+      throw e;
+    }
+    return data;
+  },
 };
 
 class PersistenceError extends Error {
@@ -1838,13 +1863,28 @@ const SavedSummary = {
     // Timeline pane (lazy-populated)
     parts.push(`<div id="analyser-pane-timeline" hidden></div>`);
 
+    // Invalidation banner (Phase D — T3-analyser-phase-d-cascade-invalidation).
+    // If the summary has been marked invalid by an analysis.invalidated event,
+    // show a red banner at the top of the panel.
+    const isInvalid = summary.valid === false;
+    if (isInvalid) {
+      parts.push(`<div class="invalidation-banner">
+        <strong>⚠ This summary has been invalidated.</strong>
+        ${summary.invalidated_by_event_id ? `<div class="hint">invalidated by event <code>${escapeHtml(summary.invalidated_by_event_id)}</code></div>` : ""}
+        <div class="hint">Regenerate to replace.</div>
+      </div>`);
+    }
+
     // Actions
     const hasKey = Settings.hasKey();
     parts.push(`<div class="analyser-toggle-row">
       <button class="btn-primary" id="btn-saved-regenerate" ${hasKey ? "" : "disabled"} style="font-size:0.78rem"
         title="${hasKey ? "Re-run analysis (new event will supersede this one)" : "Configure API key in settings first"}">↻ Regenerate</button>
+      <button class="btn-danger" id="btn-saved-invalidate" ${isInvalid ? "disabled" : ""} style="font-size:0.78rem"
+        title="${isInvalid ? "Already invalidated" : "Mark this summary invalid. Cascade-detects dependents and marks them too. One-way; regenerate to replace."}">⊘ Invalidate</button>
       <button class="btn-secondary" id="btn-saved-show-summary-event" style="font-size:0.78rem">View event id</button>
     </div>`);
+    parts.push(`<div id="analyser-invalidate-feedback"></div>`);
 
     // Task C: spawn-relationships navigation, after the actions row.
     parts.push(spawnRelationshipsSection(entity));
@@ -1874,11 +1914,157 @@ const SavedSummary = {
     document.getElementById("btn-saved-regenerate")?.addEventListener("click", () => {
       SidebarAnalyser.startAnalysis(entity);
     });
+    document.getElementById("btn-saved-invalidate")?.addEventListener("click", () => {
+      SavedSummary._openInvalidateDialog(entity, summary);
+    });
     document.getElementById("btn-saved-show-summary-event")?.addEventListener("click", () => {
       alert(`Summary event id: ${summary.event_id}\nSource: ${summary.source}\nFreeform path: ${summary.freeform_path}\nSupersedes: ${summary.supersedes_summary_event_id || "(none)"}`);
     });
 
     return true;
+  },
+
+  // Phase D: client-side cascade preview + confirmation dialog.
+  // Mirrors the server's cascade rules so the user knows what will happen
+  // BEFORE confirming. The server re-computes from scratch on commit; this
+  // is a UI courtesy only.
+  _previewCascade(targetSummary) {
+    const proj = state.projection || {};
+    const allSummaries = Object.values(proj.summaries || {});
+    const targetKey = `${targetSummary.entity_type}:${targetSummary.entity_id}`;
+    const targetLine = (allSummaries.find(s => s.event_id === targetSummary.event_id) || {}).line_no
+      ?? Number.NEGATIVE_INFINITY;
+
+    // Build 1-hop spawn neighbours via event-sourced edges only.
+    const eventSpawnNeighbours = new Set();
+    for (const r of (proj.relationships || [])) {
+      if (r.type !== "spawns" || r.source !== "event") continue;
+      if (r.from === targetKey) eventSpawnNeighbours.add(r.to);
+      else if (r.to === targetKey) eventSpawnNeighbours.add(r.from);
+    }
+
+    const cascade = [];
+    for (const s of allSummaries) {
+      if (s.event_id === targetSummary.event_id) continue;
+      if (s.valid === false) continue;  // already invalidated
+      const sKey = `${s.entity_type}:${s.entity_id}`;
+      // (1) Same-entity chain successor
+      if (sKey === targetKey && (s.line_no || 0) > targetLine) {
+        cascade.push(s); continue;
+      }
+      // (2) Origin chain (derived whose primary is the target)
+      if (s.origin_summary_event_id === targetSummary.event_id) {
+        cascade.push(s); continue;
+      }
+      // (3) Cross-entity via spawn graph, after target
+      if (eventSpawnNeighbours.has(sKey) && (s.line_no || 0) > targetLine) {
+        cascade.push(s); continue;
+      }
+    }
+    return cascade;
+  },
+
+  _openInvalidateDialog(entity, summary) {
+    const cascade = SavedSummary._previewCascade(summary);
+    const dialog = document.getElementById("cost-dialog");  // re-purpose the modal
+    const titleEl = document.getElementById("cost-dialog-title");
+    const body = document.getElementById("cost-dialog-body");
+    const cancelBtn = document.getElementById("cost-cancel");
+    const confirmBtn = document.getElementById("cost-confirm");
+    if (!dialog || !body || !confirmBtn) return;
+
+    titleEl.textContent = "Invalidate summary";
+    body.innerHTML = `
+      <p class="modal-hint">
+        About to mark this summary invalid. This is <strong>one-way</strong>;
+        the only way to "restore" is to regenerate (which supersedes it with
+        a fresh primary). Cascade-detected dependents are also marked invalid
+        in the same operation.
+      </p>
+      <div class="cost-line"><span class="cost-label">Target</span><span class="cost-value">${escapeHtml(summary.event_id.slice(0, 8))}… on ${escapeHtml(entity.entity_id)}</span></div>
+      <div class="cost-line"><span class="cost-label">Source</span><span class="cost-value">${escapeHtml(summary.source || "?")}</span></div>
+      <div class="cost-line cost-total"><span class="cost-label">Cascade size</span><span class="cost-value">${cascade.length}</span></div>
+      ${cascade.length ? `
+        <div class="invalidate-cascade-list">
+          <div class="form-label" style="margin-top:0.7rem">Will also invalidate:</div>
+          <ul style="font-size:0.78rem;font-family:var(--mono);max-height:160px;overflow-y:auto;padding-left:1.1rem;margin:0.3rem 0 0.5rem">
+            ${cascade.map(c => `<li>${escapeHtml(c.entity_id)} <span style="color:#888">(${escapeHtml(c.source)}, ${escapeHtml(c.event_id.slice(0,8))}…)</span></li>`).join("")}
+          </ul>
+        </div>
+      ` : `<div class="cost-warning-banner" style="background:#e8f5e9;border-color:#43a047;color:#1b5e20">No dependents detected — invalidating only this summary.</div>`}
+      <div class="form-row">
+        <span class="form-label">Reason</span>
+        <select id="invalidate-reason">
+          <option value="user-triggered (stale)">user-triggered (stale)</option>
+          <option value="underlying-events-changed">underlying-events-changed</option>
+          <option value="regenerating-replacement">regenerating-replacement</option>
+          <option value="other">other</option>
+        </select>
+      </div>
+    `;
+    // Re-label the confirm button to be unambiguous about the destructive action.
+    confirmBtn.textContent = "Confirm and invalidate";
+    confirmBtn.classList.remove("btn-primary");
+    confirmBtn.classList.add("btn-danger");
+
+    // Detach any previous handler.
+    if (SavedSummary._invalidateConfirmHandler) {
+      confirmBtn.removeEventListener("click", SavedSummary._invalidateConfirmHandler);
+    }
+    SavedSummary._invalidateConfirmHandler = async () => {
+      const reason = document.getElementById("invalidate-reason").value || "user-triggered";
+      dialog.hidden = true;
+      // Restore button look for any future cost-dialog opens.
+      confirmBtn.textContent = "Confirm and run";
+      confirmBtn.classList.remove("btn-danger");
+      confirmBtn.classList.add("btn-primary");
+      await SavedSummary._performInvalidate(entity, summary, reason);
+    };
+    confirmBtn.addEventListener("click", SavedSummary._invalidateConfirmHandler);
+
+    // Cancel restores button look too.
+    const cancelRestore = () => {
+      confirmBtn.textContent = "Confirm and run";
+      confirmBtn.classList.remove("btn-danger");
+      confirmBtn.classList.add("btn-primary");
+      cancelBtn.removeEventListener("click", cancelRestore);
+    };
+    cancelBtn.addEventListener("click", cancelRestore);
+
+    dialog.hidden = false;
+  },
+
+  async _performInvalidate(entity, summary, reason) {
+    const fb = document.getElementById("analyser-invalidate-feedback");
+    const btn = document.getElementById("btn-saved-invalidate");
+    if (btn) btn.disabled = true;
+    if (fb) fb.innerHTML = `<div class="analyser-loading"><div class="spinner"></div>Invalidating…</div>`;
+
+    try {
+      const resp = await PersistenceClient.invalidateSummary({
+        target_event_id: summary.event_id,
+        reason,
+      });
+      const n = (resp.cascades_to_event_ids || []).length;
+      if (fb) {
+        fb.innerHTML = `<div class="analyser-saved-banner" style="background:#fff3cd;border-color:#ffc107;color:#5d4400">
+          Invalidated · <code>${escapeHtml(resp.invalidation_event_id)}</code>
+          ${n > 0 ? `· +${n} cascaded` : ""}
+          <br><span class="hint">Run <code>repack-validate.sh</code> then reload to see the flow view repaint (struck-through node).</span>
+        </div>`;
+      }
+      if (btn) {
+        btn.textContent = "⊘ Invalidated";
+        btn.disabled = true;
+      }
+    } catch (e) {
+      const message = e instanceof PersistenceError ? e.userFacing() : (e.message || "Invalidate failed");
+      const detail = (e && e.dirty_files) ? `\n${(e.dirty_files || []).join("\n")}` : "";
+      if (fb) {
+        fb.innerHTML = `<div class="analyser-error"><strong>${escapeHtml(message)}</strong>${detail ? `<pre>${escapeHtml(detail)}</pre>` : ""}</div>`;
+      }
+      if (btn) btn.disabled = false;
+    }
   },
 
   _renderTimelineInto(pane, entity) {

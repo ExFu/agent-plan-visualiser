@@ -145,13 +145,7 @@ class APTHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/save-summary":
             return self._handle_save_summary()
         if self.path == "/api/invalidate-summary":
-            # Phase D will implement. Route reserved.
-            self._send_json(501, {
-                "ok": False,
-                "code": 501,
-                "message": "Not implemented yet; Phase D",
-            })
-            return
+            return self._handle_invalidate_summary()
         self._send_json(404, {"ok": False, "message": f"unknown endpoint {self.path}"})
 
     # --- save-summary -----------------------------------------------------
@@ -245,6 +239,165 @@ class APTHandler(SimpleHTTPRequestHandler):
             "primary_event_id": primary["event_id"],
             "derived_event_ids": [ev["event_id"] for ev, _ in prepared_derived],
             "primary_freeform_path": primary["attributes"]["freeform_path"],
+        })
+
+    # --- invalidate-summary -----------------------------------------------
+    # Phase D — T3-analyser-phase-d-cascade-invalidation.
+
+    def _handle_invalidate_summary(self):
+        clean, dirty = git_clean_check()
+        if not clean:
+            self._send_json(409, {
+                "ok": False,
+                "code": 409,
+                "message": "Working tree dirty — commit or stash before invalidating.",
+                "dirty_files": dirty,
+            })
+            return
+
+        body, err = self._read_json_body()
+        if err or body is None:
+            self._send_json(400, {"ok": False, "message": err or "no body"})
+            return
+
+        target_event_id = body.get("target_event_id")
+        reason = body.get("reason", "user-triggered")
+        if not target_event_id or not isinstance(target_event_id, str):
+            self._send_json(400, {"ok": False, "message": "missing 'target_event_id'"})
+            return
+
+        # Scan events.jsonl once: collect all analysis.live-summary +
+        # analysis.invalidated events, with their line_no.
+        summaries = []
+        already_invalidated = set()
+        try:
+            with open(EVENTS) as f:
+                for line_no, raw in enumerate(f, start=1):
+                    try:
+                        ev = json.loads(raw)
+                    except Exception:
+                        continue
+                    if ev.get("type") == "analysis.live-summary":
+                        summaries.append({
+                            "event_id": ev["event_id"],
+                            "entity_type": ev.get("entity_type"),
+                            "entity_id": ev.get("entity_id"),
+                            "line_no": line_no,
+                            "origin_summary_event_id": ev.get("attributes", {}).get("origin_summary_event_id"),
+                            "source": ev.get("attributes", {}).get("source", "primary"),
+                        })
+                    elif ev.get("type") == "analysis.invalidated":
+                        attrs = ev.get("attributes", {})
+                        t = attrs.get("target_event_id")
+                        if t:
+                            already_invalidated.add(t)
+                        for c in attrs.get("cascades_to_event_ids", []) or []:
+                            already_invalidated.add(c)
+        except OSError as e:
+            self._send_json(500, {"ok": False, "message": f"events.jsonl read failed: {e}"})
+            return
+
+        target = next((s for s in summaries if s["event_id"] == target_event_id), None)
+        if target is None:
+            self._send_json(404, {
+                "ok": False,
+                "code": 404,
+                "message": f"No analysis.live-summary event found with event_id={target_event_id}",
+            })
+            return
+        if target_event_id in already_invalidated:
+            self._send_json(400, {
+                "ok": False,
+                "code": 400,
+                "message": "Target summary is already invalidated.",
+            })
+            return
+
+        # Load projection.relationships for the spawn-graph cascade rule.
+        # We only consider event-sourced spawns (source='event'), not
+        # frontmatter-derived edges — those are timeless and would over-cascade.
+        try:
+            proj = json.loads((REPO_ROOT / ".agent-plan-tracker/projection.json").read_text())
+            event_spawn_edges = [
+                r for r in proj.get("relationships", [])
+                if r.get("type") == "spawns" and r.get("source") == "event"
+            ]
+        except (OSError, ValueError):
+            event_spawn_edges = []
+
+        # Compute cascade per T3 §5 Step 1.
+        target_key = f"{target['entity_type']}:{target['entity_id']}"
+        # Build a 1-hop spawn-neighbour set for the target's entity.
+        spawn_neighbours = set()
+        for r in event_spawn_edges:
+            if r.get("from") == target_key:
+                spawn_neighbours.add(r.get("to"))
+            elif r.get("to") == target_key:
+                spawn_neighbours.add(r.get("from"))
+
+        cascade = []
+        for s in summaries:
+            if s["event_id"] == target_event_id:
+                continue
+            if s["event_id"] in already_invalidated:
+                continue  # already invalidated; cascade list excludes
+            skey = f"{s['entity_type']}:{s['entity_id']}"
+            # (1) Same-entity chain successor
+            if skey == target_key and s["line_no"] > target["line_no"]:
+                cascade.append(s["event_id"])
+                continue
+            # (2) Origin chain (derived whose primary IS the target).
+            if s["origin_summary_event_id"] == target_event_id:
+                cascade.append(s["event_id"])
+                continue
+            # (3) Cross-entity via spawn graph, after target chronologically.
+            if skey in spawn_neighbours and s["line_no"] > target["line_no"]:
+                cascade.append(s["event_id"])
+                continue
+        cascade.sort()
+
+        # Build the invalidation event.
+        inv_event = {
+            "event_id": str(uuid.uuid4()),
+            "type": "analysis.invalidated",
+            "entity_type": target["entity_type"],
+            "entity_id": target["entity_id"],
+            "actor": "al",
+            "confidence": "explicit",
+            "schema_version": "0.2.0",
+            "attributes": {
+                "target_event_id": target_event_id,
+                "cascades_to_event_ids": cascade,
+                "reason": reason or "user-triggered",
+            },
+        }
+
+        # Validate against schema.
+        schema = self._schema()
+        ok, err_msg = validate_event(inv_event, schema)
+        if not ok:
+            self._send_json(500, {
+                "ok": False,
+                "code": 500,
+                "message": "server-built invalidation event failed schema validation",
+                "errors": [err_msg],
+            })
+            return
+
+        # Append.
+        try:
+            with open(EVENTS, "a") as f:
+                f.write(json.dumps(inv_event, separators=(",", ":")) + "\n")
+        except OSError as e:
+            self._send_json(500, {"ok": False, "message": f"events.jsonl write failed: {e}"})
+            return
+
+        self._send_json(200, {
+            "ok": True,
+            "invalidation_event_id": inv_event["event_id"],
+            "target_event_id": target_event_id,
+            "cascades_to_event_ids": cascade,
+            "reason": reason,
         })
 
     def _write_md(self, event, md_text):

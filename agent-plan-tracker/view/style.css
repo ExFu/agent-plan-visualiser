@@ -1017,6 +1017,42 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 }
 
 /* ------------------------------------------------------------------ */
+/* Invalidation banner + feedback (Phase D)                           */
+/* ------------------------------------------------------------------ */
+
+.invalidation-banner {
+  background: #ffebee;
+  border: 1px solid #c62828;
+  color: #b71c1c;
+  padding: 0.55rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  margin: 0.5rem 0 0.7rem;
+  line-height: 1.45;
+}
+.invalidation-banner code {
+  background: rgba(255,255,255,0.6);
+  padding: 0.05rem 0.3rem;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+.invalidation-banner .hint {
+  color: #5d2727;
+  font-size: 0.74rem;
+  margin-top: 0.2rem;
+}
+
+#analyser-invalidate-feedback:empty { display: none; }
+
+.invalidate-cascade-list ul {
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fafafa;
+  padding: 0.5rem 1.1rem;
+}
+
+/* ------------------------------------------------------------------ */
 /* Spawn-relationships section in the sidebar (Task C)                */
 /* ------------------------------------------------------------------ */
 
