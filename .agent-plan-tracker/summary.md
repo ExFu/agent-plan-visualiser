@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T16:50:07Z
+# Project state — generated 2026-05-27T17:41:55Z
 
-**Total events:** 107  ·  **Live:** 20  ·  **Dormant:** 0  ·  **Dead:** 10  ·  **Orphaned:** 0
+**Total events:** 112  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 10  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,6 +20,7 @@
 
 - **(milestone)**
   - `M1-bootstrap` (4 events): relationship.spawns → entity.progressed → entity.progressed
+  - `M6-analyser` (2 events): entity.created → relationship.spawns
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -34,10 +35,19 @@
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
 
+- **T2-analyser**
+  - `T3-analyser-phase-a-ephemeral` (2 events): entity.created → relationship.spawns
+
 ### By milestone
 
 - **(self: M1-bootstrap)**
   - `M1-bootstrap`
+
+- **(self: M6-analyser)**
+  - `M6-analyser`
+
+- **M6-analyser**
+  - `T3-analyser-phase-a-ephemeral`
 
 ## Blocked
 
@@ -67,6 +77,7 @@ _No flapping closures._
 ## Milestone progress
 
 - **M1-bootstrap**: 9/9 T3 complete (100%); 0 live
+- **M6-analyser**: 0/1 T3 complete (0%); 1 live
 
 ---
-_30 entities · 9 relationships · 1 decisions._
+_32 entities · 11 relationships · 1 decisions._
