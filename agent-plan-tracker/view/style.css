@@ -95,3 +95,190 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   border-left: 1px solid var(--border);
   padding-left: 0.5rem;
 }
+
+/* ===== Workstreams flow view ===== */
+.sub-toolbar { margin: 0.5rem 0 0.5rem; }
+.sub-toolbar button {
+  padding: 0.3rem 0.6rem;
+  margin-right: 0.4rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+.sub-toolbar button.active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.flow-legend {
+  font-size: 0.75rem;
+  color: #555;
+  margin: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.flow-legend svg { vertical-align: middle; margin-right: 2px; }
+
+.flow-svg-wrap {
+  overflow-x: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem;
+}
+.flow-svg { display: block; }
+
+.swimlane-band.even { fill: #f6f6f6; }
+.swimlane-band.odd  { fill: #ffffff; }
+.swimlane-label {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 11px;
+  fill: #555;
+}
+.entity-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: #333;
+}
+
+.commit-column {
+  stroke: #e5e5e5;
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.commit-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: #333;
+}
+.now-column {
+  stroke: #999;
+  stroke-width: 1.4;
+}
+.now-label {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 12px;
+  fill: #444;
+}
+
+.entity-spine {
+  stroke: #b0b0b0;
+  stroke-width: 1.4;
+  fill: none;
+}
+.rel-edge {
+  stroke: #7e57c2;
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  fill: none;
+  opacity: 0.7;
+}
+.continuation {
+  stroke: #888;
+  stroke-width: 1;
+  stroke-dasharray: 1.5 3;
+  opacity: 0.7;
+}
+
+.node {
+  stroke: #fff;
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: r 0.12s ease, stroke-width 0.12s ease;
+}
+.node:hover {
+  stroke-width: 2.5;
+  filter: brightness(1.08);
+}
+.node-count {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 9px;
+  fill: white;
+  pointer-events: none;
+}
+
+.now-badge { stroke: #fff; stroke-width: 1; }
+.now-badge.live      { fill: var(--color-live); }
+.now-badge.dormant   { fill: var(--color-dormant); }
+.now-badge.dead      { fill: var(--color-dead); }
+.now-badge.orphaned  { fill: var(--color-orphaned); }
+.now-badge.unknown   { fill: var(--color-unknown); }
+.now-badge-text {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 9px;
+  fill: white;
+  pointer-events: none;
+}
+
+#flow-tooltip {
+  position: fixed;
+  display: none;
+  pointer-events: none;
+  background: rgba(33, 33, 33, 0.95);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--sans);
+  max-width: 320px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+#flow-tooltip .tt-id {
+  font-family: var(--mono);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+#flow-tooltip .tt-commit {
+  font-size: 10px;
+  color: #ccc;
+  margin-bottom: 2px;
+}
+#flow-tooltip .tt-types {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #ffeb3b;
+}
+
+#flow-detail {
+  margin-top: 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+}
+#flow-detail h3 {
+  font-family: var(--mono);
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+#flow-detail .detail-commit {
+  color: #555;
+  font-size: 0.85rem;
+  margin: 0.25rem 0;
+}
+#flow-detail .detail-date {
+  color: #888;
+  font-size: 0.75rem;
+}
+#flow-detail .event-list {
+  font-size: 0.85rem;
+  padding-left: 1.25rem;
+}
+#flow-detail .event-list li {
+  margin-bottom: 0.4rem;
+}
+#flow-detail .hint {
+  color: #888;
+  font-style: italic;
+  font-size: 0.85rem;
+  margin: 0;
+}
