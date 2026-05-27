@@ -12,7 +12,11 @@ import sys, json
 try:
     from jsonschema import validate, ValidationError
 except ImportError:
-    sys.stderr.write("jsonschema not installed; run: pip install --user jsonschema\n")
+    sys.stderr.write(
+        f"jsonschema not installed for {sys.executable}.\n"
+        f"Run: {sys.executable} -m pip install --user jsonschema\n"
+        f"(Plain 'pip install ...' may install to a different Python — use the exact command above.)\n"
+    )
     sys.exit(2)
 schema_path, events_path = sys.argv[1], sys.argv[2]
 with open(schema_path) as f:

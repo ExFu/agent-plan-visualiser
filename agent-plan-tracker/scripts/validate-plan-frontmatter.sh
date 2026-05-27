@@ -8,15 +8,21 @@ PLANS_DIR="${2:-planning}"
 
 python3 - "$SCHEMA" "$PLANS_DIR" <<'PYEOF'
 import sys, os, json, re, glob
+_MISSING = []
 try:
     import yaml
 except ImportError:
-    sys.stderr.write("PyYAML not installed; run: pip install --user pyyaml\n")
-    sys.exit(2)
+    _MISSING.append("pyyaml")
 try:
     from jsonschema import validate, ValidationError
 except ImportError:
-    sys.stderr.write("jsonschema not installed; run: pip install --user jsonschema\n")
+    _MISSING.append("jsonschema")
+if _MISSING:
+    sys.stderr.write(
+        f"Missing Python deps for {sys.executable}: {', '.join(_MISSING)}\n"
+        f"Run: {sys.executable} -m pip install --user {' '.join(_MISSING)}\n"
+        f"(Plain 'pip install ...' may install to a different Python — use the exact command above.)\n"
+    )
     sys.exit(2)
 
 schema_path, plans_dir = sys.argv[1], sys.argv[2]
