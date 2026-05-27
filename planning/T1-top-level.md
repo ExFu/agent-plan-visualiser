@@ -241,6 +241,7 @@ Detailed architectural design lives in the **T2 thematic plans**. T1 keeps a hig
 | [T2-packaging](T2-packaging.md) | Plugin scaffold + distribution | Plugin directory layout; `.claude-plugin/plugin.json` manifest; repack-and-validate loop; (M4) npm bundle + project-init install flow |
 | [T2-extraction](T2-extraction.md) | Per-commit extraction + merge lifecycle | Pre-commit hook (M2); sequential per-commit extractor; sub-agent recursion; ambiguity halting; pre-merge-to-main cleanliness gate (M3); merge conflict handling |
 | [T2-ingest](T2-ingest.md) | Backfill + retrospective mapping | One-shot opt-in backfill workflow (M5); retrospective mapping note for non-native projects; resumability; archived after completion |
+| [T2-analyser](T2-analyser.md) | On-demand "what's outstanding?" analysis | Browser-direct Anthropic API call + thin server wrapper; new event types `analysis.live-summary` + `analysis.invalidated`; per-summary markdown files; clean-tree guard; cascade invalidation; bulk mode with prompt caching |
 
 Each T2 owns the architectural detail for its theme. T1 evolves only when the overall project shape changes (intent, themes, audience, methodology). Architectural shifts within a theme update the relevant T2.
 
