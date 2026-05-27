@@ -4,3 +4,8 @@
 
 # macOS
 .DS_Store
+
+# Backfill / extraction scratch — output of dry-runs + sample extractions.
+# Persistent backfill output should live in target projects' .agent-plan-tracker/,
+# not here.
+_scratch/
