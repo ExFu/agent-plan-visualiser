@@ -72,7 +72,8 @@ def main():
             "from": f"{row['from_entity_type']}:{row['from_entity_id']}",
             "to": f"{row['to_entity_type']}:{row['to_entity_id']}",
             "type": row["relationship_type"],
-            "source_event_id": row["source_event_id"],
+            "source": row["source"],                    # 'event' | 'frontmatter'
+            "source_event_id": row["source_event_id"],  # null for frontmatter-derived
         })
 
     decisions = []

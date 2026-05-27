@@ -40,12 +40,14 @@ CREATE TABLE IF NOT EXISTS relationships (
   to_entity_type        TEXT NOT NULL,
   to_entity_id          TEXT NOT NULL,
   relationship_type     TEXT NOT NULL,
-  source_event_id       TEXT NOT NULL,
+  source_event_id       TEXT,             -- nullable: NULL for frontmatter-derived edges
+  source                TEXT NOT NULL DEFAULT 'event',  -- 'event' | 'frontmatter'
   PRIMARY KEY (from_entity_type, from_entity_id, to_entity_type, to_entity_id, relationship_type)
 );
 CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_entity_type, from_entity_id);
 CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_entity_type, to_entity_id);
 CREATE INDEX IF NOT EXISTS idx_relationships_type ON relationships(relationship_type);
+CREATE INDEX IF NOT EXISTS idx_relationships_source ON relationships(source);
 
 CREATE TABLE IF NOT EXISTS decisions (
   decision_event_id     TEXT PRIMARY KEY,

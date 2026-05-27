@@ -197,6 +197,36 @@ Each snapshot directory contains:
 
 In M3+ this becomes incremental (delta-from-snapshot).
 
+### 3.8 Unified relationships — event-sourced + frontmatter-derived
+
+The planning methodology declares two kinds of edges:
+
+- **Event-sourced edges** — `relationship.spawns`, `relationship.depends-on`, `relationship.addendum-to`, `relationship.alongside`, `relationship.reattached`. Emitted as events in `events.jsonl`; canonical history of intentional, dated connections (especially cross-axis spawns: T2 → Mn, supersession-spawned replacements, "this triggered that").
+- **Frontmatter-declared edges** — `t2_parent` and `milestone` fields on plan frontmatter. Hierarchical metadata on the entity itself; the field IS the source of truth. No event-emission required, no drift risk because the frontmatter is the single declaration.
+
+Both are first-class for downstream consumers (HTML view's swimlane routing, analyser's 1-hop context bundle, markdown summary's "active under this T2" rollups). Consumers shouldn't have to walk two systems.
+
+**Resolution:** cache-build unifies both into the `relationships` table with a `source` column.
+
+- After processing event-sourced relationship events into `relationships` rows with `source = 'event'`, cache-build walks plan entities and synthesises rows for every `t2_parent` / `milestone` field as `(from = parent, to = child, type = 'spawns', source_event_id = NULL, source = 'frontmatter')`.
+- PK `(from_*, to_*, relationship_type)` collisions resolved by `INSERT OR IGNORE` — event-sourced rows (inserted first) always win. If an event spawn exists for the same (parent, child, spawns) tuple, the frontmatter-derived duplicate is dropped silently. Event sources retain their `source_event_id` for auditability.
+- `projection.json.relationships[*]` includes the `source` field. Consumers can ignore it (one walk over the unified set) or filter by it for audit views.
+
+**What event-sourced spawns still carry that frontmatter can't:**
+
+- Cross-axis spawns (T2 → Mn, T1 → new T2). Frontmatter has no slot for these — a T2 isn't a child of a milestone; they spawn each other across the orthogonal axis. Authored as `relationship.spawns` events.
+- Supersession-spawned replacements (entity.superseded with `attributes.entity_ids[]` listing the new entities). These are intentional, dated arcs that must remain visible in the event log.
+- Co-evolving plans on the same axis (`relationship.alongside`).
+- Dependency edges (`relationship.depends-on`).
+- Reattachment after parent supersession (`relationship.reattached`).
+
+**Rule of thumb for authors:**
+
+- T3 (or any plan) gets a `t2_parent` and/or `milestone` field in frontmatter → no spawn event needed for that hierarchy edge. Cache-build derives it.
+- A relationship that isn't pure hierarchy (cross-axis, supersession, dependency, alongside, reattach) → emit the relationship event.
+
+This matches the swap-out point (§4): the asymmetry could collapse if we later wanted single-source-of-truth event semantics, but the present design accepts the asymmetry because frontmatter is already canonical for hierarchy and forcing extra events for every T3 creation is high-friction with low marginal value.
+
 ## 4. Swap-out points
 
 - **SQLite as cache backend.** Universal, file-based, sufficient for projected scale (thousands to low tens of thousands of events). Trigger to revisit: >30% of projection queries require multi-hop traversal (depth ≥ 3), or relationship-pattern matching becomes primary projection surface. Then evaluate embedded graph engines with GQL/Cypher support (KuzuDB, Cozo). GQL standardisation reduces historical lock-in risk.

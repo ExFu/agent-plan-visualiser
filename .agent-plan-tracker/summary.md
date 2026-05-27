@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T17:53:09Z
+# Project state — generated 2026-05-27T18:06:58Z
 
-**Total events:** 117  ·  **Live:** 21  ·  **Dormant:** 0  ·  **Dead:** 11  ·  **Orphaned:** 0
+**Total events:** 121  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 10  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -15,8 +15,8 @@
   - `T2-ingest` (2 events): entity.created → relationship.spawns
   - `T2-ontology` (4 events): relationship.spawns → entity.extended → entity.progressed
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
-  - `T2-projection` (7 events): entity.progressed → entity.progressed → entity.progressed
-  - `T2-storage` (5 events): entity.extended → entity.progressed → entity.progressed
+  - `T2-projection` (8 events): entity.progressed → entity.progressed → entity.progressed
+  - `T2-storage` (6 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(milestone)**
   - `M1-bootstrap` (4 events): relationship.spawns → entity.progressed → entity.progressed
@@ -35,6 +35,9 @@
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
 
+- **T2-storage**
+  - `T3-cache-build` (3 events): entity.completed → verification.tested → entity.progressed
+
 ### By milestone
 
 - **(self: M1-bootstrap)**
@@ -42,6 +45,9 @@
 
 - **(self: M6-analyser)**
   - `M6-analyser`
+
+- **M1-bootstrap**
+  - `T3-cache-build`
 
 ## Blocked
 
@@ -56,13 +62,13 @@ _No orphaned entities._
 - `2026-05-27.outstanding-work-analyser-endpoint` (inbox-item)
 - `T3-analyser-phase-a-ephemeral` (plan)
 - `T3-build-loop` (plan)
-- `T3-cache-build` (plan)
 - `T3-events-schema-json` (plan)
 - `T3-html-view` (plan)
 - `T3-markdown-summary` (plan)
 - `T3-plan-frontmatter-schema` (plan)
 - `T3-plugin-scaffold` (plan)
 - `T3-projection-emitter` (plan)
+- `T3-projection-queries-v0` (plan)
 
 ## Notable patterns
 
@@ -70,8 +76,8 @@ _No flapping closures._
 
 ## Milestone progress
 
-- **M1-bootstrap**: 9/9 T3 complete (100%); 0 live
+- **M1-bootstrap**: 8/9 T3 complete (88%); 1 live
 - **M6-analyser**: 1/1 T3 complete (100%); 0 live
 
 ---
-_32 entities · 11 relationships · 1 decisions._
+_32 entities · 29 relationships · 1 decisions._

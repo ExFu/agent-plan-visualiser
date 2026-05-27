@@ -47,10 +47,16 @@ def load_events():
 
 
 def init_db(conn):
+    # Drop any existing tables first so schema additions (new columns,
+    # new indices) reliably take effect on rebuilds against a stale cache
+    # file. `CREATE TABLE IF NOT EXISTS` would silently skip the schema
+    # change and the index DDL would then reference a column that doesn't
+    # exist on disk. Cache is fully derivable from events.jsonl, so the
+    # nuke-and-rebuild cost is fine.
+    for table in ("events", "entities", "relationships", "decisions", "commits"):
+        conn.execute(f"DROP TABLE IF EXISTS {table}")
     with open(SCHEMA_DDL) as f:
         conn.executescript(f.read())
-    for table in ("events", "entities", "relationships", "decisions", "commits"):
-        conn.execute(f"DELETE FROM {table}")
 
 
 def resolve_blame():
@@ -198,7 +204,7 @@ def main():
             ),
         )
 
-    # Materialise relationships
+    # Materialise relationships — event-sourced edges first (source='event').
     for ev in events:
         rtype = RELATIONSHIP_TYPES.get(ev["type"])
         if not rtype:
@@ -210,10 +216,43 @@ def main():
             continue
         conn.execute(
             """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
-                to_entity_type, to_entity_id, relationship_type, source_event_id)
-                VALUES (?,?,?,?,?,?)""",
-            (from_type, from_id, ev["entity_type"], ev["entity_id"], rtype, ev["event_id"]),
+                to_entity_type, to_entity_id, relationship_type, source_event_id, source)
+                VALUES (?,?,?,?,?,?,?)""",
+            (from_type, from_id, ev["entity_type"], ev["entity_id"], rtype, ev["event_id"], "event"),
         )
+
+    # Frontmatter-derived edges (source='frontmatter').
+    # The planning methodology declares hierarchy via frontmatter fields
+    # (T3.t2_parent → T2; T3.milestone → Mn). These are equally first-class
+    # edges, but they're metadata on the entity rather than events. Consumers
+    # (HTML view, analyser, summary) shouldn't have to do a dual walk —
+    # cache-build unifies both kinds into `relationships`, with a `source`
+    # column distinguishing them. Event-sourced rows always win on PK collision
+    # (INSERT OR IGNORE below; the event-sourced pass above already inserted).
+    # See T2-storage.md §3.5 and inbox 2026-05-27.outstanding-work-analyser-endpoint
+    # (superseded) for context.
+    for (et, eid), e in entities.items():
+        if et != "plan":
+            continue
+        a = e["attrs"] or {}
+        # T3 → T2 parent
+        t2p = a.get("t2_parent")
+        if t2p:
+            conn.execute(
+                """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
+                    to_entity_type, to_entity_id, relationship_type, source_event_id, source)
+                    VALUES (?,?,?,?,?,?,?)""",
+                ("plan", t2p, "plan", eid, "spawns", None, "frontmatter"),
+            )
+        # T3 → milestone (and any plan tagged with a milestone)
+        m = a.get("milestone")
+        if m:
+            conn.execute(
+                """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
+                    to_entity_type, to_entity_id, relationship_type, source_event_id, source)
+                    VALUES (?,?,?,?,?,?,?)""",
+                ("plan", m, "plan", eid, "spawns", None, "frontmatter"),
+            )
 
     # Materialise decisions
     for ev in events:

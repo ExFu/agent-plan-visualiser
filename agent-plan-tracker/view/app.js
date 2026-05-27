@@ -1079,63 +1079,30 @@ const ContextBuilder = {
   },
 
   _related1Hop(ekey, projection) {
+    // Projection's relationships table is now unified: cache-build derives
+    // frontmatter-implied edges (T3.t2_parent → T2, plan.milestone → Mn)
+    // alongside event-sourced relationship.* events. Each row carries a
+    // `source` field ('event' | 'frontmatter') for downstream consumers
+    // that care. The analyser does not — a 1-hop walk over the unified
+    // set is all that's needed.
     const rels = projection.relationships || [];
     const out = [];
     const seen = new Set();
-    const push = (entity, relType, direction) => {
+    const push = (entity, relType, direction, source) => {
       const k = `${entity.entity_type}:${entity.entity_id}`;
       if (k === ekey || seen.has(k)) return;
       seen.add(k);
-      out.push(this._relSummary(entity, relType, direction));
+      const summary = this._relSummary(entity, relType, direction);
+      if (source === "frontmatter") summary.relation += " · derived";
+      out.push(summary);
     };
-
-    // (a) Explicit relationship edges from events.
     for (const r of rels) {
       if (r.from === ekey) {
         const e = projection.entities[r.to];
-        if (e) push(e, r.type, "outgoing");
+        if (e) push(e, r.type, "outgoing", r.source);
       } else if (r.to === ekey) {
         const e = projection.entities[r.from];
-        if (e) push(e, r.type, "incoming");
-      }
-    }
-
-    // (b) Frontmatter-implied parent/child edges for plans.
-    //     The projection's relationships table only carries event-sourced
-    //     relationships. T3-to-T2 (t2_parent) and T3-to-Mn (milestone) are
-    //     declared in plan frontmatter and are equally first-class for the
-    //     analyser's context bundle — without them, a T2 sees no T3s.
-    const focal = projection.entities[ekey];
-    if (focal && focal.entity_type === "plan") {
-      const fa = focal.attributes || {};
-      // Focal is a T2 → pull in its T3 children.
-      if (fa.tier === 2) {
-        for (const e of Object.values(projection.entities)) {
-          if (e.entity_type !== "plan") continue;
-          if ((e.attributes || {}).t2_parent === focal.entity_id) {
-            push(e, "t2_parent-child", "outgoing");
-          }
-        }
-      }
-      // Focal is a milestone → pull in plans with this milestone tag.
-      if (fa.plan_kind === "milestone") {
-        for (const e of Object.values(projection.entities)) {
-          if (e.entity_type !== "plan") continue;
-          if ((e.attributes || {}).milestone === focal.entity_id) {
-            push(e, "milestone-member", "outgoing");
-          }
-        }
-      }
-      // Focal is a T3 → pull in its T2 parent + its milestone parent.
-      if (fa.tier === 3) {
-        if (fa.t2_parent) {
-          const parent = projection.entities[`plan:${fa.t2_parent}`];
-          if (parent) push(parent, "t2_parent-of", "incoming");
-        }
-        if (fa.milestone) {
-          const m = projection.entities[`plan:${fa.milestone}`];
-          if (m) push(m, "milestone-of", "incoming");
-        }
+        if (e) push(e, r.type, "incoming", r.source);
       }
     }
     return out;
