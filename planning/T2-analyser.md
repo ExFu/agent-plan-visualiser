@@ -68,15 +68,18 @@ Two events added to the ontology under a new **Analysis** category:
 Attributes:
 - `entity_id` — the focal entity (also the event's `entity_id` field).
 - `model` — exact Anthropic model id used (e.g. `claude-sonnet-4-20250514`). No silent default.
+- `source` — `primary` (the entity was the focus of the call) or `derived` (the summary fell out as a side-effect of a primary call on another entity — see §3.13).
+- `origin_summary_event_id` — for `derived` summaries: the `event_id` of the primary summary this fell out of. Null for `primary`.
 - `structured` — object with the four canonical sections:
   - `outstanding` — string[]
   - `blocked` — string[] (each entry references blocker/HITL where applicable)
   - `recently_changed` — string[]
   - `next_move` — string (single most actionable next step)
-- `freeform_path` — relative path to the per-summary markdown file (e.g. `.agent-plan-tracker/summaries/T2-projection-c2700009-....md`).
-- `supersedes_summary_event_id` — `event_id` of the prior live summary on this entity, if any.
+- `freeform_path` — relative path to the per-summary markdown file (e.g. `.agent-plan-tracker/summaries/T2-projection-c2700009-....md`). For `derived` summaries this is typically a section pointer into the parent's md, not a standalone file (see §3.13).
+- `supersedes_summary_event_id` — `event_id` of the prior live summary on this entity, if any. **A `primary` summary always supersedes any `derived` summary on the same entity; a `derived` summary never supersedes a `primary` one.**
 - `context_event_id_range` — `{from, to}` capturing which events were folded into context. Enables cascade-invalidation logic to detect dependence.
-- `prompt_cache_hit` — boolean (telemetry; bulk mode only).
+- `estimated_input_tokens` / `estimated_output_tokens` / `actual_input_tokens` / `actual_output_tokens` — telemetry for cost transparency and future estimator calibration.
+- `prompt_cache_hit_ratio` — fraction of input tokens served from prompt cache (global mode only).
 
 **`analysis.invalidated`** — marks one or more prior summaries invalid.
 
@@ -168,21 +171,26 @@ Conservative over aggressive — false positives (over-invalidating) just mean r
 
 Invalidated summaries remain visible in the flow view but rendered dimmed / struck-through, and are excluded from the "most recent valid summary" lookup.
 
-### 3.8 Bulk mode + prompt caching
+### 3.8 Global update mode + prompt caching
 
-"Analyse all live" button generates summaries for every currently-live entity in one pass. Implementation:
+"Analyse all live (global)" button generates summaries for every currently-live entity in one pass. This is the right path when the operator wants a fresh full-graph picture; running per-entity analysis on T1 would in principle pull in the whole graph but the focal-on-T1 framing would leave T2/T3 summaries shallow — global mode treats every live entity as a primary focus in its own right.
+
+Implementation:
 
 1. Browser fetches `projection.json`, identifies live entities (~20 currently for this project).
-2. Builds **shared context** — global project state (T1 + recent events across entities + live-entities index) — placed at the top of the prompt and marked for Anthropic prompt caching (`cache_control: {type: "ephemeral"}`).
-3. For each live entity, issues a fresh request that **reuses the cached shared context** and varies only the per-entity tail (plan body, entity-specific timeline, prior summary).
-4. Each response is a structured summary saved through the same `/api/save-summary` flow (clean-tree check runs once at start; subsequent saves fail-fast if tree becomes dirty mid-run).
+2. Builds **shared context** — global project state (T1 plan + recent events across entities + live-entities index + the live-relationship subgraph from §3.12) — placed at the top of the prompt and marked for Anthropic prompt caching (`cache_control: {type: "ephemeral"}`).
+3. For each live entity, issues a fresh request that **reuses the cached shared context** and varies only the per-entity tail (plan body, entity-specific timeline, prior valid summary).
+4. Each response is a `source: primary` structured summary saved through the same `/api/save-summary` flow (clean-tree check runs once at start; subsequent saves fail-fast if tree becomes dirty mid-run).
+5. Opportunistic derived summaries on dependents (§3.13) are **suppressed** in global mode — every entity is getting a primary anyway, so derived would be wasted output tokens.
 
-Cost model: ~80-90% of the input tokens are the shared context, which is billed at the cached-read rate after the first request. For ~20 entities that's a meaningful cost ratio shift — bulk mode is cheaper per entity than running 20 individual calls.
+Cost model: ~80-90% of input tokens are shared context, billed at the cached-read rate after the first request. For ~20 entities that's a meaningful cost ratio shift — global mode is significantly cheaper per entity than running 20 individual calls.
 
 Realistic? Yes, **conditional** on:
 - Anthropic API supports the `cache_control` header (it does, as of Sonnet 4 / Opus 4).
 - Shared context is large enough to benefit from caching (the 1024-token minimum is easily hit by T1 + recent events).
-- The bulk run completes within the cache TTL (5 minutes by default, extendable). For ~20 entities at a few seconds each, well within.
+- The global run completes within the cache TTL (5 minutes by default, extendable). For ~20 entities at a few seconds each, well within.
+
+A cost-warning dialog (§3.9.1) fires before the run with a hard confirmation gate.
 
 ### 3.9 Sidebar rendering
 
@@ -194,9 +202,28 @@ When the user clicks LIVE on an entity, the sidebar offers two paths:
 Summary view in the sidebar shows:
 - The four structured sections (Outstanding / Blocked / Recently changed / Next move) as cleanly formatted cards.
 - A toggle to flip to raw freeform markdown.
-- The model used + timestamp + token cost (telemetry transparency).
+- The model used + timestamp + actual token cost (telemetry transparency).
+- A small badge if the summary is `derived` (§3.13) — "Side-effect of T2-X analysis on YYYY-MM-DD; run primary analysis to refresh".
 - "Save" button — gated by clean-tree check.
 - If a saved summary already exists, it's shown by default with a "Regenerate" button. The chain (prior valid summaries) is browsable via collapsible history.
+
+#### 3.9.1 Cost-warning dialog (gates every live call)
+
+Before any Claude call fires — per-entity, global, or regenerate — the browser computes an estimate from the assembled context bundle (input tokens via tiktoken-equivalent or a heuristic char-count proxy; output tokens from a model-specific cap × expected summaries) and current Anthropic public pricing baked into the JS. Dialog shows:
+
+```
+About to analyse: T2-projection (primary)
+  Model:            claude-sonnet-4-20250514
+  Input tokens:     ~14,200  (cache hit projected on 11,800 → 83%)
+  Output tokens:    ~1,500   (one structured summary + freeform)
+  Derived summaries: 3 dependents will also be summarised (§3.13)
+  Estimated cost:   $0.043
+  [ Cancel ]   [ Confirm and run ]
+```
+
+Global mode dialog is more dramatic (~20 entities, multi-dollar territory) and uses red accent. Confirm gate is always required — no silent dispatch even on per-entity calls. A "don't ask for calls under $0.10" toggle exists in settings (per-machine, default off).
+
+Estimator calibration improves over time: every saved summary records `estimated_input_tokens` alongside `actual_input_tokens`. The settings modal surfaces accumulated error so the user knows whether estimates are trustworthy.
 
 ### 3.10 Flow-view rendering
 
@@ -213,30 +240,117 @@ Triggered from a gear icon in the toolbar. Two fields:
 
 A status indicator in the toolbar shows whether a key is configured. Missing-key state disables Analyse buttons with an inline "Configure API key" link.
 
+### 3.12 Programmatic context building (no agentic discovery)
+
+The agent is never asked "go find related entities" or "figure out what depends on this". That would waste tokens on discovery the cache can answer for free. Instead the browser **pre-builds the context bundle** by walking the cache and projection, and hands the agent a fully assembled package.
+
+**Inputs available client-side without an API call:**
+
+- `projection.json` — full entities/relationships/decisions/events index.
+- `cache.sqlite` — same data queryable; served as a binary blob or pre-exported as JSON slices (e.g. per-entity event arrays).
+- Plan markdown files — fetched directly via the existing static file server.
+- Inbox markdown files — same.
+
+**Per-entity context bundle, assembled in browser JS:**
+
+1. **Focal entity** — plan body (markdown), full event timeline, derived state.
+2. **Direct children** — for a T2 focal, every T3 with `t2_parent` pointing to it; for a milestone focal, every plan with `milestone` pointing to it. Walked via the `entities.attributes` lookup, no LLM needed.
+3. **Relationship graph (1-hop)** — follow `relationship.spawns`, `relationship.depends-on`, `relationship.alongside`, `relationship.addendum-to`, `relationship.reattached` from the focal in both directions. For each related entity, include its plan_kind + tier + current derived_state + one-line summary.
+4. **Open blockers** — `blocker` entities with `derived_state = live` mentioned by id in the focal's plan body or appearing in any event with the focal as `entity_id`.
+5. **Open HITL questions** — same lookup against `hitl-question` entities.
+6. **Inbox items referencing the focal** — flat grep across `.agent-plan-tracker/inbox/*.md` for the focal `entity_id` string. Browser fetches an inbox-index file (generated by cache-build) listing entity references per file; no full-text scan needed at call time.
+7. **Prior valid summary chain on the focal** — most recent `analysis.live-summary` where the chain is valid (no intervening `analysis.invalidated`), passed in full. Older valid summaries summarised by their `next_move` lines only (chain compression).
+
+The agent receives this as a structured prompt section like:
+
+```
+## Focal entity: T2-projection
+[plan markdown body]
+
+## Recent events on T2-projection
+[event timeline, most recent 30]
+
+## Related entities (1-hop graph)
+- T3-html-view (child, dead) — completed in commit abc123
+- T3-projection-emitter (child, dead) — completed in commit def456
+- T2-ontology (alongside, live) — last summary on 2026-05-26: "next: ..."
+
+## Open blockers referencing T2-projection
+(none)
+
+## Open inbox items referencing T2-projection
+- 2026-05-23.html-view-visual-style (open, t3 candidate) — body...
+
+## Prior valid summary on T2-projection
+[full markdown of most recent live-summary]
+```
+
+The agent's only job is **reason and structure**. It doesn't fetch, walk, or grep — those are pre-computed. This drives input token cost down by 30-50% vs an agentic-discovery approach (rough estimate; calibrate after Phase A).
+
+**Token-cost ceiling per call**: if the assembled bundle exceeds a threshold (default 30k input tokens for per-entity calls, 80k for global), the cost-warning dialog (§3.9.1) flags it in red and recommends either trimming context (fewer historical events, no inbox items) or splitting the call.
+
+### 3.13 Opportunistic caching of derived summaries
+
+When running a **primary** analysis on focal E, the assembled context bundle (§3.12) includes 1-hop related entities. Claude reasons over all of them to answer "what's outstanding on E?". The prompt instructs Claude to **also emit a structured summary for each direct dependent it touched**, in the same output:
+
+```
+## Primary summary
+[focal entity: structured + freeform]
+
+## Derived summaries (1-hop dependents touched)
+### T3-html-view
+- next_move: ...
+- outstanding: ...
+(or: "no useful summary — dead entity, no derived needed")
+
+### 2026-05-23.html-view-visual-style
+- next_move: ...
+```
+
+Each derived summary is saved as a separate `analysis.live-summary` event with:
+- `source: derived`
+- `origin_summary_event_id` → the primary's `event_id`
+- `freeform_path` → may point into a section of the primary's markdown file (e.g. `summaries/T2-projection-c2800007-....md#derived-T3-html-view`), or to a standalone file — implementation choice deferred to Phase B.
+
+**Supersession rules:**
+- A new `primary` on entity X **always** supersedes any prior summary on X (primary or derived).
+- A new `derived` on entity X supersedes a prior `derived` on X. It does **not** supersede a prior `primary` (because primary is higher-confidence — the focal call's attention was on it).
+- A `primary` on X older than a `derived` on X gets superseded *only* by another `primary` on X. The derived is treated as a freshness signal but doesn't replace authoritative content.
+
+**Why this matters:** when a global update runs, every entity gets a primary — no need for derived. But for ad-hoc per-entity calls, dependents get cheap drive-by refreshes. Over time the project accumulates summaries opportunistically without explicit cost.
+
+**Confidence display:** the sidebar marks derived summaries with a "side-effect" badge (§3.9) so the operator knows the analysis wasn't focused on this entity. Encourages running a primary analysis when precision matters.
+
+**Cost framing:** derived summaries cost only output tokens, not input — the input context was already paid for in the primary call. A primary call on a T2 with 4 children adds ~4 × 200 = 800 output tokens; well under 10% extra cost for 4 free side-effect updates.
+
+**Suppressed in global mode** (§3.8): every entity is getting a primary anyway, no waste.
+
 ## 4. Phases — T3 candidates
 
 Five phases, each is a candidate T3. Milestone scheduling deferred — the M-axis will assign these once the bootstrap M1 settles and the user decides priority versus M2 (auto-extract) work.
 
-### Phase A — Ephemeral browser-only analyser (~2h)
+### Phase A — Ephemeral browser-only analyser (~2.5h)
 
 - Settings modal + API key + model picker.
-- Per-entity context builder (plan md + entity timeline + related entities — no summary chain yet).
+- **Programmatic context builder** (§3.12) — pre-assembles bundle from projection.json + cache exports + plan/inbox md fetches. Walks 1-hop relationship graph. No agentic discovery.
+- **Cost-warning dialog** (§3.9.1) — input/output token estimate + dollar cost before every call. Hard confirm gate.
 - Direct Anthropic call with structured + freeform response.
 - Sidebar render: structured sections + raw md toggle.
-- **No persistence** — close the tab, summary is gone. Proves the value loop before investing in storage.
+- **No persistence** — close the tab, summary is gone. Proves the value loop + the programmatic-context approach before investing in storage.
 
-Acceptance: user clicks LIVE → Analyse → sees a useful summary within ~10 seconds. No new event types yet.
+Acceptance: user clicks LIVE → Analyse → confirms cost dialog → sees a useful summary within ~10 seconds. Context bundle assembled entirely client-side from cache+projection (no LLM call for discovery). No new event types yet.
 
-### Phase B — Persistence + new event types + server wrapper (~2h)
+### Phase B — Persistence + new event types + server wrapper + opportunistic derived (~3h)
 
-- T2-ontology gets `analysis.live-summary` schema branch.
+- T2-ontology gets `analysis.live-summary` schema branch including `source` and `origin_summary_event_id` fields.
 - Server wrapper replaces `python3 -m http.server`. Three endpoints land.
 - Clean-tree guard.
 - Per-summary markdown file convention.
+- **Opportunistic derived caching** (§3.13) — primary calls also emit + save summaries for 1-hop dependents touched. Supersession rules (primary always beats derived) enforced server-side at save time.
 - Saved summaries persist across reloads, replay through cache-build.
 - No cascade-invalidate logic yet — single-summary regenerate replaces.
 
-Acceptance: save a summary, reload the view, summary is still there. `events.jsonl` carries a valid `analysis.live-summary` event; markdown file exists.
+Acceptance: save a primary summary on a T2 with 3 children → 4 `analysis.live-summary` events appended (1 primary + 3 derived); markdown files exist. Reload the view, all 4 summaries are there. Running a primary on one of the children supersedes its derived correctly.
 
 ### Phase C — Flow-view rendering (~1h)
 
@@ -256,17 +370,18 @@ Acceptance: a saved summary shows as a node in the flow view; clicking it routes
 
 Acceptance: invalidate summary S1, see S2 (on related entity, generated after) also marked invalid; events.jsonl carries an `analysis.invalidated` event listing both.
 
-### Phase E — Bulk mode (~1h)
+### Phase E — Global update mode (~1.5h)
 
-- "Analyse all live" toolbar button.
+- "Analyse all live (global)" toolbar button with red-accent cost-warning dialog (§3.9.1).
 - Shared-context prompt construction with `cache_control` for the shared portion.
-- Sequential per-entity follow-on calls reusing the cache.
-- Progress UI showing per-entity completion.
+- Sequential per-entity follow-on calls reusing the cache, each producing a `primary` summary.
+- Derived-summary emission suppressed in this mode (every entity gets a primary anyway).
+- Progress UI showing per-entity completion + running cost total + cache-hit ratio.
 - All saves go through the same single-save endpoint.
 
-Acceptance: bulk run on the project's ~20 live entities completes in <5 min, saves 20 summaries, telemetry shows cache-hit rate >80% on subsequent requests.
+Acceptance: global run on the project's ~20 live entities completes in <5 min, saves 20 primary summaries, telemetry shows prompt-cache-hit ratio >80% on subsequent requests, total cost matches dialog estimate within ±15%.
 
-**Total: ~7-8h spread across phases.** Each phase is independently shippable.
+**Total: ~9h spread across phases.** Each phase is independently shippable.
 
 ## 5. Dependencies
 
@@ -281,6 +396,8 @@ Acceptance: bulk run on the project's ~20 live entities completes in <5 min, sav
 - **Per-summary markdown file.** Trigger to revisit: summary count explodes (>10k); filesystem becomes unwieldy. Replacement: inline in event JSON (accept the bloat) or external store. Lean filesystem until friction is real.
 - **Cascade invalidation conservatism.** Trigger to revisit: users complain about over-invalidation noise. Replacement: more precise dependency tracking (e.g. only invalidate downstream summaries whose Claude prompt actually quoted the invalidated one). Lean conservative-and-cheap until friction is real.
 - **Settings stored in localStorage.** Trigger to revisit: users want sync across machines / browsers. Replacement: settings file in `.agent-plan-tracker/` (per-project) or a separate config. Lean localStorage for v1 since it's a dev tool used on one machine at a time.
+- **Opportunistic derived-summary emission.** Trigger to revisit: derived summaries prove low-signal (Claude consistently fills them with hedge phrases like "no useful summary"), or supersession rules generate user confusion. Replacement: drop derived entirely; per-entity calls focus only on the focal. Lean keep-derived until empirical friction shows otherwise — the output-token cost is small and the cached side-effect value is real.
+- **Programmatic 1-hop traversal scope.** Trigger to revisit: 1-hop misses important transitive context (e.g. T1 analysis should reach T3s, not stop at T2s) or includes too much noise. Replacement: configurable hop depth, or hop-by-relationship-type rules. Lean 1-hop until friction surfaces.
 
 ## 7. Open questions
 
@@ -292,6 +409,10 @@ Acceptance: bulk run on the project's ~20 live entities completes in <5 min, sav
 6. **Caching beyond the bulk-mode hit.** Should single-entity calls also use prompt caching for the global-context portion across sessions? Possibly, but cache TTL (5min default) limits the win for sporadic single calls. Worth measuring before committing.
 7. **Schema-version bump for new events.** Adding two event types — does this require bumping `schema_version` from `0.1.0` to `0.2.0`, or is it additive enough to stay at `0.1.0`? Lean `0.2.0` for clarity (matches T2-ontology §4 versioning intent). Decision logged when Phase B lands.
 8. **Bulk-mode partial failure.** If summary 7 of 20 fails (API error, validation fail), do the first 6 stay saved? Lean yes — each save is atomic and independent; partial completion is acceptable, surface in progress UI.
+9. **Derived freeform storage layout.** Should derived summaries (§3.13) share a markdown file with their primary (anchor sections) or get their own files? Shared is leaner (1 file per primary call) but invalidating a derived independently of the primary is uglier. Own files is fatter but cleaner semantically. Decide in Phase B based on whether independent derived-only invalidation is needed (probably not — see Q10).
+10. **Can a derived summary be invalidated independently of its origin primary?** Lean no — derived is a side-effect; invalidating it without invalidating the primary creates a weird half-state. Force "invalidate origin → cascades to all its derived" as the only path. Validate during Phase D design.
+11. **Cost-estimator accuracy.** A char-count proxy for token count is rough (typically ±15%). Worth shipping tiktoken-equivalent JS for tighter estimates? Probably yes once estimator error in real use exceeds ±25%, but lean cheap-and-rough for Phase A.
+12. **Inbox-index pre-computation.** §3.12 step 6 assumes cache-build emits an inbox-to-entity reference index. That's a small addition to T2-storage's cache builder. Confirm with T2-storage owner that this is in scope before Phase A relies on it; fallback is a runtime grep across inbox md files (browser-side fetch each one).
 
 ## 8. Out of scope for this T2
 

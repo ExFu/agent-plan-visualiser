@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T16:45:25Z
+# Project state — generated 2026-05-27T16:50:07Z
 
-**Total events:** 105  ·  **Live:** 20  ·  **Dormant:** 0  ·  **Dead:** 10  ·  **Orphaned:** 0
+**Total events:** 107  ·  **Live:** 20  ·  **Dormant:** 0  ·  **Dead:** 10  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -10,7 +10,7 @@
   - `T1-top-level` (29 events): entity.extended → entity.extended → entity.extended
 
 - **(T2 itself)**
-  - `T2-analyser` (2 events): entity.created → relationship.spawns
+  - `T2-analyser` (3 events): entity.created → relationship.spawns → entity.extended
   - `T2-extraction` (2 events): entity.created → relationship.spawns
   - `T2-ingest` (2 events): entity.created → relationship.spawns
   - `T2-ontology` (4 events): relationship.spawns → entity.extended → entity.progressed
