@@ -9,7 +9,7 @@ sqlite3 -header -column "$CACHE" <<SQL
 SELECT
   line_no,
   type,
-  substr(commit_message_first_line, 1, 50) AS commit,
+  substr(commit_message_first_line, 1, 50) AS commit_msg,
   substr(json_extract(attributes, '\$.summary'), 1, 80) AS summary_snippet
 FROM events
 WHERE entity_id = '${ENTITY_ID}'

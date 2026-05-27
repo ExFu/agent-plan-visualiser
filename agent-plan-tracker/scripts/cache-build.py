@@ -73,7 +73,7 @@ def resolve_blame():
             iso_date = None
             if cur_date_epoch is not None:
                 try:
-                    iso_date = datetime.datetime.utcfromtimestamp(int(cur_date_epoch)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    iso_date = datetime.datetime.fromtimestamp(int(cur_date_epoch), tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 except (ValueError, TypeError):
                     iso_date = None
             blame[line_no] = (cur_commit, cur_author, iso_date, cur_summary)

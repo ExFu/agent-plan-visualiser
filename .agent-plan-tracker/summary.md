@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T13:35:59Z
+# Project state — generated 2026-05-27T13:53:29Z
 
-**Total events:** 69  ·  **Live:** 18  ·  **Dormant:** 0  ·  **Dead:** 1  ·  **Orphaned:** 0
+**Total events:** 91  ·  **Live:** 18  ·  **Dormant:** 0  ·  **Dead:** 9  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -12,13 +12,13 @@
 - **(T2 itself)**
   - `T2-extraction` (2 events): entity.created → relationship.spawns
   - `T2-ingest` (2 events): entity.created → relationship.spawns
-  - `T2-ontology` (3 events): entity.created → relationship.spawns → entity.extended
-  - `T2-packaging` (5 events): entity.progressed → entity.progressed → entity.extended
-  - `T2-projection` (3 events): entity.created → relationship.spawns → entity.extended
-  - `T2-storage` (3 events): entity.created → relationship.spawns → entity.extended
+  - `T2-ontology` (4 events): relationship.spawns → entity.extended → entity.progressed
+  - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
+  - `T2-projection` (4 events): relationship.spawns → entity.extended → entity.progressed
+  - `T2-storage` (4 events): relationship.spawns → entity.extended → entity.progressed
 
 - **(milestone)**
-  - `M1-bootstrap` (3 events): entity.created → relationship.spawns → entity.progressed
+  - `M1-bootstrap` (4 events): relationship.spawns → entity.progressed → entity.progressed
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -47,7 +47,15 @@ _No orphaned entities._
 
 ## Recently closed (current dead state)
 
+- `T3-build-loop` (plan)
+- `T3-cache-build` (plan)
+- `T3-events-schema-json` (plan)
+- `T3-html-view` (plan)
+- `T3-markdown-summary` (plan)
+- `T3-plan-frontmatter-schema` (plan)
 - `T3-plugin-scaffold` (plan)
+- `T3-projection-emitter` (plan)
+- `T3-projection-queries-v0` (plan)
 
 ## Notable patterns
 
@@ -55,7 +63,7 @@ _No flapping closures._
 
 ## Milestone progress
 
-- **M1-bootstrap**: 1/9 T3 complete (11%); 0 live
+- **M1-bootstrap**: 9/9 T3 complete (100%); 0 live
 
 ---
-_19 entities · 8 relationships · 0 decisions._
+_27 entities · 8 relationships · 0 decisions._

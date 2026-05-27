@@ -98,7 +98,7 @@ def main():
     milestone_progress = compute_milestone_progress(entities)
 
     projection = {
-        "generated_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "schema_version": SCHEMA_VERSION,
         "ontology_version": ONTOLOGY_VERSION,
         "entities": entities,
