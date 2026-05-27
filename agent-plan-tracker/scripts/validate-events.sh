@@ -2,7 +2,7 @@
 # Validate every event in events.jsonl against the active schema.
 # Usage: validate-events.sh [schema-path] [events-path]
 set -uo pipefail
-SCHEMA="${1:-agent-plan-tracker/schemas/0.1.0/events.schema.json}"
+SCHEMA="${1:-agent-plan-tracker/schemas/0.2.0/events.schema.json}"
 EVENTS="${2:-.agent-plan-tracker/events.jsonl}"
 
 if ! command -v check-jsonschema >/dev/null 2>&1; then

@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T17:53:09Z
+# Project state — generated 2026-05-27T18:08:11Z
 
-**Total events:** 117  ·  **Live:** 21  ·  **Dormant:** 0  ·  **Dead:** 11  ·  **Orphaned:** 0
+**Total events:** 122  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 11  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -10,7 +10,7 @@
   - `T1-top-level` (29 events): entity.extended → entity.extended → entity.extended
 
 - **(T2 itself)**
-  - `T2-analyser` (4 events): relationship.spawns → entity.extended → entity.progressed
+  - `T2-analyser` (5 events): entity.extended → entity.progressed → entity.progressed
   - `T2-extraction` (2 events): entity.created → relationship.spawns
   - `T2-ingest` (2 events): entity.created → relationship.spawns
   - `T2-ontology` (4 events): relationship.spawns → entity.extended → entity.progressed
@@ -35,6 +35,9 @@
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
 
+- **T2-analyser**
+  - `T3-analyser-phase-b-persistence` (3 events): entity.created → relationship.spawns → relationship.spawns
+
 ### By milestone
 
 - **(self: M1-bootstrap)**
@@ -42,6 +45,9 @@
 
 - **(self: M6-analyser)**
   - `M6-analyser`
+
+- **M6-analyser**
+  - `T3-analyser-phase-b-persistence`
 
 ## Blocked
 
@@ -71,7 +77,7 @@ _No flapping closures._
 ## Milestone progress
 
 - **M1-bootstrap**: 9/9 T3 complete (100%); 0 live
-- **M6-analyser**: 1/1 T3 complete (100%); 0 live
+- **M6-analyser**: 1/2 T3 complete (50%); 1 live
 
 ---
-_32 entities · 11 relationships · 1 decisions._
+_33 entities · 13 relationships · 1 decisions._

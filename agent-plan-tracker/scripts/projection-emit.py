@@ -11,8 +11,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE = REPO_ROOT / ".agent-plan-tracker/cache.sqlite"
 OUT = REPO_ROOT / ".agent-plan-tracker/projection.json"
 
-SCHEMA_VERSION = "0.1.0"
-ONTOLOGY_VERSION = "0.1.0"
+SCHEMA_VERSION = "0.2.0"
+ONTOLOGY_VERSION = "0.2.0"
 
 
 def compute_milestone_progress(entities):
@@ -83,6 +83,39 @@ def main():
             "explains_arcs": json.loads(row["referenced_event_ids"]),
         })
 
+    # Latest-valid-summary per entity (T2-analyser §3.6, Phase B).
+    # Sort by rowid (insertion order = events.jsonl line order) so iteration is chronological.
+    # Rules:
+    #   - primary always beats derived (regardless of recency)
+    #   - within same source, later wins
+    latest_summary_by_entity = {}
+    for row in conn.execute(
+        "SELECT * FROM summaries WHERE valid = 1 ORDER BY line_no ASC"
+    ):
+        key = f"{row['entity_type']}:{row['entity_id']}"
+        prev = latest_summary_by_entity.get(key)
+        keep = True
+        if prev is not None:
+            if prev["source"] == "primary" and row["source"] == "derived":
+                # derived never displaces primary
+                keep = False
+            elif prev["source"] == "derived" and row["source"] == "primary":
+                # primary always displaces derived
+                keep = True
+            else:
+                # same source: later wins (we're iterating ascending)
+                keep = True
+        if keep:
+            latest_summary_by_entity[key] = {
+                "event_id": row["event_id"],
+                "source": row["source"],
+                "model": row["model"],
+                "freeform_path": row["freeform_path"],
+                "structured": json.loads(row["structured"]),
+                "supersedes_summary_event_id": row["supersedes_summary_event_id"],
+                "origin_summary_event_id": row["origin_summary_event_id"],
+            }
+
     state_counts = {s: 0 for s in ("live", "dormant", "dead", "orphaned", "unknown")}
     for row in conn.execute("SELECT derived_state, count(*) c FROM entities GROUP BY derived_state"):
         state_counts[row["derived_state"]] = row["c"]
@@ -106,6 +139,7 @@ def main():
         "decisions": decisions,
         "summary_stats": summary_stats,
         "milestone_progress": milestone_progress,
+        "latest_summary_by_entity": latest_summary_by_entity,
     }
 
     tmp = OUT.with_suffix(".tmp")

@@ -3,7 +3,7 @@
 # Also enforces filename-equals-id rule (not in JSON Schema).
 # Usage: validate-plan-frontmatter.sh [schema-path] [plans-dir]
 set -euo pipefail
-SCHEMA="${1:-agent-plan-tracker/schemas/0.1.0/plan-frontmatter.schema.json}"
+SCHEMA="${1:-agent-plan-tracker/schemas/0.2.0/plan-frontmatter.schema.json}"
 PLANS_DIR="${2:-planning}"
 
 python3 - "$SCHEMA" "$PLANS_DIR" <<'PYEOF'

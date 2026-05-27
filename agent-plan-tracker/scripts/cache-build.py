@@ -14,7 +14,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVENTS = REPO_ROOT / ".agent-plan-tracker/events.jsonl"
 CACHE = REPO_ROOT / ".agent-plan-tracker/cache.sqlite"
-SCHEMA_DDL = REPO_ROOT / "agent-plan-tracker/schemas/0.1.0/cache.schema.sql"
+SCHEMA_DDL = REPO_ROOT / "agent-plan-tracker/schemas/0.2.0/cache.schema.sql"
 
 STATE_FROM_EVENT = {
     "entity.created": "live",
@@ -49,7 +49,8 @@ def load_events():
 def init_db(conn):
     with open(SCHEMA_DDL) as f:
         conn.executescript(f.read())
-    for table in ("events", "entities", "relationships", "decisions", "commits"):
+    for table in ("events", "entities", "relationships", "decisions", "commits",
+                  "summaries"):
         conn.execute(f"DELETE FROM {table}")
 
 
@@ -255,10 +256,55 @@ def main():
             )
             last_boundary = ev["_line_no"]
 
+    # Materialise summaries (T2-analyser §3.2 / Phase B).
+    # Pass 1: insert one row per analysis.live-summary event.
+    # Pass 2: walk analysis.invalidated events and flip valid=0 on referenced summaries.
+    # Analysis events are state-neutral on the focal entity (handled above as
+    # any-other-event with no STATE_FROM_EVENT entry).
+    for ev in events:
+        if ev["type"] != "analysis.live-summary":
+            continue
+        attrs = ev.get("attributes", {})
+        cre_id, _, _, _ = find_commit_for(ev["_line_no"])
+        conn.execute(
+            """INSERT OR REPLACE INTO summaries (event_id, entity_type, entity_id,
+                source, model, origin_summary_event_id, supersedes_summary_event_id,
+                freeform_path, structured, line_no, valid, invalidated_by_event_id,
+                created_commit_recorded_event_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,1,NULL,?)""",
+            (
+                ev["event_id"],
+                ev.get("entity_type"),
+                ev.get("entity_id"),
+                attrs.get("source", "primary"),
+                attrs.get("model", ""),
+                attrs.get("origin_summary_event_id"),
+                attrs.get("supersedes_summary_event_id"),
+                attrs.get("freeform_path", ""),
+                json.dumps(attrs.get("structured", {}), separators=(",", ":")),
+                ev["_line_no"],
+                cre_id,
+            ),
+        )
+    for ev in events:
+        if ev["type"] != "analysis.invalidated":
+            continue
+        attrs = ev.get("attributes", {})
+        target = attrs.get("target_event_id")
+        cascades = attrs.get("cascades_to_event_ids", []) or []
+        for tid in [target] + list(cascades):
+            if not tid:
+                continue
+            conn.execute(
+                "UPDATE summaries SET valid = 0, invalidated_by_event_id = ? WHERE event_id = ?",
+                (ev["event_id"], tid),
+            )
+
     conn.commit()
     counts = {
         t: conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
-        for t in ("events", "entities", "relationships", "decisions", "commits")
+        for t in ("events", "entities", "relationships", "decisions", "commits",
+                  "summaries")
     }
     conn.close()
     print(f"cache built: {counts}")
