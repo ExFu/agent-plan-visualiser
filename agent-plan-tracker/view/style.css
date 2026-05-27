@@ -136,14 +136,20 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 .swimlane-band.odd  { fill: #ffffff; }
 .swimlane-label {
   font-family: var(--sans);
-  font-weight: 600;
-  font-size: 11px;
-  fill: #555;
+  font-weight: 700;
+  font-size: 12px;
+  fill: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 .entity-label {
   font-family: var(--mono);
   font-size: 10px;
   fill: #333;
+  cursor: help;
+}
+.entity-label:hover {
+  fill: #1565c0;
 }
 
 .commit-column {

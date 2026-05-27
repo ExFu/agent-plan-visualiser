@@ -308,7 +308,7 @@ function computeFlowLayout(projection, events, mode) {
   let y = TOP_MARGIN;
   for (const sl of swimlaneOrder) {
     const slTop = y;
-    y += 10; // padding inside top
+    y += 30; // top-band for swimlane label, then entities below
     const ents = swimlaneEntities[sl];
     for (const ek of ents) {
       entityRow[ek] = y + ROW_HEIGHT / 2;
@@ -467,7 +467,7 @@ function renderFlowSVG(layout) {
     }));
     swG.appendChild(textNS({
       class: "swimlane-label",
-      x: 12, y: sl.top + 18,
+      x: 12, y: sl.top + 22,
     }, sl.label));
     // Per-entity sub-label
     for (const ek of sl.entities) {
@@ -476,13 +476,17 @@ function renderFlowSVG(layout) {
         // Compute from entityRow approximation: skip if unknown
         continue;
       }
-      // entity short label on the left
+      // entity short label on the left, full id available via <title>
       const entity = state.projection.entities[ek];
       const short = entity.entity_id.length > 28 ? entity.entity_id.slice(0, 26) + "…" : entity.entity_id;
-      swG.appendChild(textNS({
+      const labelEl = textNS({
         class: "entity-label",
         x: 28, y: yMid + 3,
-      }, short));
+      }, short);
+      const titleEl = createNS("title");
+      titleEl.textContent = entity.entity_id;
+      labelEl.appendChild(titleEl);
+      swG.appendChild(labelEl);
     }
   });
   svg.appendChild(swG);
