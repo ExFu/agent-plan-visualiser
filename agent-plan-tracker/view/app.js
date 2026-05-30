@@ -10,6 +10,17 @@ const state = {
   events: null,
   currentView: "board",
   flowMode: "milestone", // "milestone" | "t2"
+  // Flow-view focus filters (T3-flow-view-filtering). Persist across switchView
+  // re-renders. Entity-keyed members (hiddenEntities, entity isolateRoot,
+  // lifecycle) are mode-independent; swimlane-keyed members are cleared on a
+  // milestone<->t2 mode switch (swimlane keys differ between modes).
+  flowFilters: {
+    hiddenEntities: new Set(),     // entity keys muted via eye toggle — keep a greyed row
+    hiddenSwimlanes: new Set(),    // swimlane keys muted via section eye toggle
+    collapsedSwimlanes: new Set(), // swimlane keys collapsed to a placeholder node
+    isolateRoot: null,             // { kind: "entity"|"swimlane", key } or null
+    lifecycle: "all",              // "all" | "open" | "closed"
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -50,6 +61,14 @@ async function main() {
   document.getElementById("btn-board").addEventListener("click", () => switchView("board"));
   document.getElementById("btn-tree").addEventListener("click", () => switchView("tree"));
   document.getElementById("btn-flow").addEventListener("click", () => switchView("flow"));
+
+  // Esc clears flow-view isolation (T3-flow-view-filtering D2).
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && state.currentView === "flow" && state.flowFilters.isolateRoot) {
+      state.flowFilters.isolateRoot = null;
+      rerenderFlow();
+    }
+  });
 
   switchView("flow");
 }
@@ -164,6 +183,8 @@ function treeNode(entity, p, children) {
 // ---------------------------------------------------------------------------
 
 function renderFlow(projection, events, content) {
+  const F = state.flowFilters;
+
   // Sub-mode toggle
   const sub = document.createElement("div");
   sub.className = "sub-toolbar";
@@ -175,11 +196,53 @@ function renderFlow(projection, events, content) {
     b.textContent = label;
     if (mode === state.flowMode) b.classList.add("active");
     b.addEventListener("click", () => {
-      state.flowMode = mode;
+      if (state.flowMode !== mode) {
+        state.flowMode = mode;
+        // swimlane-keyed filters don't map across modes — clear them.
+        F.hiddenSwimlanes.clear();
+        F.collapsedSwimlanes.clear();
+        if (F.isolateRoot && F.isolateRoot.kind === "swimlane") F.isolateRoot = null;
+      }
       switchView("flow");
     });
     sub.appendChild(b);
   }
+
+  // Lifecycle filter (T3-flow-view-filtering D1): All / Open / Closed.
+  const lcWrap = document.createElement("span");
+  lcWrap.className = "lifecycle-filter";
+  lcWrap.appendChild(document.createTextNode("show:"));
+  for (const [val, label, title] of [
+    ["all", "All", "Show every entity"],
+    ["open", "Open", "Hide closed (dead) entities — keep live / dormant / orphaned"],
+    ["closed", "Closed", "Show only closed (dead) entities"],
+  ]) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.title = title;
+    if (F.lifecycle === val) b.classList.add("active");
+    b.addEventListener("click", () => { F.lifecycle = val; rerenderFlow(); });
+    lcWrap.appendChild(b);
+  }
+  sub.appendChild(lcWrap);
+
+  // Isolation banner + unisolate (T3-flow-view-filtering D2).
+  if (F.isolateRoot) {
+    const banner = document.createElement("span");
+    banner.className = "isolate-banner";
+    const what = F.isolateRoot.kind === "swimlane"
+      ? swimlaneLabel(F.isolateRoot.key, state.flowMode)
+      : (F.isolateRoot.key.split(":")[1] || F.isolateRoot.key);
+    banner.appendChild(document.createTextNode(`Isolated: ${what} `));
+    const clear = document.createElement("button");
+    clear.className = "isolate-clear";
+    clear.textContent = "✕ Unisolate";
+    clear.title = "Clear isolation (Esc)";
+    clear.addEventListener("click", () => { F.isolateRoot = null; rerenderFlow(); });
+    banner.appendChild(clear);
+    sub.appendChild(banner);
+  }
+
   content.appendChild(sub);
 
   // Legend
@@ -244,6 +307,93 @@ function renderFlow(projection, events, content) {
   makeResizable(handle, sidebar);
 }
 
+// --- Flow filter substrate (T3-flow-view-filtering D1/D2) -------------------
+
+// Convenience: re-render the flow view after a filter mutation.
+function rerenderFlow() { switchView("flow"); }
+
+// Spawn adjacency over the unified relationship set (event + frontmatter edges).
+function buildSpawnAdjacency(projection) {
+  const parents = {};   // ekey -> Set(parent ekeys)
+  const children = {};  // ekey -> Set(child ekeys)
+  for (const r of (projection.relationships || [])) {
+    if (r.type !== "spawns") continue;
+    (children[r.from] ||= new Set()).add(r.to);
+    (parents[r.to] ||= new Set()).add(r.from);
+  }
+  return { parents, children };
+}
+
+// root + all transitive ancestors (up the spawn graph) + all transitive
+// descendants (down). Does NOT pull in siblings.
+function relatedSetForEntity(ekey, adj) {
+  const out = new Set([ekey]);
+  const up = [ekey];
+  while (up.length) {
+    const k = up.pop();
+    for (const p of (adj.parents[k] || [])) if (!out.has(p)) { out.add(p); up.push(p); }
+  }
+  const down = [ekey];
+  while (down.length) {
+    const k = down.pop();
+    for (const c of (adj.children[k] || [])) if (!out.has(c)) { out.add(c); down.push(c); }
+  }
+  return out;
+}
+
+// Computes which entities get a row (laidOut), which of those have their SVG
+// marks suppressed (eye-hide), and which swimlanes are collapsed. Pure.
+function computeFlowVisibility(projection, filters, mode) {
+  const entities = projection.entities;
+  const allKeys = Object.keys(entities);
+  const adj = buildSpawnAdjacency(projection);
+
+  let candidate = new Set(allKeys);
+
+  // 2. lifecycle filter — removes rows entirely.
+  if (filters.lifecycle === "open") {
+    candidate = new Set([...candidate].filter(k => entities[k].derived_state !== "dead"));
+  } else if (filters.lifecycle === "closed") {
+    candidate = new Set([...candidate].filter(k => entities[k].derived_state === "dead"));
+  }
+
+  // 3. isolation — removes rows entirely (intersection with related set).
+  if (filters.isolateRoot) {
+    let related;
+    if (filters.isolateRoot.kind === "entity") {
+      related = relatedSetForEntity(filters.isolateRoot.key, adj);
+    } else {
+      related = new Set();
+      for (const k of allKeys) {
+        if (swimlaneKey(entities[k], mode) === filters.isolateRoot.key) {
+          for (const r of relatedSetForEntity(k, adj)) related.add(r);
+        }
+      }
+    }
+    candidate = new Set([...candidate].filter(k => related.has(k)));
+  }
+
+  const laidOut = candidate;
+
+  // 4. eye-hide — stays laid out, marks suppressed, greyed row retained.
+  const suppressed = new Set();
+  for (const k of laidOut) {
+    if (filters.hiddenEntities.has(k) ||
+        filters.hiddenSwimlanes.has(swimlaneKey(entities[k], mode))) {
+      suppressed.add(k);
+    }
+  }
+
+  // 5. collapse — keep only collapsed swimlanes that still have >=1 laid-out member.
+  const collapsed = new Set();
+  for (const k of laidOut) {
+    const sl = swimlaneKey(entities[k], mode);
+    if (filters.collapsedSwimlanes.has(sl)) collapsed.add(sl);
+  }
+
+  return { laidOut, suppressed, collapsed, adj };
+}
+
 function computeFlowLayout(projection, events, mode) {
   // LEFT_MARGIN now small — the sticky HTML gutter (Task A) holds entity +
   // swimlane labels, so the SVG no longer needs to reserve space for them.
@@ -291,6 +441,13 @@ function computeFlowLayout(projection, events, mode) {
   }
   // Trailing buffer (in-progress, no closing commit.recorded): no assignment.
 
+  // 2.5. Visibility (T3-flow-view-filtering): which entities get rows, which
+  // are mark-suppressed (eye-hide), which swimlanes are collapsed.
+  const vis = computeFlowVisibility(projection, state.flowFilters, mode);
+  const isCollapsedSwimlane = (sl) => vis.collapsed.has(sl);
+  // entity key -> collapsed swimlane key it belongs to (for edge rerouting).
+  const memberCollapsedSwimlane = {};
+
   // 3. Group events by entity (excluding meta / non-entity events).
   //    Analysis events are also excluded — they get their own node kind
   //    (summary nodes) rendered separately (Phase C — T2-analyser §3.10).
@@ -307,13 +464,20 @@ function computeFlowLayout(projection, events, mode) {
   const swimlaneEntities = {};
   const swimlaneOrder = [];
 
+  const collapsedMembers = {}; // sl -> [ekey] laid-out members of a collapsed swimlane
   for (const [ekey, entity] of Object.entries(entities)) {
+    if (!vis.laidOut.has(ekey)) continue;
     const sl = swimlaneKey(entity, mode);
     if (!swimlaneEntities[sl]) {
       swimlaneEntities[sl] = [];
       swimlaneOrder.push(sl);
     }
-    swimlaneEntities[sl].push(ekey);
+    if (isCollapsedSwimlane(sl)) {
+      (collapsedMembers[sl] ||= []).push(ekey);
+      memberCollapsedSwimlane[ekey] = sl;  // no individual row for collapsed members
+    } else {
+      swimlaneEntities[sl].push(ekey);
+    }
   }
 
   // Sort swimlane order by priority.
@@ -347,17 +511,25 @@ function computeFlowLayout(projection, events, mode) {
     });
   }
 
-  // 6. Y-position each entity and compute swimlane spans.
+  // 6. Y-position each entity (or one placeholder row per collapsed swimlane)
+  //    and compute swimlane spans.
   const entityRow = {}; // entity_key -> y
+  const placeholderRowY = {}; // collapsed sl -> y
   const swimlaneSpans = [];
   let y = TOP_MARGIN;
   for (const sl of swimlaneOrder) {
     const slTop = y;
     y += 30; // top-band for swimlane label, then entities below
+    const collapsed = isCollapsedSwimlane(sl);
     const ents = swimlaneEntities[sl];
-    for (const ek of ents) {
-      entityRow[ek] = y + ROW_HEIGHT / 2;
+    if (collapsed) {
+      placeholderRowY[sl] = y + ROW_HEIGHT / 2;
       y += ROW_HEIGHT;
+    } else {
+      for (const ek of ents) {
+        entityRow[ek] = y + ROW_HEIGHT / 2;
+        y += ROW_HEIGHT;
+      }
     }
     y += SWIMLANE_PADDING;
     swimlaneSpans.push({
@@ -366,6 +538,9 @@ function computeFlowLayout(projection, events, mode) {
       top: slTop,
       bottom: y - SWIMLANE_PADDING / 2,
       entities: ents,
+      collapsed,
+      placeholderY: collapsed ? placeholderRowY[sl] : undefined,
+      memberCount: collapsed ? (collapsedMembers[sl] || []).length : ents.length,
     });
   }
   const totalHeight = y + 20;
@@ -376,6 +551,8 @@ function computeFlowLayout(projection, events, mode) {
   const nodes = [];
   const entityNodes = {};
   for (const [ekey, evs] of Object.entries(entityEvents)) {
+    if (vis.suppressed.has(ekey)) continue;        // eye-hidden: keep row, draw no marks
+    if (entityRow[ekey] === undefined) continue;   // not laid out / collapsed member
     const byCommit = {};
     for (const ev of evs) {
       const cId = eventToCommit.get(ev.event_id);
@@ -407,6 +584,38 @@ function computeFlowLayout(projection, events, mode) {
     entityNodes[ek].sort((a, b) => a.x - b.x);
   }
 
+  // 7.1. Placeholder nodes for collapsed swimlanes (T3-flow-view-filtering D4).
+  // One node per collapsed swimlane, at the x of the earliest member event's
+  // commit column. Spawn edges into members reroute here.
+  const placeholderNodes = {}; // sl -> { x, y, sl, members:[ekey], memberCount }
+  for (const sl of Object.keys(collapsedMembers)) {
+    if (placeholderRowY[sl] === undefined) continue;
+    const members = collapsedMembers[sl];
+    let minIdx = Infinity;
+    for (const ek of members) {
+      for (const ev of (entityEvents[ek] || [])) {
+        const cId = eventToCommit.get(ev.event_id);
+        const c = cId && commitMap[cId];
+        if (c && c.idx < minIdx) minIdx = c.idx;
+      }
+    }
+    const x = (minIdx === Infinity)
+      ? LEFT_MARGIN + COMMIT_WIDTH / 2
+      : LEFT_MARGIN + minIdx * COMMIT_WIDTH + COMMIT_WIDTH / 2;
+    placeholderNodes[sl] = { x, y: placeholderRowY[sl], sl, members, memberCount: members.length };
+  }
+
+  // Maps an entity key to the node a spawn edge should attach to: its own
+  // first/last node, or its collapsed swimlane's placeholder. null if the
+  // entity has no drawable endpoint (suppressed or filtered out).
+  const endpointNode = (ekey, which) => {
+    const sl = memberCollapsedSwimlane[ekey];
+    if (sl && placeholderNodes[sl]) return placeholderNodes[sl];
+    const ns = entityNodes[ekey];
+    if (ns && ns.length) return which === "last" ? ns[ns.length - 1] : ns[0];
+    return null;
+  };
+
   // 7.5. Summary nodes (Phase C — T2-analyser §3.10).
   // One node per analysis.live-summary event, placed on the entity's lifeline
   // at the x-coordinate of its bracketing commit column. Rendered separately
@@ -416,8 +625,9 @@ function computeFlowLayout(projection, events, mode) {
   for (const ev of events) {
     if (ev.type !== "analysis.live-summary") continue;
     const ekey = `${ev.entity_type}:${ev.entity_id}`;
+    if (vis.suppressed.has(ekey)) continue;  // eye-hidden: no summary mark either
     const yCoord = entityRow[ekey];
-    if (yCoord === undefined) continue;  // entity has no lifeline (shouldn't happen)
+    if (yCoord === undefined) continue;  // entity has no lifeline (collapsed / filtered)
     const cId = eventToCommit.get(ev.event_id);
     let x;
     if (cId) {
@@ -444,14 +654,14 @@ function computeFlowLayout(projection, events, mode) {
     });
   }
 
-  // 8. Relationship edges (spawns).
+  // 8. Relationship edges (spawns), with collapsed-swimlane rerouting.
   const relEdges = [];
   for (const r of (projection.relationships || []).filter(r => r.type === "spawns")) {
-    const fns = entityNodes[r.from];
-    const tns = entityNodes[r.to];
-    if (!fns || !tns) continue;
-    // From the source's first node, to the target's first node.
-    relEdges.push({ from: fns[0], to: tns[0] });
+    const from = endpointNode(r.from, "first");
+    const to = endpointNode(r.to, "first");
+    if (!from || !to) continue;   // an endpoint is hidden/filtered -> drop the edge
+    if (from === to) continue;    // both ends inside one collapsed swimlane -> drop
+    relEdges.push({ from, to });
   }
 
   // 9. Continuation lines + "now" badges for live/dormant/orphaned entities.
@@ -474,6 +684,7 @@ function computeFlowLayout(projection, events, mode) {
   return {
     nodes, entityNodes, relEdges, continuations, nowBadges, summaryNodes,
     swimlaneSpans, commits, commitMap, entityRow, eventToCommit,
+    suppressed: vis.suppressed, placeholderNodes, memberCollapsedSwimlane,
     LEFT_MARGIN, TOP_MARGIN, COMMIT_WIDTH, NOW_COLUMN_WIDTH, ROW_HEIGHT, NODE_RADIUS,
     nowX, totalWidth, totalHeight,
   };
@@ -761,6 +972,33 @@ function renderFlowSVG(layout) {
   }
   svg.appendChild(sumG);
 
+  // Placeholder nodes for collapsed swimlanes (T3-flow-view-filtering D4).
+  // A hollow rounded rect with a count; spawn edges reroute to it. Click to expand.
+  const phG = createNS("g", { class: "placeholder-nodes" });
+  for (const sl of Object.keys(layout.placeholderNodes || {})) {
+    const p = layout.placeholderNodes[sl];
+    const W = 30, H = 16;
+    const rect = createNS("rect", {
+      class: "placeholder-node",
+      x: p.x - W / 2, y: p.y - H / 2, width: W, height: H, rx: 3,
+    });
+    const titleEl = createNS("title");
+    titleEl.textContent =
+      `${swimlaneLabel(sl, state.flowMode)} — ${p.memberCount} entit${p.memberCount === 1 ? "y" : "ies"} collapsed\n` +
+      p.members.map(k => "• " + k).join("\n") + "\n(click to expand)";
+    rect.appendChild(titleEl);
+    const expand = () => { state.flowFilters.collapsedSwimlanes.delete(sl); rerenderFlow(); };
+    rect.addEventListener("click", expand);
+    phG.appendChild(rect);
+    const label = textNS({
+      class: "placeholder-node-count",
+      x: p.x, y: p.y + 4, "text-anchor": "middle",
+    }, "▸ " + p.memberCount);
+    label.addEventListener("click", expand);
+    phG.appendChild(label);
+  }
+  svg.appendChild(phG);
+
   return svg;
 }
 
@@ -775,36 +1013,92 @@ function renderFlowSVG(layout) {
 // edge while the SVG's commit columns scroll past.
 
 function renderFlowGutter(layout, gutter) {
+  const F = state.flowFilters;
+
   // Drag handle on right edge.
   const handle = document.createElement("div");
   handle.className = "flow-gutter-drag-handle";
   handle.title = "Drag to resize the entity-name column";
   gutter.appendChild(handle);
 
-  // Swimlane label headers — one per band, at the swimlane's top.
+  // Small clickable control glyph (isolate / eye / caret). stopPropagation so
+  // a control click never triggers the row's open-markdown handler.
+  const ctrl = (cls, glyph, title, onClick) => {
+    const s = document.createElement("span");
+    s.className = "gctrl " + cls;
+    s.textContent = glyph;
+    s.title = title;
+    s.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
+    return s;
+  };
+
+  // Swimlane headers — isolate / eye / collapse controls + label.
   for (const sl of layout.swimlaneSpans) {
     const div = document.createElement("div");
     div.className = "flow-gutter-swimlane";
     div.style.top = (sl.top + 4) + "px";
-    div.textContent = sl.label;
+
+    const ctrls = document.createElement("span");
+    ctrls.className = "gctrls";
+    ctrls.appendChild(ctrl("gctrl-isolate", "⌖",
+      `Isolate "${sl.label}" + everything it links to`,
+      () => { F.isolateRoot = { kind: "swimlane", key: sl.key }; rerenderFlow(); }));
+    const slHidden = F.hiddenSwimlanes.has(sl.key);
+    ctrls.appendChild(ctrl("gctrl-eye" + (slHidden ? " is-off" : ""), slHidden ? "◌" : "◉",
+      slHidden ? "Show this section's nodes" : "Hide this section's nodes",
+      () => { slHidden ? F.hiddenSwimlanes.delete(sl.key) : F.hiddenSwimlanes.add(sl.key); rerenderFlow(); }));
+    ctrls.appendChild(ctrl("gctrl-caret", sl.collapsed ? "▸" : "▾",
+      sl.collapsed ? "Expand this section" : "Collapse this section to a placeholder",
+      () => { sl.collapsed ? F.collapsedSwimlanes.delete(sl.key) : F.collapsedSwimlanes.add(sl.key); rerenderFlow(); }));
+    div.appendChild(ctrls);
+
+    const label = document.createElement("span");
+    label.className = "gsl-label";
+    label.textContent = sl.collapsed ? `${sl.label} (${sl.memberCount})` : sl.label;
+    div.appendChild(label);
     gutter.appendChild(div);
+
+    // Collapsed: one muted placeholder row in place of member rows.
+    if (sl.collapsed && sl.placeholderY !== undefined) {
+      const prow = document.createElement("div");
+      prow.className = "flow-gutter-row flow-gutter-placeholder";
+      prow.style.top = (sl.placeholderY - 9) + "px";
+      prow.textContent = `▸ ${sl.memberCount} collapsed`;
+      prow.title = "Click to expand this section";
+      prow.addEventListener("click", () => { F.collapsedSwimlanes.delete(sl.key); rerenderFlow(); });
+      gutter.appendChild(prow);
+    }
   }
 
-  // Per-entity rows.
+  // Per-entity rows (non-collapsed swimlanes only).
   for (const sl of layout.swimlaneSpans) {
+    if (sl.collapsed) continue;
     for (const ek of sl.entities) {
-      // Prefer entityRow (set even for entities without nodes); fall back
-      // to first node's y for defensive resilience.
       const yMid = (layout.entityRow && layout.entityRow[ek] !== undefined)
         ? layout.entityRow[ek]
         : layout.entityNodes[ek]?.[0]?.y;
       if (yMid === undefined) continue;
       const entity = state.projection.entities[ek];
       if (!entity) continue;
+      const suppressed = layout.suppressed && layout.suppressed.has(ek);
       const row = document.createElement("div");
-      row.className = "flow-gutter-row";
+      row.className = "flow-gutter-row" + (suppressed ? " is-suppressed" : "");
       row.style.top = (yMid - 9) + "px";  // center on the lifeline (height=18)
-      row.textContent = entity.entity_id;
+
+      const ctrls = document.createElement("span");
+      ctrls.className = "gctrls";
+      ctrls.appendChild(ctrl("gctrl-isolate", "⌖", "Isolate to this entity + its parents/children",
+        () => { F.isolateRoot = { kind: "entity", key: ek }; rerenderFlow(); }));
+      ctrls.appendChild(ctrl("gctrl-eye" + (suppressed ? " is-off" : ""), suppressed ? "◌" : "◉",
+        suppressed ? "Show this entity's nodes" : "Hide this entity's nodes",
+        () => { F.hiddenEntities.has(ek) ? F.hiddenEntities.delete(ek) : F.hiddenEntities.add(ek); rerenderFlow(); }));
+      row.appendChild(ctrls);
+
+      const name = document.createElement("span");
+      name.className = "grow-label";
+      name.textContent = entity.entity_id;
+      row.appendChild(name);
+
       row.title = entity.entity_id + " (click to open)";
       row.addEventListener("click", () => showPlanMarkdown(entity));
       gutter.appendChild(row);
@@ -946,6 +1240,7 @@ function showDetail(n) {
   if (!panel) return;
   const parts = [];
   parts.push(`<h3 class="md-title">${escapeHtml(n.entity.entity_id)}</h3>`);
+  parts.push(`<div class="detail-actions"><button class="btn-isolate" id="btn-isolate-detail" title="Show only this entity and its parents/children/spawns">⌖ Isolate to this</button></div>`);
   parts.push(`<p class="detail-commit"><strong>Commit:</strong> ${escapeHtml(n.commitMessage)}<br><span class="detail-date">${escapeHtml(n.commitDate)}</span></p>`);
   parts.push(`<p>${n.eventCount} event(s) in this commit for this entity:</p>`);
   parts.push("<ul class='event-list'>");
@@ -958,6 +1253,10 @@ function showDetail(n) {
   panel.innerHTML = parts.join("");
   attachReadMoreToggles(panel);
   attachSpawnRelClickHandlers(panel);
+  document.getElementById("btn-isolate-detail")?.addEventListener("click", () => {
+    state.flowFilters.isolateRoot = { kind: "entity", key: n.entityKey };
+    rerenderFlow();
+  });
 }
 
 // Task C — return an HTML string listing the entity's spawn parents and

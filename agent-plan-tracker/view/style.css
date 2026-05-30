@@ -1204,3 +1204,114 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   fill: rgba(21,101,192,0.06) !important;
 }
 
+/* ===== Flow-view focus filters (T3-flow-view-filtering) ===== */
+
+/* Gutter control glyphs (isolate / eye / collapse), shared by rows + headers. */
+.gctrls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  margin-right: 5px;
+}
+.gctrl {
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.5;
+  user-select: none;
+  width: 13px;
+  text-align: center;
+  color: #555;
+}
+.gctrl:hover { opacity: 1; color: #1565c0; }
+.gctrl-eye.is-off { opacity: 0.85; color: #c62828; }
+.gctrl-caret { color: #6a1b9a; }
+.flow-gutter-swimlane .gctrl { font-size: 12px; }
+
+/* Row label after the controls — takes the remaining width with ellipsis. */
+.grow-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.gsl-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+
+/* Eye-hidden entity: greyed row, kept in place so the toggle stays reachable. */
+.flow-gutter-row.is-suppressed { opacity: 0.45; font-style: italic; }
+.flow-gutter-row.is-suppressed:hover { opacity: 0.75; }
+
+/* Collapsed-section placeholder row in the gutter. */
+.flow-gutter-placeholder {
+  color: #6a1b9a;
+  font-style: italic;
+  padding-left: 14px;
+}
+
+/* Collapsed-section placeholder node in the SVG. */
+.placeholder-node {
+  fill: #f3e5f5;
+  stroke: #6a1b9a;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+  cursor: pointer;
+}
+.placeholder-node:hover { fill: #e1bee7; }
+.placeholder-node-count {
+  font-family: var(--mono);
+  font-size: 9px;
+  fill: #6a1b9a;
+  cursor: pointer;
+  pointer-events: none;
+}
+
+/* Lifecycle filter segmented control in the sub-toolbar. */
+.lifecycle-filter {
+  margin-left: 1rem;
+  font-size: 0.78rem;
+  color: #666;
+}
+.lifecycle-filter button {
+  padding: 0.2rem 0.5rem;
+  margin-left: 0.3rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: 3px;
+  font-size: 0.78rem;
+}
+.lifecycle-filter button.active { background: var(--fg); color: var(--bg); }
+
+/* Isolation banner + unisolate button. */
+.isolate-banner {
+  margin-left: 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6a1b9a;
+  background: #f3e5f5;
+  border: 1px solid #ce93d8;
+  border-radius: 3px;
+  padding: 0.2rem 0.5rem;
+}
+.isolate-clear {
+  cursor: pointer;
+  border: none;
+  background: #6a1b9a;
+  color: #fff;
+  border-radius: 3px;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.74rem;
+  margin-left: 0.3rem;
+}
+.isolate-clear:hover { background: #4a148c; }
+
+/* "Isolate to this" button in the node-detail panel. */
+.detail-actions { margin: 0.2rem 0 0.5rem; }
+.btn-isolate {
+  cursor: pointer;
+  border: 1px solid #ce93d8;
+  background: #f3e5f5;
+  color: #6a1b9a;
+  border-radius: 3px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.btn-isolate:hover { background: #e1bee7; }
+
