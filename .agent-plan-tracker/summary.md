@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-27T19:08:45Z
+# Project state — generated 2026-05-30T20:08:45Z
 
-**Total events:** 167  ·  **Live:** 21  ·  **Dormant:** 0  ·  **Dead:** 16  ·  **Orphaned:** 0
+**Total events:** 170  ·  **Live:** 21  ·  **Dormant:** 0  ·  **Dead:** 17  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -33,17 +33,12 @@
   - `2026-05-23.snapshot-trigger-config` (1 events): entity.created
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
-
-- **T2-storage**
-  - `T3-cache-build` (3 events): entity.completed → verification.tested → entity.progressed
+  - `2026-05-30.progressed-after-completed-state-flip` (1 events): entity.created
 
 ### By milestone
 
 - **(self: M1-bootstrap)**
   - `M1-bootstrap`
-
-- **M1-bootstrap**
-  - `T3-cache-build`
 
 ## Blocked
 
@@ -63,8 +58,8 @@ _No orphaned entities._
 - `T3-analyser-phase-d-cascade-invalidation` (plan)
 - `T3-analyser-phase-e-global-mode` (plan)
 - `T3-build-loop` (plan)
+- `T3-cache-build` (plan)
 - `T3-events-schema-json` (plan)
-- `T3-flow-view-density` (plan)
 
 ## Notable patterns
 
@@ -72,8 +67,8 @@ _No flapping closures._
 
 ## Milestone progress
 
-- **M1-bootstrap**: 9/10 T3 complete (90%); 1 live
+- **M1-bootstrap**: 10/10 T3 complete (100%); 0 live
 - **M6-analyser**: 5/5 T3 complete (100%); 0 live
 
 ---
-_37 entities · 39 relationships · 1 decisions._
+_38 entities · 39 relationships · 1 decisions._
