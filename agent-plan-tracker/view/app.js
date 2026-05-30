@@ -1265,8 +1265,59 @@ const Settings = {
     const modal = document.getElementById("settings-modal");
     if (!modal) return;
     document.getElementById("settings-api-key").value = this.apiKey;
-    document.getElementById("settings-default-model").value = this.defaultModel;
     modal.hidden = false;
+    // No preloading: populate only from the key actually in the input. On open
+    // that's the saved key (if any); with no key the dropdown stays at its
+    // placeholder until one is typed/pasted (see initModal).
+    this._populateModelSelect(this.apiKey);
+  },
+
+  // Rebuild the default-model <select> from the live /v1/models catalogue for
+  // the key currently in the input. We never preload a hardcoded list: with no
+  // key the dropdown shows only the placeholder; the list is fetched
+  // dynamically the moment a key is provided. `keyOverride` lets the key field
+  // drive the list before the key is saved.
+  async _populateModelSelect(keyOverride) {
+    const sel = document.getElementById("settings-default-model");
+    if (!sel) return;
+    const cur = this.defaultModel;
+    const placeholder = `<option value="">— none, pick at call time —</option>`;
+    const key = (keyOverride !== undefined ? keyOverride : (this.apiKey || "")).trim();
+
+    // No key in the input yet → nothing to fetch. Placeholder only.
+    if (!key) {
+      sel.innerHTML = placeholder;
+      sel.value = "";
+      sel.disabled = false;
+      return;
+    }
+
+    // Token guards against an out-of-order response if the key changes while a
+    // fetch is in flight (debounced input can fire several times).
+    const token = (this._modelFetchToken = (this._modelFetchToken || 0) + 1);
+    sel.disabled = true;
+    sel.innerHTML = placeholder + `<option disabled>loading models…</option>`;
+
+    let models;
+    try {
+      models = await ModelCatalog.list({ key });
+    } catch {
+      models = ModelCatalog.FALLBACK.slice();
+    }
+    if (token !== this._modelFetchToken) return;  // superseded by a newer fetch
+
+    const opts = [placeholder];
+    for (const m of models) {
+      opts.push(`<option value="${escapeHtml(m.id)}" ${m.id === cur ? "selected" : ""}>${escapeHtml(m.display_name)}</option>`);
+    }
+    // Preserve a previously-saved default even if it's no longer in the catalogue,
+    // so we don't silently drop the user's choice (they'll see it's stale).
+    if (cur && !models.some(m => m.id === cur)) {
+      opts.push(`<option value="${escapeHtml(cur)}" selected>${escapeHtml(cur)} (not in current catalogue)</option>`);
+    }
+    sel.innerHTML = opts.join("");
+    sel.value = cur || "";
+    sel.disabled = false;
   },
   closeModal() {
     const modal = document.getElementById("settings-modal");
@@ -1276,6 +1327,17 @@ const Settings = {
   initModal() {
     const saveBtn = document.getElementById("settings-save");
     const clearBtn = document.getElementById("settings-clear");
+    const keyInput = document.getElementById("settings-api-key");
+    // Fetch the model list dynamically as soon as a key is provided in the
+    // input, debounced so a paste/type triggers a single fetch rather than one
+    // per keystroke. An empty field shows only the placeholder (no preload).
+    if (keyInput) {
+      let keyDebounce;
+      keyInput.addEventListener("input", () => {
+        clearTimeout(keyDebounce);
+        keyDebounce = setTimeout(() => this._populateModelSelect(keyInput.value), 400);
+      });
+    }
     if (saveBtn) saveBtn.addEventListener("click", () => {
       this.apiKey = document.getElementById("settings-api-key").value;
       this.defaultModel = document.getElementById("settings-default-model").value;
@@ -1298,20 +1360,93 @@ const Settings = {
   },
 };
 
+// --- ModelCatalog -----------------------------------------------------------
+// Single source of truth for which models the picker offers. We NEVER hardcode
+// model IDs in the UI: Anthropic retires snapshots over time, and a baked-in ID
+// (e.g. claude-sonnet-4-20250514) eventually returns `not_found_error` at call
+// time. Instead we fetch the live catalogue from GET /v1/models with the user's
+// key, so the picker can only ever offer models that key actually supports.
+//
+// Cached in-memory per key. A small static fallback is used ONLY when no key is
+// present yet (so the dropdown isn't empty) or if the catalogue fetch fails.
+
+const ModelCatalog = {
+  ENDPOINT: "https://api.anthropic.com/v1/models",
+  _cache: null,          // [{ id, display_name }]
+  _cachedForKey: null,   // which key the cache belongs to
+
+  // Last-resort placeholders. Intentionally generation-agnostic family aliases
+  // are NOT valid model IDs, so we list a couple of conservative current IDs.
+  // These are only shown pre-key / on fetch failure; the live catalogue
+  // overrides them the moment a working key is available.
+  FALLBACK: [
+    { id: "claude-sonnet-4-5", display_name: "claude-sonnet-4-5 (fallback — confirm against your catalogue)" },
+  ],
+
+  async list({ key } = {}) {
+    const useKey = (key !== undefined ? key : Settings.apiKey || "").trim();
+    if (!useKey) return this.FALLBACK.slice();
+    if (this._cache && this._cachedForKey === useKey) return this._cache;
+    try {
+      const res = await fetch(this.ENDPOINT + "?limit=100", {
+        headers: {
+          "x-api-key": useKey,
+          "anthropic-version": AnalyseClient.API_VERSION,
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const models = (data.data || [])
+        .map(m => ({ id: m.id, display_name: m.display_name || m.id }))
+        .filter(m => m.id);
+      this._cache = models.length ? models : this.FALLBACK.slice();
+      this._cachedForKey = useKey;
+      return this._cache;
+    } catch (e) {
+      console.warn("ModelCatalog: live /v1/models fetch failed; using fallback.", e);
+      return this.FALLBACK.slice();
+    }
+  },
+
+  // Pick a sensible default. An explicit Settings.defaultModel wins ONLY if it's
+  // still in the live catalogue — otherwise a stale saved default (e.g. a model
+  // that has since been retired) would be re-selected and fail with not_found at
+  // call time. Falls back to a sonnet, then the first available model.
+  defaultId(models) {
+    const list = models || [];
+    const saved = Settings.defaultModel;
+    if (saved && list.some(m => m.id === saved)) return saved;
+    const sonnet = list.find(m => /sonnet/i.test(m.id));
+    return (sonnet || list[0] || {}).id || "";
+  },
+};
+
 // --- Estimator --------------------------------------------------------------
 // Char-count proxy: ~4 chars/token (English-heavy text). ±15-25% accuracy.
 // Pricing baked in for v1; verify against Anthropic public pricing periodically.
 
 const Estimator = {
-  // USD per million tokens — keep in sync with anthropic.com/pricing.
-  PRICING: {
-    "claude-sonnet-4-20250514":    { in:  3, out: 15 },
-    "claude-opus-4-20250514":      { in: 15, out: 75 },
-    "claude-3-5-sonnet-20241022":  { in:  3, out: 15 },
-    "claude-3-5-haiku-20241022":   { in: 0.80, out: 4 },
-  },
+  // USD per million tokens. Per-model-ID overrides only — leave empty unless a
+  // specific snapshot's price diverges from its family. priceFor() falls back to
+  // family inference (opus / sonnet / haiku), so new snapshots need no entry here
+  // and we never hardcode model IDs that will later retire out of the catalogue.
+  PRICING: {},
   DEFAULT_MAX_OUTPUT: 2048,
   CHARS_PER_TOKEN: 4,
+
+  // Resolve $/M-token pricing for any model ID. Exact PRICING entries win;
+  // otherwise infer by family so new snapshots (e.g. claude-opus-4-8) still get
+  // a sane estimate rather than defaulting to sonnet rates. Cost is an estimate
+  // either way (±15-25%), so family inference is acceptable.
+  priceFor(model) {
+    if (this.PRICING[model]) return this.PRICING[model];
+    const id = String(model || "");
+    if (/opus/i.test(id))  return { in: 15,  out: 75 };
+    if (/haiku/i.test(id)) return { in: 1,   out: 5 };
+    if (/sonnet/i.test(id)) return { in: 3,  out: 15 };
+    return { in: 3, out: 15 };
+  },
 
   estimateTokensFromText(text) {
     return Math.ceil((text || "").length / this.CHARS_PER_TOKEN);
@@ -1319,7 +1454,7 @@ const Estimator = {
   estimateCallCost({ promptText, model, maxOutput }) {
     const inputTokens = this.estimateTokensFromText(promptText);
     const outputTokens = maxOutput || this.DEFAULT_MAX_OUTPUT;
-    const p = this.PRICING[model] || { in: 3, out: 15 };
+    const p = this.priceFor(model);
     const dollars = (inputTokens * p.in + outputTokens * p.out) / 1_000_000;
     return { inputTokens, outputTokens, dollars };
   },
@@ -2105,15 +2240,17 @@ const SidebarAnalyser = {
     }
     // Restore the live-status view while the dialog is open.
     showLiveStatus(entity);
-    this._showCostDialog({ entity, systemPrompt, userPrompt, bundle });
+    await this._showCostDialog({ entity, systemPrompt, userPrompt, bundle });
   },
 
-  _showCostDialog({ entity, systemPrompt, userPrompt, bundle }) {
+  async _showCostDialog({ entity, systemPrompt, userPrompt, bundle }) {
     const dialog = document.getElementById("cost-dialog");
     const body = document.getElementById("cost-dialog-body");
     if (!dialog || !body) return;
-    const defaultModel = Settings.defaultModel || "claude-sonnet-4-20250514";
     const fullPromptText = systemPrompt + "\n\n" + userPrompt;
+    // Live model catalogue for this key — never a hardcoded list.
+    const models = await ModelCatalog.list();
+    const defaultModel = ModelCatalog.defaultId(models);
 
     const renderForModel = (model) => {
       const cost = Estimator.estimateCallCost({ promptText: fullPromptText, model });
@@ -2125,8 +2262,8 @@ const SidebarAnalyser = {
         <div class="form-row">
           <span class="form-label">Model</span>
           <select id="cost-model-pick">
-            ${Object.keys(Estimator.PRICING).map(m =>
-              `<option value="${m}" ${m === model ? "selected" : ""}>${m}</option>`
+            ${models.map(m =>
+              `<option value="${escapeHtml(m.id)}" ${m.id === model ? "selected" : ""}>${escapeHtml(m.display_name)}</option>`
             ).join("")}
           </select>
         </div>
@@ -2370,7 +2507,7 @@ const SidebarAnalyser = {
   },
 
   _actualCostFromUsage(usage, model) {
-    const p = Estimator.PRICING[model] || { in: 3, out: 15 };
+    const p = Estimator.priceFor(model);
     return (usage.inputTokens * p.in + usage.outputTokens * p.out) / 1_000_000;
   },
 
@@ -2620,7 +2757,8 @@ const GlobalAnalyser = {
   async start() {
     if (this._running) return;
     if (!Settings.hasKey()) { Settings.openModal(); return; }
-    const model = Settings.defaultModel || "claude-sonnet-4-20250514";
+    const model = ModelCatalog.defaultId(await ModelCatalog.list());
+    if (!model) { alert("No usable model found for this API key (GET /v1/models returned nothing). Check the key in settings."); return; }
 
     // Pre-flight clean tree.
     try {
@@ -2643,7 +2781,7 @@ const GlobalAnalyser = {
     const sharedTok = Estimator.estimateTokensFromText(systemPrompt + "\n" + sharedPrompt);
     const perTailEstimate = 1500;
     const perOutputEstimate = 1500;
-    const p = Estimator.PRICING[model] || { in: 3, out: 15 };
+    const p = Estimator.priceFor(model);
     const firstCallIn = sharedTok + perTailEstimate;
     const subsequentCallIn = perTailEstimate + sharedTok * 0.1;  // cache-read rate (~10% rough)
     const nEnts = liveEntities.length;
@@ -2792,8 +2930,8 @@ const GlobalAnalyser = {
         });
         row.status = "saved";
         row.eventId = resp.primary_event_id;
-        row.cost = (result.usage.inputTokens * (Estimator.PRICING[model]?.in || 3) +
-                    result.usage.outputTokens * (Estimator.PRICING[model]?.out || 15)) / 1_000_000;
+        row.cost = (result.usage.inputTokens * Estimator.priceFor(model).in +
+                    result.usage.outputTokens * Estimator.priceFor(model).out) / 1_000_000;
         row.cacheHit = result.usage.cacheHitRatio;
       } catch (e) {
         row.status = "failed";
