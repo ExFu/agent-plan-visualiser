@@ -1,6 +1,6 @@
-# Project state — generated 2026-05-30T20:43:42Z
+# Project state — generated 2026-05-30T22:38:32Z
 
-**Total events:** 173  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 17  ·  **Orphaned:** 0
+**Total events:** 180  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 18  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -36,7 +36,7 @@
   - `2026-05-30.progressed-after-completed-state-flip` (1 events): entity.created
 
 - **T2-projection**
-  - `T3-flow-view-filtering` (2 events): entity.created → entity.progressed
+  - `T3-flow-view-filtering` (3 events): entity.created → entity.progressed → entity.progressed
 
 ### By milestone
 
@@ -58,6 +58,7 @@ _No orphaned entities._
 
 - `2026-05-27.outstanding-work-analyser-endpoint` (inbox-item)
 - `M6-analyser` (plan)
+- `T3-analyser-live-model-catalog` (plan)
 - `T3-analyser-phase-a-ephemeral` (plan)
 - `T3-analyser-phase-b-persistence` (plan)
 - `T3-analyser-phase-c-flow-rendering` (plan)
@@ -65,7 +66,6 @@ _No orphaned entities._
 - `T3-analyser-phase-e-global-mode` (plan)
 - `T3-build-loop` (plan)
 - `T3-cache-build` (plan)
-- `T3-events-schema-json` (plan)
 
 ## Notable patterns
 
@@ -73,8 +73,8 @@ _No flapping closures._
 
 ## Milestone progress
 
-- **M1-bootstrap**: 10/11 T3 complete (90%); 1 live
+- **M1-bootstrap**: 11/12 T3 complete (91%); 1 live
 - **M6-analyser**: 5/5 T3 complete (100%); 0 live
 
 ---
-_39 entities · 41 relationships · 1 decisions._
+_40 entities · 43 relationships · 1 decisions._

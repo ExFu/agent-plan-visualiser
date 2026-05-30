@@ -1289,7 +1289,9 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   border-radius: 3px;
   padding: 0.2rem 0.5rem;
 }
-.isolate-clear {
+/* Scoped under .isolate-banner so it outranks `.sub-toolbar button`
+   (which would otherwise force a white background → white-on-white). */
+.isolate-banner .isolate-clear {
   cursor: pointer;
   border: none;
   background: #6a1b9a;
@@ -1299,7 +1301,7 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   font-size: 0.74rem;
   margin-left: 0.3rem;
 }
-.isolate-clear:hover { background: #4a148c; }
+.isolate-banner .isolate-clear:hover { background: #4a148c; }
 
 /* "Isolate to this" button in the node-detail panel. */
 .detail-actions { margin: 0.2rem 0 0.5rem; }

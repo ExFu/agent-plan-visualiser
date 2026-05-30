@@ -324,6 +324,24 @@ function buildSpawnAdjacency(projection) {
   return { parents, children };
 }
 
+// Entities that supersede something else — the live replacements named in the
+// `entity_ids` of entity.superseded events. These are exempt from cascade-hide
+// (hiding an old plan must not drag its newer replacement into hiding).
+function computeSuperseders(projection) {
+  const byId = {};
+  for (const [k, e] of Object.entries(projection.entities)) {
+    if (!(e.entity_id in byId)) byId[e.entity_id] = k;
+  }
+  const out = new Set();
+  for (const ev of (state.events || [])) {
+    if (ev.type !== "entity.superseded") continue;
+    for (const id of (ev.attributes?.entity_ids || [])) {
+      if (byId[id]) out.add(byId[id]);
+    }
+  }
+  return out;
+}
+
 // root + all transitive ancestors (up the spawn graph) + all transitive
 // descendants (down). Does NOT pull in siblings.
 function relatedSetForEntity(ekey, adj) {
@@ -376,9 +394,27 @@ function computeFlowVisibility(projection, filters, mode) {
   const laidOut = candidate;
 
   // 4. eye-hide — stays laid out, marks suppressed, greyed row retained.
+  // Hiding an entity cascades to its spawned descendants that have no surviving
+  // parent (every spawn-parent is also hidden). Superseding entities are never
+  // cascaded onto — hiding an old plan must not hide its newer replacement.
+  const superseders = computeSuperseders(projection);
+  const closure = new Set(filters.hiddenEntities);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const k of allKeys) {
+      if (closure.has(k) || superseders.has(k)) continue;
+      const ps = adj.parents[k];
+      if (ps && ps.size > 0 && [...ps].every(p => closure.has(p))) {
+        closure.add(k);
+        changed = true;
+      }
+    }
+  }
+
   const suppressed = new Set();
   for (const k of laidOut) {
-    if (filters.hiddenEntities.has(k) ||
+    if (closure.has(k) ||
         filters.hiddenSwimlanes.has(swimlaneKey(entities[k], mode))) {
       suppressed.add(k);
     }

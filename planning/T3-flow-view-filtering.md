@@ -142,3 +142,28 @@ Manual, in-browser (the view's only runtime). Serve repo root, open `agent-plan-
 4. D4: collapse a spawned-into section; confirm placeholder + re-routed edges; expand restores.
 5. Regression: milestone↔t2 mode switch still works; analyser summary nodes/now-badges still render; no console errors.
 Screenshot each as evidence (no automated test harness exists for the view; [[T2-projection]] §7 keeps the view manually verified for now).
+
+## 7. Addenda
+
+**2026-05-30 — D3 cascade-on-hide + two fixes (post-review).** After first review:
+
+1. **Eye-hide now cascades.** Hiding an entity also suppresses its spawned
+   descendants that have **no surviving parent** (every spawn-parent is hidden),
+   computed as a fixpoint closure over the spawn graph. A descendant that still
+   has another (unhidden) spawn-parent stays visible. This makes hiding a parent
+   actually de-noise its exclusive subtree rather than leaving orphaned children
+   floating. Reversible: un-hiding the parent recomputes the closure.
+2. **Superseders are exempt from the cascade.** An entity named in the
+   `entity_ids` of any `entity.superseded` event (i.e. a live replacement) is
+   never auto-hidden by the cascade — hiding an old plan must not drag its newer
+   replacement into hiding. Supersession is event-data, not a graph edge, so it
+   is read from the event log (`computeSuperseders`). Explicit per-entity hides
+   still work on a superseder; only the *cascade* skips them.
+3. **Unisolate button legibility fix.** `.isolate-clear` lived inside
+   `.sub-toolbar`, so `.sub-toolbar button` (higher specificity) forced a white
+   background while the button kept white text → invisible. Re-scoped the rule to
+   `.isolate-banner .isolate-clear` to outrank it.
+
+Verified headlessly: cascade + superseder-exemption assertions added to the
+logic suite (28 total) alongside the DOM-wiring suite (11). In-browser visual
+check of the unisolate button still pending the shared-port unblock.
