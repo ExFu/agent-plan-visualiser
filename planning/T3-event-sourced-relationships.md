@@ -3,13 +3,13 @@ id: T3-event-sourced-relationships
 plan_kind: thematic
 tier: 3
 t2_parent: T2-storage
-milestone: M2-auto-extract
+milestone: M1.2-relationship-ssot
 status: draft
 ---
 
 # T3-event-sourced-relationships — make the event log the single source of truth for entity relationships
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Do NOT start until placement (§8 Q1) is confirmed.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Placement is confirmed (§8 Q1, resolved 2026-06-01): this plan is the sole constituent of milestone **M1.2-relationship-ssot** (a focused M1 follow-up).
 
 **Goal:** Make a plan's parentage (thematic `t2_parent`, milestone membership) a **derived projection of the event log**, not a value read independently from three places that can disagree. Wire up the currently-dead `relationship.reattached` event so that *moving* an entity between parents is a first-class, graph-visible operation — and so editing a frontmatter field alone can no longer silently change project state.
 
@@ -122,7 +122,7 @@ Two prose locations currently assert the *opposite* of this resolution and must 
 
 ## 8. HITL questions
 
-- **Q1 (placement — needs sign-off before implementation).** This plan is filed `milestone: M2-auto-extract` because (a) it must **not** sit under M1-bootstrap (an open M1 T3 is exactly what keeps M1 from closing — the problem we're clearing), and (b) M2's extractor will be the primary *producer* of reattach events, and projections must be trustworthy before automation leans on them. Caveat: `M2-auto-extract.md` does not yet exist (only `M1-bootstrap.md` and `M6-analyser.md` are authored), so this is a T3 authored ahead of its milestone plan. **Alternatives:** (i) promote to a standalone "architecture hardening" milestone (the user noted appetite for inserted milestones — "M6 should've been M1.1"); (ii) park under `T2-storage` with no milestone until M2 is authored (would require relaxing the schema's tier-3 `milestone` requirement — reject). Recommend M2-auto-extract; confirm or redirect.
+- **Q1 (placement). RESOLVED 2026-06-01.** ~~This plan is filed `milestone: M2-auto-extract`...~~ Originally filed under the phantom `M2-auto-extract` (which has no plan file). Resolved by the operator: this plan is the sole constituent of a new focused **sub-milestone `M1.2-relationship-ssot`**, attached to M1-bootstrap. Rationale: this is *follow-up work arising from M1* (a correctness defect surfaced by M1 dogfooding), not new auto-extract capability — so it belongs as a small M1.x hardening milestone, not folded into M2. Filing it under M1.2 (not M1-bootstrap directly) keeps it from blocking M1's close. This required a backward-compatible loosening of `plan-frontmatter.schema.json` to permit decimal milestone ids (`M[0-9]+(\.[0-9]+)?`) and a numeric `milestone_index`. The earlier alternatives (standalone hardening milestone / no-milestone-park) are subsumed: M1.2 *is* the focused hardening milestone, and the schema still requires a milestone for tier-3 thematic plans (no relaxation of that rule). Note: the move from `M2-auto-extract`→`M1.2` is itself recorded as the first real `relationship.reattached` event (see §7/events), inert until this plan lands.
 - **Q2 (schema version).** Bump to 0.3.0 (adds required `axis`). Confirm we version-bump rather than retrofit 0.2.0 in place — consistent with the project's `schema_version`-per-event discipline.
 - **Q3 (axis vocabulary).** `{t2-parent, milestone}` now; is `depends-on` / `alongside` reattachment foreseen soon enough to design the enum wider today? Lean: keep it to the two parentage axes; extend when needed.
 
@@ -142,5 +142,5 @@ Two prose locations currently assert the *opposite* of this resolution and must 
 - `relationship.reattached` ×N on the analyser T3s (axis `milestone`, and `t2-parent` where applicable) — the first real uses of the event.
 - `verification.tested` on T3-event-sourced-relationships (test_type: `reattach-fold` + `frontmatter-edit-noop`).
 - `entity.completed` on T3-event-sourced-relationships.
-- `entity.progressed` on M2-auto-extract (once that milestone plan exists) or its confirmed host.
+- `entity.progressed` on M1.2-relationship-ssot (its host milestone) as constituent work lands.
 - `commit.recorded`.

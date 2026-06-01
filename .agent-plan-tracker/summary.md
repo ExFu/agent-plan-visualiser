@@ -1,13 +1,13 @@
-# Project state — generated 2026-06-01T15:47:08Z
+# Project state — generated 2026-06-01T16:50:16Z
 
-**Total events:** 189  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 19  ·  **Orphaned:** 0
+**Total events:** 194  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Dead:** 19  ·  **Orphaned:** 0
 
 ## Live work
 
 ### By thematic parent
 
 - **(T1 itself)**
-  - `T1-top-level` (30 events): entity.extended → entity.extended → entity.extended
+  - `T1-top-level` (31 events): entity.extended → entity.extended → entity.extended
 
 - **(T2 itself)**
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
@@ -20,6 +20,7 @@
 
 - **(milestone)**
   - `M1-bootstrap` (5 events): entity.progressed → entity.progressed → entity.progressed
+  - `M1.2-relationship-ssot` (2 events): entity.created → relationship.spawns
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -36,12 +37,15 @@
   - `2026-05-30.progressed-after-completed-state-flip` (1 events): entity.created
 
 - **T2-storage**
-  - `T3-event-sourced-relationships` (2 events): entity.created → relationship.spawns
+  - `T3-event-sourced-relationships` (3 events): entity.created → relationship.spawns → relationship.reattached
 
 ### By milestone
 
 - **(self: M1-bootstrap)**
   - `M1-bootstrap`
+
+- **(self: M1.2-relationship-ssot)**
+  - `M1.2-relationship-ssot`
 
 - **M2-auto-extract**
   - `T3-event-sourced-relationships`
@@ -74,8 +78,8 @@ _No flapping closures._
 ## Milestone progress
 
 - **M1-bootstrap**: 12/12 T3 complete (100%); 0 live
-- **M2-auto-extract**: 0/1 T3 complete (0%); 1 live
+- **M1.2-relationship-ssot**: 0/1 T3 complete (0%); 1 live
 - **M6-analyser**: 5/5 T3 complete (100%); 0 live
 
 ---
-_41 entities · 45 relationships · 2 decisions._
+_42 entities · 46 relationships · 2 decisions._

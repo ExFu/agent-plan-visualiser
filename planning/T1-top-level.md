@@ -105,6 +105,8 @@ Each Mn is a first-class plan with its own structure:
 - **How**: which T3s (from across themes and lettered workstreams) deliver into this milestone? What counts as "Mn complete"?
 - **What**: the enumerated T3 references, plus milestone-level verification criteria.
 
+**Sub-milestones (Mn.m).** Sometimes shipping a milestone surfaces focused follow-up work that is *hardening of that milestone*, not the next capability. Folding it into the next major milestone would bloat that milestone and delay the fix. Instead it gets a small, sharply-scoped **sub-milestone** with a decimal index — e.g. `M1.1` (the analyser; currently mis-filed as `M6-analyser`, renumber deferred) and `M1.2-relationship-ssot` (the relationship single-source-of-truth fix, surfaced during M1 close-out). The decimal `milestone_index` (1.1, 1.2) orders them between M1 and M2 and signals "M1 follow-up, not new scope." Mechanically they are ordinary milestone plans (`plan_kind: milestone`) attached to their parent milestone via a `relationship.spawns` edge.
+
 Mn plans have their own lifecycle. They progress as their constituent T3s land. They complete when their definition-of-done is satisfied (not strictly when all originally-scheduled T3s are done — milestones promise capability outcomes, not specific T3 membership). T3s can be moved between milestones as a normal scope adjustment, no supersession needed; that's expected reshuffling, not destruction.
 
 A T3 carries its milestone as frontmatter (`milestone: M1-bootstrap` or similar). Scheduling is metadata, not a graph relationship — it's the kind of thing that adjusts naturally as work shapes up. Persisting it as a relationship event would create noise without proportional value.
