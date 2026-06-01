@@ -202,7 +202,9 @@ In M3+ this becomes incremental (delta-from-snapshot).
 The planning methodology declares two kinds of edges:
 
 - **Event-sourced edges** — `relationship.spawns`, `relationship.depends-on`, `relationship.addendum-to`, `relationship.alongside`, `relationship.reattached`. Emitted as events in `events.jsonl`; canonical history of intentional, dated connections (especially cross-axis spawns: T2 → Mn, supersession-spawned replacements, "this triggered that").
-- **Frontmatter-declared edges** — `t2_parent` and `milestone` fields on plan frontmatter. Hierarchical metadata on the entity itself; the field IS the source of truth. No event-emission required, no drift risk because the frontmatter is the single declaration.
+- **Frontmatter-declared edges** — `t2_parent` and `milestone` fields on plan frontmatter. Hierarchical metadata on the entity itself; ~~the field IS the source of truth. No event-emission required, no drift risk because the frontmatter is the single declaration.~~
+
+> **Correction (2026-06-01, M1.2-relationship-ssot — supersedes the struck text above).** The frontmatter field is the **creation-time seed**, not the standing source of truth. The authoritative edge is the **cache fold**: the `entity.created` frontmatter snapshot seeds the edge, and each `relationship.reattached` event *rewrites* it last-write-wins (machinery: [[T3-milestone-parent-ontology]] D3; membership projection repoint: [[T3-event-sourced-relationships]] D-C). Consequences: (1) editing a plan's `t2_parent`/`milestone` field **alone** no longer moves it in any projection — a `relationship.reattached` event is the move primitive; (2) drift between the live field and the event-derived parent is therefore **possible and is audited** (M3-clean-gate drift audit), not impossible. Keep the frontmatter field truthful so the file reads true, but the event log is what moves state.
 
 Both are first-class for downstream consumers (HTML view's swimlane routing, analyser's 1-hop context bundle, markdown summary's "active under this T2" rollups). Consumers shouldn't have to walk two systems.
 
@@ -225,7 +227,9 @@ Both are first-class for downstream consumers (HTML view's swimlane routing, ana
 - T3 (or any plan) gets a `t2_parent` and/or `milestone` field in frontmatter → no spawn event needed for that hierarchy edge. Cache-build derives it.
 - A relationship that isn't pure hierarchy (cross-axis, supersession, dependency, alongside, reattach) → emit the relationship event.
 
-This matches the swap-out point (§4): the asymmetry could collapse if we later wanted single-source-of-truth event semantics, but the present design accepts the asymmetry because frontmatter is already canonical for hierarchy and forcing extra events for every T3 creation is high-friction with low marginal value.
+~~This matches the swap-out point (§4): the asymmetry could collapse if we later wanted single-source-of-truth event semantics, but the present design accepts the asymmetry because frontmatter is already canonical for hierarchy and forcing extra events for every T3 creation is high-friction with low marginal value.~~
+
+> **Correction (2026-06-01, M1.2-relationship-ssot — supersedes the struck text above).** That "later" arrived: the single-source-of-truth collapse is **realised**, without the high-friction cost the original feared. Plain T3 creation still needs no spawn event — the `entity.created` frontmatter snapshot is the seed and cache-build derives the hierarchy edge. The change is only that *post-creation moves* are events (`relationship.reattached`) rather than silent frontmatter edits, and projections read the resulting cache fold rather than re-reading live files. So the asymmetry didn't collapse into "an event per T3"; it collapsed into "seed once from frontmatter, move via events" — low-friction at creation, authoritative thereafter.
 
 ## 4. Swap-out points
 

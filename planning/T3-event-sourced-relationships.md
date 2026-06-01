@@ -4,7 +4,7 @@ plan_kind: thematic
 tier: 3
 t2_parent: T2-storage
 milestone: M1.2-relationship-ssot
-status: draft
+status: completed
 ---
 
 # T3-event-sourced-relationships — make milestone *membership* a projection of the cache, not a live-file read

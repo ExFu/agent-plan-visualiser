@@ -3,7 +3,7 @@ id: T3-analyser-live-model-catalog
 plan_kind: thematic
 tier: 3
 t2_parent: T2-analyser
-milestone: M1-bootstrap
+milestone: M6-analyser
 status: completed
 ---
 
