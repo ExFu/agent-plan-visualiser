@@ -1,13 +1,13 @@
-# Project state — generated 2026-05-30T22:38:32Z
+# Project state — generated 2026-06-01T15:45:46Z
 
-**Total events:** 180  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 18  ·  **Orphaned:** 0
+**Total events:** 185  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Dead:** 18  ·  **Orphaned:** 0
 
 ## Live work
 
 ### By thematic parent
 
 - **(T1 itself)**
-  - `T1-top-level` (29 events): entity.extended → entity.extended → entity.extended
+  - `T1-top-level` (30 events): entity.extended → entity.extended → entity.extended
 
 - **(T2 itself)**
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
@@ -38,6 +38,9 @@
 - **T2-projection**
   - `T3-flow-view-filtering` (3 events): entity.created → entity.progressed → entity.progressed
 
+- **T2-storage**
+  - `T3-event-sourced-relationships` (2 events): entity.created → relationship.spawns
+
 ### By milestone
 
 - **(self: M1-bootstrap)**
@@ -45,6 +48,9 @@
 
 - **M1-bootstrap**
   - `T3-flow-view-filtering`
+
+- **M2-auto-extract**
+  - `T3-event-sourced-relationships`
 
 ## Blocked
 
@@ -74,7 +80,8 @@ _No flapping closures._
 ## Milestone progress
 
 - **M1-bootstrap**: 11/12 T3 complete (91%); 1 live
+- **M2-auto-extract**: 0/1 T3 complete (0%); 1 live
 - **M6-analyser**: 5/5 T3 complete (100%); 0 live
 
 ---
-_40 entities · 43 relationships · 1 decisions._
+_41 entities · 45 relationships · 2 decisions._
