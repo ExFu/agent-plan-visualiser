@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-01T16:50:16Z
+# Project state — generated 2026-06-01T17:07:19Z
 
-**Total events:** 194  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Dead:** 19  ·  **Orphaned:** 0
+**Total events:** 197  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Dead:** 19  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,7 +20,7 @@
 
 - **(milestone)**
   - `M1-bootstrap` (5 events): entity.progressed → entity.progressed → entity.progressed
-  - `M1.2-relationship-ssot` (2 events): entity.created → relationship.spawns
+  - `M1.2-relationship-ssot` (3 events): entity.created → relationship.spawns → entity.extended
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -37,7 +37,7 @@
   - `2026-05-30.progressed-after-completed-state-flip` (1 events): entity.created
 
 - **T2-storage**
-  - `T3-event-sourced-relationships` (3 events): entity.created → relationship.spawns → relationship.reattached
+  - `T3-event-sourced-relationships` (5 events): relationship.reattached → entity.extended → commit.recorded
 
 ### By milestone
 

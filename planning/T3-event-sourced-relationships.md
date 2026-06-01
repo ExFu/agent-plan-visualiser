@@ -52,16 +52,17 @@ And R4 — the event designed to express a move — does nothing, so there is no
 - **Flow-view rendering changes.** The view already renders whatever edges the projection emits; once the cache folds reattach correctly, the view follows for free. No `view/` changes anticipated (confirm in §7 V5).
 - **Dependency-edge moves.** `relationship.depends-on` reattachment is not in scope; this T3 covers parentage axes (thematic + milestone) only. The axis attribute (§4 D-A) is designed to extend to other axes later.
 
-## 3. The first reattach: analyser milestone re-tag (acceptance test, deferred in from M1 close-out)
+## 3. The first reattach: analyser milestone renumber + re-tag (acceptance test, deferred in from M1 close-out)
 
-The mis-tagged analyser T3s are the natural first exercise of the new machinery. Once the consumer is fixed, emit one `relationship.reattached` per mis-tagged entity:
+The mis-tagged analyser plans are the natural first exercise of the new machinery, now composed with a milestone **renumber** surfaced during M1.2 planning. Three moves, all via real events once the consumer is fixed. Tags below were verified against the live files on 2026-06-01:
 
-- `T3-analyser-live-model-catalog`: axis `milestone`, `from_parent: M1-bootstrap` → `to_parent: M6-analyser` (and, if also thematically mis-parented, axis `t2_parent` `T2-projection`/whatever → `T2-analyser`).
-- Repeat for the other analyser-phase T3s tagged `milestone: M1-bootstrap` that belong under `M6-analyser` (enumerate at implementation time from the cache, not from memory).
+1. **Renumber the milestone entity `M6-analyser` → `M1.1-analyser`.** It should always have been an M1 sub-milestone — analyser hardening *arising from* M1, not the 6th major milestone (see T1 §2.4 sub-milestones). `M6-analyser` is a **completed** milestone (full lifecycle ending in `entity.completed`), so the fold must carry the rename **without resurrecting it to live** — see D-F. Emit `entity.renamed` (`from_name: M6-analyser`, `to_name: M1.1-analyser`).
+2. **Re-tag the 5 analyser-phase T3s** — `T3-analyser-phase-{a,b,c,d,e}-*`, currently `milestone: M6-analyser` → `M1.1-analyser`. One `relationship.reattached` each, axis `milestone`.
+3. **Re-home `T3-analyser-live-model-catalog`** — currently mis-tagged `milestone: M1-bootstrap` → `M1.1-analyser` (axis `milestone`). This is the original M1-closeout mis-parent; the other `milestone: M1-bootstrap` plans (build-loop, cache-build, html-view, …) are legitimate bootstrap work and stay put.
 
-**Acceptance:** after rebuild, `milestone_progress` shows these T3s under M6-analyser (not M1-bootstrap); the flow-view graph draws the M6 edge and *visibly records* the move; M1-bootstrap's live count drops accordingly. The frontmatter `milestone:` field of each file is updated to match (so the file isn't misleading), but the **event** is what moved the state — proving frontmatter-edit-alone is no longer the mechanism.
+**Acceptance:** after rebuild, `milestone_progress` shows all six analyser plans under **M1.1-analyser** (not M6-analyser, not M1-bootstrap); the milestone entity appears as **M1.1-analyser** in `completed` state, and **M6-analyser no longer materialises as a separate live/phantom entity** (no resurrection); the flow-view graph draws the M1.1 edges and *visibly records* the moves; M1-bootstrap's live count drops by one (live-model-catalog leaves). Each file's `milestone:`/`id` frontmatter is updated to match (so files aren't misleading), but the **events** are what moved the state — proving frontmatter-edit-alone is no longer the mechanism.
 
-> Note: this re-tag was originally going to be a quick frontmatter edit during M1 close-out. It was deferred into this T3 precisely because the quick edit would have *demonstrated* the bug (R3 moves, R1/R2/graph don't) rather than fixing it.
+> Note: this renumber + re-tag was originally going to be quick frontmatter edits during M1 close-out. It was deferred into this T3 precisely because the quick edit would have *demonstrated* the bugs (R3 moves; R1/R2/graph don't; and `entity.renamed` would resurrect a dead milestone) rather than fixing them. The M6→M1.1 renumber is the canonical example and the reason D-F exists.
 
 ## 4. Design decisions
 
@@ -80,6 +81,12 @@ Replace the frozen-snapshot edge synthesis. For each axis, the current parent of
 
 Process events in log order; reattach overwrites the seed. The `relationships` row records `source` (`"frontmatter-seed"` vs `"reattached"`) and `source_event_id` so provenance is queryable. Old edge is removed/replaced, not left dangling.
 
+**Vocabulary note — why reattach reads differently from spawns (resolved 2026-06-01).** The new parent is **not missing** from a reattach event; the two event types simply use different vocabularies for the same edge:
+- `relationship.spawns` uses *edge-endpoint* vocabulary — `from_entity_id` literally names the **parent endpoint**, and cache-build writes the row `(from = parent, to = child)`. So for spawns, `from_entity_id` *is* the parent.
+- `relationship.reattached` uses *transition* vocabulary — it names a **move** for the event's own `entity_id` (the child): `from_parent` (old) → `to_parent` (new). The new parent is `to_parent`.
+
+The dead-code bug is *only* that the edge loop looks exclusively for the key `from_entity_id` and skips any event lacking it (`if not from_id: continue`). This fold teaches cache-build the second dialect: for a reattach the edge is `(parent = to_parent, child = entity_id)`, ordered after the seed so the latest move wins. `from_parent` is retained purely for **audit** — the log answers "what moved, from where, to where" without replaying prior state.
+
 ### D-C — `projection-emit.py` reads parentage from the cache, not the live file
 `compute_milestone_progress()` stops reading `planning/*.md` frontmatter. It reads milestone membership from the cache `relationships` table (the §D-B fold). This collapses R3 into the single event-derived source and removes the live-file divergence entirely.
 
@@ -91,12 +98,20 @@ Two prose locations currently assert the *opposite* of this resolution and must 
 - **T2-storage §3.8 ("Unified relationships")** currently states the frontmatter "field IS the source of truth. No event-emission required, no drift risk because the frontmatter is the single declaration." → rewrite to: frontmatter seeds; event log is authoritative; reattach is the move primitive; drift is possible and audited (M3).
 - **T1 §2.4** carries the aside that milestone membership "shouldn't be a relationship event (would create noise)." → annotate as superseded by the Q9 resolution (cross-reference the §5 addendum). Keep the original text (append-only spirit), add a dated correction.
 
+### D-F — `entity.renamed` must migrate the entity, not resurrect it
+Discovered 2026-06-01 while scoping the M6→M1.1 renumber: `entity.renamed` is broken in today's `cache-build.py`, the same root-cause family as the dead reattach path (cache-build was never taught to consume the event correctly):
+1. **No key migration.** The entity loop keys by `(entity_type, event entity_id)` and never rewrites an entity's id on rename. A rename therefore produces *two* cache entities — the old id (carrying the full frozen history) and a separate new id — instead of one migrated entity.
+2. **Resurrection.** `STATE_FROM_EVENT["entity.renamed"] = "live"`, so consuming a rename on a **completed** entity (exactly the M6-analyser case) flips it back to live.
+
+**Decision:** the fold treats `entity.renamed` as an **identity migration**. The renamed entity's full event history, frozen `entity.created` attributes, **and derived state** move onto `to_name`; the old id leaves **no** live/phantom entity behind; the derived state is whatever the migrated history dictates (M6-analyser stays `completed`). `entity.renamed` is **not** a state-transition event — drop it from `STATE_FROM_EVENT` (or make it explicitly state-preserving). Frontmatter `id` + filename are updated to the new name so the file reads true, but the **event** is what migrates the entity. Verified directly by the §3 M6→M1.1 renumber (`V8`).
+
 ## 5. Acceptance criteria
 
 - `events.schema.json` 0.3.0 defines `relationship.reattached` with required `axis ∈ {t2-parent, milestone}` plus `from_parent`/`to_parent`; `validate-events.sh` passes on the whole log.
 - `cache-build.py` folds reattach events: a hand-emitted reattach measurably changes the `relationships` table (old edge gone, new edge present, `source="reattached"`, correct `source_event_id`). The dead `from_entity_id` path is removed.
 - `projection-emit.py` `compute_milestone_progress()` reads parentage from the cache; grepping the file shows **no** live `planning/*.md` frontmatter read for milestone membership.
-- End-to-end on the analyser re-tag (§3): after `cache-build → projection-emit → summary-emit`, the analyser T3s appear under M6-analyser in `milestone_progress`, the flow-view graph shows the M6 edge, and M1-bootstrap's live count is correct.
+- End-to-end on the analyser renumber + re-tag (§3): after `cache-build → projection-emit → summary-emit`, all six analyser plans appear under **M1.1-analyser** in `milestone_progress`, the flow-view graph shows the M1.1 edges, and M1-bootstrap's live count drops by one (live-model-catalog leaves).
+- The renumbered milestone materialises as **M1.1-analyser** in `completed` state; **M6-analyser does not appear as a separate entity** (no resurrection, no phantom) — proves `entity.renamed` migrates rather than duplicates (D-F).
 - Editing a plan's `milestone:` frontmatter *without* a reattach event does **not** move it in `milestone_progress` (proves the cache/projection no longer reads live frontmatter) — and is the case M3's audit will later flag.
 - Idempotent rebuild (re-running the pipeline yields identical cache + projection).
 
@@ -107,7 +122,7 @@ Two prose locations currently assert the *opposite* of this resolution and must 
 3. **cache-build edge fold (D-B)** — replace frontmatter-edge synthesis + dead reattach path with the ordered fold; record `source`/`source_event_id`.
 4. **projection-emit (D-C)** — repoint `compute_milestone_progress()` at the cache.
 5. **Methodology text (D-E)** — rewrite T2-storage §3.8; annotate T1 §2.4; update cheatsheet if it documents milestone tagging.
-6. **First reattach (§3)** — emit `relationship.reattached` events for the analyser re-tag; update each file's frontmatter to match; rebuild; verify §5.
+6. **First reattach + renumber (§3)** — emit `entity.renamed` (M6-analyser→M1.1-analyser) + `relationship.reattached` ×6 (5 phase T3s + live-model-catalog, axis `milestone`); rename `planning/M6-analyser.md`→`M1.1-analyser.md` and update its `id`/`milestone_index`; update each re-tagged file's `milestone:` frontmatter; rebuild; verify §5.
 7. **Dogfood + commit** — append `commit.recorded`; run both validators; rebuild pipeline.
 
 ## 7. Verification
@@ -119,27 +134,31 @@ Two prose locations currently assert the *opposite* of this resolution and must 
 - **V5** — open `view/index.html`, confirm the flow view draws the moved edges with no `view/` code change (confirms the view is purely projection-driven).
 - **V6** — frontmatter-edit-without-event control: edit one plan's `milestone:`, rebuild, assert `milestone_progress` does **not** move; then revert.
 - **V7** — both validators green; pipeline idempotent.
+- **V8** — rename migration (D-F): after the M6→M1.1 `entity.renamed` is folded, the cache has exactly one entity for the milestone (`M1.1-analyser`, state `completed`) and **zero** rows for `M6-analyser`; assert M6-analyser is absent from `entities` and absent as an edge endpoint in `relationships`.
 
 ## 8. HITL questions
 
 - **Q1 (placement). RESOLVED 2026-06-01.** ~~This plan is filed `milestone: M2-auto-extract`...~~ Originally filed under the phantom `M2-auto-extract` (which has no plan file). Resolved by the operator: this plan is the sole constituent of a new focused **sub-milestone `M1.2-relationship-ssot`**, attached to M1-bootstrap. Rationale: this is *follow-up work arising from M1* (a correctness defect surfaced by M1 dogfooding), not new auto-extract capability — so it belongs as a small M1.x hardening milestone, not folded into M2. Filing it under M1.2 (not M1-bootstrap directly) keeps it from blocking M1's close. This required a backward-compatible loosening of `plan-frontmatter.schema.json` to permit decimal milestone ids (`M[0-9]+(\.[0-9]+)?`) and a numeric `milestone_index`. The earlier alternatives (standalone hardening milestone / no-milestone-park) are subsumed: M1.2 *is* the focused hardening milestone, and the schema still requires a milestone for tier-3 thematic plans (no relaxation of that rule). Note: the move from `M2-auto-extract`→`M1.2` is itself recorded as the first real `relationship.reattached` event (see §7/events), inert until this plan lands.
 - **Q2 (schema version).** Bump to 0.3.0 (adds required `axis`). Confirm we version-bump rather than retrofit 0.2.0 in place — consistent with the project's `schema_version`-per-event discipline.
 - **Q3 (axis vocabulary).** `{t2-parent, milestone}` now; is `depends-on` / `alongside` reattachment foreseen soon enough to design the enum wider today? Lean: keep it to the two parentage axes; extend when needed.
+- **Q4 (M6→M1.1 renumber). RESOLVED 2026-06-01 (operator-directed).** "Rename M6 to M1.1 now" was the trigger; scoping it revealed `entity.renamed` is inert + resurrects-to-live (D-F), and that the rename is just another representation-divergence on a *completed* milestone. Resolution: the renumber is **not** a separate housekeeping edit — it is folded into this T3 as the headline of the §3 acceptance test (the move that needs working rename+reattach folding to be expressible at all). Doing it by hand before T3 lands would either dirty the cache (resurrection/phantom) or pre-empt the acceptance test, so it is deliberately deferred to here. (This supersedes M1.2 §4's earlier "separate housekeeping change" note.)
 
 ## 9. Files to create / modify
 
 - **Create:** `agent-plan-tracker/schemas/0.3.0/events.schema.json` (+ sibling schemas copied forward as needed).
-- **Modify:** `agent-plan-tracker/scripts/cache-build.py` (edge fold; remove dead reattach path).
+- **Modify:** `agent-plan-tracker/scripts/cache-build.py` (edge fold; remove dead reattach path; `entity.renamed` identity-migration per D-F + drop from `STATE_FROM_EVENT`).
 - **Modify:** `agent-plan-tracker/scripts/projection-emit.py` (`compute_milestone_progress` → cache).
 - **Modify:** `planning/T2-storage.md` §3.8; `planning/T1-top-level.md` §2.4 (dated correction).
-- **Append:** `.agent-plan-tracker/events.jsonl` — the analyser-retag reattach events + `commit.recorded`.
-- **Modify:** each mis-tagged analyser `planning/T3-analyser-*.md` frontmatter `milestone:`.
+- **Append:** `.agent-plan-tracker/events.jsonl` — `entity.renamed` (M6→M1.1) + the analyser-retag reattach events ×6 + `commit.recorded`.
+- **Rename:** `planning/M6-analyser.md` → `planning/M1.1-analyser.md`; update its `id` (M6-analyser→M1.1-analyser) and `milestone_index` (6→1.1).
+- **Modify:** each re-tagged analyser plan's `milestone:` frontmatter — `T3-analyser-phase-{a..e}-*.md` (M6-analyser→M1.1-analyser) and `T3-analyser-live-model-catalog.md` (M1-bootstrap→M1.1-analyser).
 - **Possibly:** `cheatsheet/` entry on "moving an entity between parents = emit reattach, don't just edit frontmatter".
 
 ## 10. Events this T3 will emit
 
 - `entity.progressed` on T2-storage (edge-fold landed) and T2-projection (projection repointed).
-- `relationship.reattached` ×N on the analyser T3s (axis `milestone`, and `t2-parent` where applicable) — the first real uses of the event.
+- `entity.renamed` on the analyser milestone (M6-analyser→M1.1-analyser) — the first real use of the event; exercises the D-F identity migration.
+- `relationship.reattached` ×6 on the analyser plans (5 phase T3s + live-model-catalog, axis `milestone`) — the first real uses of the event.
 - `verification.tested` on T3-event-sourced-relationships (test_type: `reattach-fold` + `frontmatter-edit-noop`).
 - `entity.completed` on T3-event-sourced-relationships.
 - `entity.progressed` on M1.2-relationship-ssot (its host milestone) as constituent work lands.
