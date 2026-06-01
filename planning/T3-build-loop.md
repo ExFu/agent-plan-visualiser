@@ -4,7 +4,7 @@ plan_kind: thematic
 tier: 3
 t2_parent: T2-packaging
 milestone: M1-bootstrap
-status: draft
+status: completed
 ---
 
 # T3-build-loop — Repack-and-validate cycle

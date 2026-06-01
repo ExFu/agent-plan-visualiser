@@ -4,7 +4,7 @@ plan_kind: thematic
 tier: 3
 t2_parent: T2-projection
 milestone: M1-bootstrap
-status: draft
+status: completed
 ---
 
 # T3-html-view — HTML view rendering projection.json

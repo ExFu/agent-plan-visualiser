@@ -4,7 +4,7 @@ plan_kind: thematic
 tier: 3
 t2_parent: T2-storage
 milestone: M1-bootstrap
-status: draft
+status: completed
 ---
 
 # T3-cache-build — SQLite cache builder from events.jsonl

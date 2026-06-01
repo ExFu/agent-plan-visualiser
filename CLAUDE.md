@@ -10,7 +10,9 @@ The plugin is project-agnostic. Any planning-driven project that uses git + writ
 
 Read `planning/T1-top-level.md` first. It captures the validated design so far, plus the open design questions queued.
 
-We are in **design + M1 bootstrap phase**. The T1 plan is still in active authoring; M1 (the first milestone — hand-rollable end-to-end against this project) is queued. Don't start coding the automated extraction pipeline until the ontology + extraction-prompt template + storage format are all settled and the remaining open questions in §5 are closed (most are slated for resolution during M1 dogfooding).
+**M1 is complete.** The hand-rolled end-to-end pipeline works and is dogfooded against this project: JSON-Schema validation, `cache-build.py` (events.jsonl → SQLite), `projection-emit.py`, `summary-emit.py`, the vanilla-JS HTML flow view, and the SQL audit catalogue all run green via `repack-validate.sh`. Two sub/sequence milestones also shipped on top of M1: **M6-analyser** (browser-direct "what's outstanding?" analyser, all five phases A–E — this drove the ontology's first evolution to schema `0.2.0` with the `analysis.*` events) and **M1.2-relationship-ssot** (milestone/theme membership is now event-sourced — `relationship.reattached` is the move primitive, frontmatter is only a creation-time seed).
+
+The T1 plan remains in active authoring as the design source of truth. The next unbuilt frontier is **M2 (automated per-commit extraction)** — until then, events are still hand-rolled into `events.jsonl` in interactive sessions, then sealed by a `commit.recorded` and a git commit. M3 (cleanliness gate), M4 (fresh-install packaging), and M5 (backfill) follow.
 
 ## Conventions
 

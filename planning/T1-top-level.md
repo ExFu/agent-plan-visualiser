@@ -7,8 +7,8 @@ status: active-authoring
 
 # T1-top-level — agent-plan-tracker — Top-level plan
 
-**Status**: Draft. T1 in active authoring.
-**Phase**: design exploration — pre-implementation. Currently bootstrapping plugin scaffold + M1 implementation plan.
+**Status**: Active authoring (design SSOT). Still edited as the design evolves; rarely superseded.
+**Phase**: implementation underway. **M1 (hand-rollable end-to-end) is complete**, plus M6-analyser (all phases) and M1.2-relationship-ssot. The tracker runs green against this project via `repack-validate.sh`. Next frontier: M2 (automated per-commit extraction). Several §5 questions are now closed (notably Q9 — milestone membership is event-sourced); the rest resolve through M2+ dogfooding.
 
 ---
 

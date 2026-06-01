@@ -2,12 +2,12 @@
 id: M6-analyser
 plan_kind: milestone
 milestone_index: 6
-status: planned
+status: completed
 ---
 
 # M6-analyser — On-demand "what's outstanding?" analyser, rolled out across five phases
 
-**Status**: Planned. Phase A T3 drafted; Phases B-E T3s to be authored as each phase is unblocked.
+**Status**: Completed (2026-06-01). All five phases A–E landed (6/6 T3s); the analyser is operational against this project. Reparented to M1-bootstrap via `relationship.reattached`; label/index grandfathered for historical honesty.
 **Sits at**: Sixth milestone in the sequence axis. Touches one theme: T2-analyser. Indirectly extends T2-ontology (new event types), T2-storage (summary files), T2-projection (flow-view rendering, sidebar surfaces).
 
 **Position in M-axis ordering note:** Bootstrap delivered (M1). Auto-extract (M2), cleanliness gates (M3), packaging (M4), ingest (M5) are queued but no work has begun. M6 is being prioritised ahead of M2-M5 because the analyser is immediately useful against the project's own growing event log — operator demand is real and present, while M2-M5 deliver value only at scale.

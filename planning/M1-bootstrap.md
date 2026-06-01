@@ -2,12 +2,12 @@
 id: M1-bootstrap
 plan_kind: milestone
 milestone_index: 1
-status: planned
+status: completed
 ---
 
 # M1-bootstrap — Hand-rollable end-to-end
 
-**Status**: Planned. Not yet started.
+**Status**: Completed (2026-06-01). All 15 constituent T3s landed; the hand-rolled end-to-end pipeline runs green against this project. See §9 for the closure record.
 **Sits at**: First milestone in the sequence axis. Touches themes T2-ontology, T2-storage, T2-projection, T2-packaging.
 
 ---
@@ -123,3 +123,18 @@ M3 adds the cleanliness gate at merge-to-main (using projections M1 already prod
 M4 packages for distribution and onboarding to fresh projects.
 
 M5 backfills existing projects with retrospective mapping.
+
+## 9. Closure record (2026-06-01)
+
+M1 is **complete**. Definition-of-done (§5) verified against the dogfood event log and a green `repack-validate.sh` run (8/8 steps):
+
+- ✅ `schemas/0.2.0/events.schema.json` validates every event in `events.jsonl` (prehistoric events retro-migrated; schema since evolved to `0.2.0` for the analyser).
+- ✅ `schemas/0.2.0/plan-frontmatter.schema.json` validates every plan's frontmatter.
+- ✅ `cache-build.py` produces `cache.sqlite` from `events.jsonl`, `commit_ref` populated via `git blame`, idempotent rebuild.
+- ✅ `projection-emit.py` produces `projection.json`; `summary-emit.py` produces `summary.md`.
+- ✅ HTML view (`view/`) renders the live project state (entity board + workstreams flow), iterated well past the M1 functional bar.
+- ✅ All artefacts live inside the plugin scaffold (`agent-plan-tracker/`).
+
+All 15 constituent T3s are `closed` in the event log (the original 9 plus six that accreted during dogfooding: the flow-view density/filtering/controls/button-system passes, `T3-milestone-parent-ontology`, and `T3-lifecycle-term-closed`). M1 hardening continued under the sub/sequence milestones **M1.2-relationship-ssot** and **M6-analyser**, both also complete — those are tracked separately and do not gate M1.
+
+Closure was recorded as an `entity.completed` event on `M1-bootstrap` rather than by the frontmatter edit above: per the M1.2 single-source-of-truth resolution, the event log moves state and frontmatter is descriptive.

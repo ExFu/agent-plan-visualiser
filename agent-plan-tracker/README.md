@@ -4,7 +4,7 @@ Event-sourced planning methodology + tracking spine, packaged as a Claude Code p
 
 ## Status
 
-**Pre-M1.** Work in progress — not yet installable on other projects. Current focus is reaching M1: a hand-rollable end-to-end pipeline against this project itself, dogfooding the methodology.
+**M1 shipped; pre-distribution.** Not yet installable on other projects — that's M4. The hand-rolled end-to-end pipeline is complete and dogfooded against this repo: schema validation → SQLite cache → `projection.json` → `summary.md` → HTML flow view, all green via `scripts/repack-validate.sh`. Two further milestones landed on top: **M6-analyser** (browser-direct outstanding-work analyser; first ontology evolution to schema `0.2.0`) and **M1.2-relationship-ssot** (event-sourced relationship membership). Next frontier: **M2 — automated per-commit extraction** (events are still hand-rolled until then).
 
 ## What it will do
 

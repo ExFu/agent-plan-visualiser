@@ -4,7 +4,7 @@ plan_kind: thematic
 tier: 3
 t2_parent: T2-analyser
 milestone: M6-analyser
-status: draft
+status: completed
 ---
 
 # T3-analyser-phase-b-persistence — Persistence, new event types, server wrapper, opportunistic derived
