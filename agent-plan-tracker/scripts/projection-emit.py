@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Emit .agent-plan-tracker/projection.json from cache.sqlite."""
 import datetime
-import glob
 import json
 import re
 import sqlite3
@@ -15,34 +14,43 @@ SCHEMA_VERSION = "0.2.0"
 ONTOLOGY_VERSION = "0.2.0"
 
 
-def compute_milestone_progress(entities):
-    """Walk planning/ T3 plan files; read milestone frontmatter; aggregate per Mn."""
-    try:
-        import yaml
-    except ImportError:
-        return {}
+def compute_milestone_progress(entities, relationships):
+    """Aggregate per-milestone Tier-3 counts from the cache relationship fold.
+
+    Milestone membership is read from the cache `relationships` (milestone
+    `spawns` Tier-3 edges), NOT from a live read of planning/*.md frontmatter.
+    cache-build already materialises those edges as the event-sourced single
+    source of truth: the `entity.created` frontmatter snapshot *seeds* the edge
+    and each `relationship.reattached` event *rewrites* it last-write-wins
+    (see T3-milestone-parent-ontology D3). Reading them here collapses the last
+    independent membership source — so editing a plan's `milestone:` field alone
+    no longer moves it in milestone_progress; a relationship.reattached event is
+    required. Frontmatter-vs-event drift becomes possible-but-detectable and is
+    flagged by the M3 drift audit. See T3-event-sourced-relationships (M1.2) D-C
+    / T1 §5 Q9.
+
+    Semantics preserved from the prior file-glob implementation: only main-spine
+    Tier-3 plans (id `T3-*`) are counted; status is joined from the cache
+    entities (event-derived `derived_state`).
+    """
     progress = {}
-    for path in glob.glob(str(REPO_ROOT / "planning/T3-*.md")):
-        with open(path) as f:
-            content = f.read()
-        m = re.match(r"^---\n(.*?)\n---\n", content, re.DOTALL)
-        if not m:
+    for rel in relationships:
+        if rel["type"] != "spawns":
             continue
-        try:
-            fm = yaml.safe_load(m.group(1))
-        except Exception:
+        # milestone (plan:M<digit>...) spawns a main-spine Tier-3 plan (plan:T3-...)
+        mid = rel["from"].split(":", 1)[1]
+        if not re.match(r"^M[0-9]", mid):  # excludes prefixed plans like MT2-*
             continue
-        milestone = fm.get("milestone")
-        if not milestone:
+        cid = rel["to"].split(":", 1)[1]
+        if not cid.startswith("T3-"):
             continue
-        slot = progress.setdefault(milestone, {
+        slot = progress.setdefault(mid, {
             "scheduled_t3_count": 0,
             "completed_t3_count": 0,
             "live_t3_count": 0,
         })
         slot["scheduled_t3_count"] += 1
-        t3_id = fm.get("id")
-        ent = entities.get(f"plan:{t3_id}")
+        ent = entities.get(rel["to"])
         if ent:
             if ent["derived_state"] == "live":
                 slot["live_t3_count"] += 1
@@ -150,7 +158,7 @@ def main():
         "orphaned_count": state_counts["orphaned"],
         "unknown_count": state_counts["unknown"],
     }
-    milestone_progress = compute_milestone_progress(entities)
+    milestone_progress = compute_milestone_progress(entities, relationships)
 
     projection = {
         "generated_at": datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

@@ -7,7 +7,7 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^([A-Z]?T[0-3]|M[0-9]+)-[a-z0-9][a-z0-9-]*$"
+      "pattern": "^([A-Z]?T[0-3]|M[0-9]+(\\.[0-9]+)?)-[a-z0-9][a-z0-9-]*$"
     },
     "plan_kind": { "type": "string", "enum": ["thematic", "milestone"] },
     "status": {
@@ -32,7 +32,7 @@
         "tier": { "type": "integer", "enum": [0, 1, 2, 3] },
         "tier_prefix": { "type": "string", "pattern": "^[A-Z]$" },
         "t2_parent": { "type": "string", "pattern": "^([A-Z]?T2)-[a-z0-9][a-z0-9-]*$" },
-        "milestone": { "type": "string", "pattern": "^M[0-9]+-[a-z0-9][a-z0-9-]*$" }
+        "milestone": { "type": "string", "pattern": "^M[0-9]+(\\.[0-9]+)?-[a-z0-9][a-z0-9-]*$" }
       },
       "required": ["tier"],
       "allOf": [
@@ -45,7 +45,7 @@
     {
       "properties": {
         "plan_kind": { "const": "milestone" },
-        "milestone_index": { "type": "integer", "minimum": 1 }
+        "milestone_index": { "type": "number", "minimum": 1 }
       },
       "required": ["milestone_index"]
     }
