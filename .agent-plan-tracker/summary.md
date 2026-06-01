@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-01T15:45:46Z
+# Project state — generated 2026-06-01T15:47:08Z
 
-**Total events:** 185  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Dead:** 18  ·  **Orphaned:** 0
+**Total events:** 189  ·  **Live:** 22  ·  **Dormant:** 0  ·  **Dead:** 19  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -19,7 +19,7 @@
   - `T2-storage` (6 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(milestone)**
-  - `M1-bootstrap` (4 events): relationship.spawns → entity.progressed → entity.progressed
+  - `M1-bootstrap` (5 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -35,9 +35,6 @@
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
   - `2026-05-30.progressed-after-completed-state-flip` (1 events): entity.created
 
-- **T2-projection**
-  - `T3-flow-view-filtering` (3 events): entity.created → entity.progressed → entity.progressed
-
 - **T2-storage**
   - `T3-event-sourced-relationships` (2 events): entity.created → relationship.spawns
 
@@ -45,9 +42,6 @@
 
 - **(self: M1-bootstrap)**
   - `M1-bootstrap`
-
-- **M1-bootstrap**
-  - `T3-flow-view-filtering`
 
 - **M2-auto-extract**
   - `T3-event-sourced-relationships`
@@ -79,7 +73,7 @@ _No flapping closures._
 
 ## Milestone progress
 
-- **M1-bootstrap**: 11/12 T3 complete (91%); 1 live
+- **M1-bootstrap**: 12/12 T3 complete (100%); 0 live
 - **M2-auto-extract**: 0/1 T3 complete (0%); 1 live
 - **M6-analyser**: 5/5 T3 complete (100%); 0 live
 

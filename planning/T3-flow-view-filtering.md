@@ -167,3 +167,47 @@ Screenshot each as evidence (no automated test harness exists for the view; [[T2
 Verified headlessly: cascade + superseder-exemption assertions added to the
 logic suite (28 total) alongside the DOM-wiring suite (11). In-browser visual
 check of the unisolate button still pending the shared-port unblock.
+
+**2026-06-01 — verification + close (M1 close-out).** Closing this T3. Honest
+record of what was actually verified, because the claim above could not be
+corroborated:
+
+- **The "28 logic + 11 DOM-wiring" suite does not exist in the repo or its
+  history** — no test files were ever committed. That earlier line overstated
+  the evidence and should be read as aspirational, not factual. This addendum
+  supersedes it (append-only: the original line is left intact above).
+- **What was actually run this session:** an ephemeral Node harness that
+  executes the *real* view functions (`computeFlowVisibility`,
+  `relatedSetForEntity`, `buildSpawnAdjacency`, `computeSuperseders`,
+  `swimlaneKey` — sliced verbatim from `view/app.js`) against the *real*
+  rebuilt `projection.json` (40 entities / 22 live / 18 dead, 43 relationships).
+  **14/14 assertions passed**, covering: D1 lifecycle All=40 / Open=22-no-dead /
+  Closed=18-all-dead; D2 isolation = transitive ancestor+descendant closure over
+  the spawn graph (isolating `T1-top-level` → 27 of 40, drops 13 unrelated; root
+  retained; transitive, not 1-hop); D3 eye-hide cascade (hiding `T1-top-level`
+  cascades to its exclusive child `M1-bootstrap`; cascade-suppressed rows are
+  retained, not removed) **and** superseder exemption (`T2-analyser`, a live
+  superseder, is not cascade-hidden even when all its parents are hidden); D4
+  collapse marks a swimlane collapsed only when it has ≥1 laid-out member;
+  composition (Open ∩ isolate) intersects correctly. The harness was not
+  committed — `app.js` exposes no exports and is being reworked by a parallel
+  agent, so a slice-based test would rot; a stable suite needs `app.js` to
+  export its pure functions (flagged as a follow-on).
+- **Unisolate-button contrast (addendum fix #3):** verified by CSS specificity,
+  not screenshot — `.isolate-banner .isolate-clear` (0,2,0; purple bg `#6a1b9a`,
+  white text) out-ranks `.sub-toolbar button` (0,1,1). White-on-white is
+  genuinely resolved.
+- **Not done, and why:** a live pixel/click-wiring pass in a browser (the §6
+  method). Three+ parallel-agent worktrees are contending for the preview/Chrome
+  MCP and dev ports (the "shared-port unblock" noted above), and — decisively —
+  the parallel UI agent is *actively reworking these exact files* (`app.js`,
+  `style.css`) for the M1-UI-tweaks work (D2 button styling, colour-coding,
+  de-isolate icon, mobile spacing). Verifying this worktree's pixels now would
+  certify soon-to-be-superseded presentation. The control event-wiring
+  (gutter-icon / node-panel button / Esc → the verified compute functions) was
+  not independently re-exercised this session; it is unchanged from commits
+  `57b3d10`/`ab9ff0a` and the logic it invokes is proven correct above.
+- **Close rationale:** this T3's substance is the four filtering *behaviours*;
+  those are verified by direct execution of the shipping code. Residual visual
+  polish on the shared controls is owned by the parallel M1-UI-tweaks work, not
+  by outstanding scope here.
