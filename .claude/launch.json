@@ -4,8 +4,8 @@
     {
       "name": "apt-view",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["agent-plan-tracker/scripts/serve.py", "--port", "8765"],
-      "port": 8765
+      "runtimeArgs": ["agent-plan-tracker/scripts/serve.py", "--port", "8772"],
+      "port": 8772
     }
   ]
 }

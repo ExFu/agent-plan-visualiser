@@ -3,7 +3,7 @@
   /* derived-state colours */
   --color-live: #0288d1;       /* blue — active, ongoing (distinct from green/completed) */
   --color-dormant: #f9a825;    /* amber */
-  --color-dead: #757575;       /* grey */
+  --color-closed: #757575;     /* grey */
   --color-orphaned: #c62828;   /* red */
   --color-unknown: #6a1b9a;    /* purple */
   /* event-pill base colours (match dominantEventColor in app.js) */
@@ -24,6 +24,28 @@
   --border: #e0e0e0;
   --mono: 'Menlo', 'Consolas', monospace;
   --sans: -apple-system, system-ui, sans-serif;
+  /* Semantic button palette — single source of truth. The button system
+     (see the `button` base rule below) layers a single variant class
+     (.btn-primary etc.) over the neutral base; each variant renders its own
+     colours from these tokens and outranks the base by specificity, so the
+     white-on-white clobber can't recur. */
+  --btn-primary: #1976d2;
+  --btn-primary-hover: #1565c0;
+  --btn-danger: #c62828;
+  --btn-danger-hover: #b71c1c;
+  --btn-analyse: #6a1b9a;
+  --btn-analyse-hover: #4a148c;
+  /* Isolation accent + tints (de-isolate cue, banner, placeholder, caret). */
+  --isolate-accent: #6a1b9a;
+  --isolate-accent-hover: #4a148c;
+  --isolate-tint: #f3e5f5;
+  --isolate-tint-hover: #e1bee7;
+  --isolate-border: #ce93d8;
+  /* Gutter-control accents (D4) — colour-coded so the three kinds are scannable. */
+  --gctrl-isolate: #00838f;   /* blue-teal */
+  --gctrl-eye-on: #2e7d32;    /* green — shown/visible */
+  --gctrl-eye-off: #c62828;   /* red — hidden */
+  --gctrl-caret: #6a1b9a;     /* purple — collapse */
 }
 body {
   margin: 0;
@@ -33,19 +55,37 @@ body {
   background: var(--bg);
 }
 h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
-.toolbar { margin-bottom: 1rem; }
-.toolbar button {
+/* ===== Button system (DRY, location-independent) =====
+   Base is the bare `button` element selector (0,0,1): the neutral pill every
+   button starts from. Single-class layers below each outrank it automatically
+   — `button.active` / `button:disabled` (0,1,1) and the semantic `.btn-*`
+   variants (0,1,0). No location-based colour selectors, no `:not()` chains, no
+   `!important`: a button is legible by default and specialises predictably.
+   Containers (.toolbar/.sub-toolbar/…) keep LAYOUT ONLY. */
+button {
+  font-family: var(--sans);
+  font-size: 0.85rem;
   padding: 0.4rem 0.8rem;
-  margin-right: 0.5rem;
   cursor: pointer;
   border: 1px solid var(--border);
   background: var(--card-bg);
+  color: var(--fg);
   border-radius: 4px;
 }
-.toolbar button.active {
+button.active {
   background: var(--fg);
   color: var(--bg);
+  border-color: var(--fg);
 }
+button:disabled {
+  background: #e9e9e9;
+  color: #9e9e9e;
+  border-color: #dcdcdc;
+  cursor: not-allowed;
+}
+
+.toolbar { margin-bottom: 1rem; }
+.toolbar button { margin-right: 0.5rem; }
 .meta {
   color: #666;
   font-size: 0.85rem;
@@ -89,7 +129,7 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 }
 .badge.live { background: var(--color-live); }
 .badge.dormant { background: var(--color-dormant); }
-.badge.dead { background: var(--color-dead); }
+.badge.closed { background: var(--color-closed); }
 .badge.orphaned { background: var(--color-orphaned); }
 .badge.unknown { background: var(--color-unknown); }
 .sequence {
@@ -114,15 +154,7 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 .sub-toolbar button {
   padding: 0.3rem 0.6rem;
   margin-right: 0.4rem;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
   border-radius: 3px;
-  font-size: 0.85rem;
-}
-.sub-toolbar button.active {
-  background: var(--fg);
-  color: var(--bg);
 }
 
 .flow-legend {
@@ -365,7 +397,7 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 .now-badge:hover { stroke-width: 2.5; filter: brightness(1.1); }
 .now-badge.live      { fill: var(--color-live); }
 .now-badge.dormant   { fill: var(--color-dormant); }
-.now-badge.dead      { fill: var(--color-dead); }
+.now-badge.closed    { fill: var(--color-closed); }
 .now-badge.orphaned  { fill: var(--color-orphaned); }
 .now-badge.unknown   { fill: var(--color-unknown); }
 .now-badge-text {
@@ -705,20 +737,19 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   border: 1px solid var(--border);
 }
 .btn-primary {
-  background: #1976d2;
+  background: var(--btn-primary);
   color: white;
-  border-color: #1976d2;
+  border-color: var(--btn-primary);
 }
-.btn-primary:hover { background: #1565c0; }
-.btn-primary:disabled { background: #aaa; border-color: #aaa; cursor: not-allowed; }
+.btn-primary:hover { background: var(--btn-primary-hover); }
 .btn-secondary { background: var(--card-bg); color: #333; }
 .btn-secondary:hover { background: #f0f0f0; }
 .btn-danger {
-  background: #c62828;
+  background: var(--btn-danger);
   color: white;
-  border-color: #c62828;
+  border-color: var(--btn-danger);
 }
-.btn-danger:hover { background: #b71c1c; }
+.btn-danger:hover { background: var(--btn-danger-hover); }
 
 /* Cost dialog body (populated dynamically) */
 #cost-dialog-body { font-size: 0.85rem; }
@@ -754,9 +785,9 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   flex-wrap: wrap;
 }
 .btn-analyse {
-  background: #6a1b9a;
+  background: var(--btn-analyse);
   color: white;
-  border: 1px solid #6a1b9a;
+  border: 1px solid var(--btn-analyse);
   font-family: var(--sans);
   font-size: 0.82rem;
   font-weight: 600;
@@ -767,12 +798,7 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   align-items: center;
   gap: 0.4rem;
 }
-.btn-analyse:hover:not(:disabled) { background: #4a148c; }
-.btn-analyse:disabled {
-  background: #bbb;
-  border-color: #bbb;
-  cursor: not-allowed;
-}
+.btn-analyse:hover:not(:disabled) { background: var(--btn-analyse-hover); }
 .btn-analyse .spark { font-size: 0.95rem; }
 
 /* Analyser result rendering */
@@ -846,15 +872,6 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   font-size: 0.75rem;
   padding: 0.25rem 0.6rem;
   border-radius: 3px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  cursor: pointer;
-  font-family: var(--sans);
-}
-.analyser-toggle-row button.active {
-  background: var(--fg);
-  color: var(--bg);
-  border-color: var(--fg);
 }
 
 .analyser-freeform {
@@ -1057,9 +1074,9 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 /* ------------------------------------------------------------------ */
 
 .btn-global-analyse {
-  background: #6a1b9a;
+  background: var(--btn-analyse);
   color: white;
-  border: 1px solid #6a1b9a;
+  border: 1px solid var(--btn-analyse);
   font-family: var(--sans);
   font-size: 0.82rem;
   font-weight: 600;
@@ -1071,12 +1088,7 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
   align-items: center;
   gap: 0.35rem;
 }
-.btn-global-analyse:hover:not(:disabled) { background: #4a148c; }
-.btn-global-analyse:disabled {
-  background: #bbb;
-  border-color: #bbb;
-  cursor: not-allowed;
-}
+.btn-global-analyse:hover:not(:disabled) { background: var(--btn-analyse-hover); }
 
 .modal-wide {
   max-width: 900px;
@@ -1206,32 +1218,48 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 
 /* ===== Flow-view focus filters (T3-flow-view-filtering) ===== */
 
-/* Gutter control glyphs (isolate / eye / collapse), shared by rows + headers. */
+/* Gutter control glyphs (isolate / eye / collapse), shared by rows + headers.
+   Colour-coded by kind (D4) so they're scannable at a glance; roomier hit-areas
+   (~18px square) keep them tappable on touch. Low default opacity, full on hover. */
 .gctrls {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   flex: 0 0 auto;
   margin-right: 5px;
 }
 .gctrl {
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
-  opacity: 0.5;
+  opacity: 0.6;
   user-select: none;
-  width: 13px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  border-radius: 4px;
   color: #555;
 }
-.gctrl:hover { opacity: 1; color: #1565c0; }
-.gctrl-eye.is-off { opacity: 0.85; color: #c62828; }
-.gctrl-caret { color: #6a1b9a; }
-.flow-gutter-swimlane .gctrl { font-size: 12px; }
+.gctrl:hover { opacity: 1; background: rgba(0,0,0,0.05); }
+/* Per-kind hues. */
+.gctrl-isolate { color: var(--gctrl-isolate); }
+.gctrl-deisolate { color: var(--isolate-accent); font-weight: 700; }
+.gctrl-eye { color: var(--gctrl-eye-on); }
+.gctrl-eye.is-off { color: var(--gctrl-eye-off); }
+.gctrl-caret { color: var(--gctrl-caret); }
+.flow-gutter-swimlane .gctrl { font-size: 13px; }
 
 /* Row label after the controls — takes the remaining width with ellipsis. */
 .grow-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .gsl-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+/* The currently-isolated row/header label — bold + isolation purple so it's
+   instantly findable among the surviving rows. */
+.grow-label.is-isolated-root,
+.gsl-label.is-isolated-root { font-weight: 700; color: var(--isolate-accent); }
 
 /* Eye-hidden entity: greyed row, kept in place so the toggle stays reachable. */
 .flow-gutter-row.is-suppressed { opacity: 0.45; font-style: italic; }
@@ -1239,24 +1267,24 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 
 /* Collapsed-section placeholder row in the gutter. */
 .flow-gutter-placeholder {
-  color: #6a1b9a;
+  color: var(--isolate-accent);
   font-style: italic;
   padding-left: 14px;
 }
 
 /* Collapsed-section placeholder node in the SVG. */
 .placeholder-node {
-  fill: #f3e5f5;
-  stroke: #6a1b9a;
+  fill: var(--isolate-tint);
+  stroke: var(--isolate-accent);
   stroke-width: 1.5;
   stroke-dasharray: 3 2;
   cursor: pointer;
 }
-.placeholder-node:hover { fill: #e1bee7; }
+.placeholder-node:hover { fill: var(--isolate-tint-hover); }
 .placeholder-node-count {
   font-family: var(--mono);
   font-size: 9px;
-  fill: #6a1b9a;
+  fill: var(--isolate-accent);
   cursor: pointer;
   pointer-events: none;
 }
@@ -1270,22 +1298,18 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 .lifecycle-filter button {
   padding: 0.2rem 0.5rem;
   margin-left: 0.3rem;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
   border-radius: 3px;
   font-size: 0.78rem;
 }
-.lifecycle-filter button.active { background: var(--fg); color: var(--bg); }
 
 /* Isolation banner + unisolate button. */
 .isolate-banner {
   margin-left: 1rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #6a1b9a;
-  background: #f3e5f5;
-  border: 1px solid #ce93d8;
+  color: var(--isolate-accent);
+  background: var(--isolate-tint);
+  border: 1px solid var(--isolate-border);
   border-radius: 3px;
   padding: 0.2rem 0.5rem;
 }
@@ -1294,26 +1318,26 @@ h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
 .isolate-banner .isolate-clear {
   cursor: pointer;
   border: none;
-  background: #6a1b9a;
+  background: var(--isolate-accent);
   color: #fff;
   border-radius: 3px;
   padding: 0.12rem 0.45rem;
   font-size: 0.74rem;
   margin-left: 0.3rem;
 }
-.isolate-banner .isolate-clear:hover { background: #4a148c; }
+.isolate-banner .isolate-clear:hover { background: var(--isolate-accent-hover); }
 
 /* "Isolate to this" button in the node-detail panel. */
 .detail-actions { margin: 0.2rem 0 0.5rem; }
 .btn-isolate {
   cursor: pointer;
-  border: 1px solid #ce93d8;
-  background: #f3e5f5;
-  color: #6a1b9a;
+  border: 1px solid var(--isolate-border);
+  background: var(--isolate-tint);
+  color: var(--isolate-accent);
   border-radius: 3px;
   padding: 0.25rem 0.6rem;
   font-size: 0.78rem;
   font-weight: 600;
 }
-.btn-isolate:hover { background: #e1bee7; }
+.btn-isolate:hover { background: var(--isolate-tint-hover); }
 

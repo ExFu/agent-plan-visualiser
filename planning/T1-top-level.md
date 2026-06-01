@@ -105,13 +105,23 @@ Each Mn is a first-class plan with its own structure:
 - **How**: which T3s (from across themes and lettered workstreams) deliver into this milestone? What counts as "Mn complete"?
 - **What**: the enumerated T3 references, plus milestone-level verification criteria.
 
-**Sub-milestones (Mn.m).** Sometimes shipping a milestone surfaces focused follow-up work that is *hardening of that milestone*, not the next capability. Folding it into the next major milestone would bloat that milestone and delay the fix. Instead it gets a small, sharply-scoped **sub-milestone** with a decimal index — e.g. `M1.1` (the analyser; currently mis-filed as `M6-analyser`, renumber deferred) and `M1.2-relationship-ssot` (the relationship single-source-of-truth fix, surfaced during M1 close-out). The decimal `milestone_index` (1.1, 1.2) orders them between M1 and M2 and signals "M1 follow-up, not new scope." Mechanically they are ordinary milestone plans (`plan_kind: milestone`) attached to their parent milestone via a `relationship.spawns` edge.
+**Sub-milestones (Mn.m).** Sometimes shipping a milestone surfaces focused follow-up work that is *hardening of that milestone*, not the next capability. Folding it into the next major milestone would bloat that milestone and delay the fix. Instead it gets a small, sharply-scoped **sub-milestone** with a decimal index — e.g. `M1.2-relationship-ssot` (the relationship single-source-of-truth fix, surfaced during M1 close-out). The decimal `milestone_index` (1.1, 1.2) orders them between M1 and M2 and signals "M1 follow-up, not new scope." Mechanically they are ordinary milestone plans (`plan_kind: milestone`) attached to their parent milestone via a `relationship.spawns`/`relationship.reattached` edge. (The analyser is the *grandfathered* case: it conceptually should have been `M1.1` but keeps its flat label `M6-analyser` and instead **reattaches** to `M1-bootstrap` — see §2.4.0 — rather than being renumbered.)
 
 Mn plans have their own lifecycle. They progress as their constituent T3s land. They complete when their definition-of-done is satisfied (not strictly when all originally-scheduled T3s are done — milestones promise capability outcomes, not specific T3 membership). T3s can be moved between milestones as a normal scope adjustment, no supersession needed; that's expected reshuffling, not destruction.
 
 A T3 carries its milestone as frontmatter (`milestone: M1-bootstrap` or similar). Scheduling is metadata, not a graph relationship — it's the kind of thing that adjusts naturally as work shapes up. Persisting it as a relationship event would create noise without proportional value.
 
-> **Correction (2026-06-01, see §5 Q9):** the paragraph above is superseded. Frontmatter-only proved insufficient in M1 dogfooding — it let the cache, the graph, and the live-read projection disagree about the same membership fact. Frontmatter now only *seeds* the initial edge at `entity.created`; subsequent moves are `relationship.reattached` events (with an `axis` discriminator) so the reshuffle is event-sourced and graph-visible. The "noise" worry was wrong: milestone moves are infrequent and worth recording. Implementation: `T3-event-sourced-relationships`.
+#### 2.4.0 What a milestone hangs off (the milestone-parent rule)
+
+A T3's *milestone membership* is frontmatter (above), but a milestone has its **own** spawn-parent — a graph edge — and that parent is constrained:
+
+> **A top-level milestone `Mn` hangs off a Tier-1 plan** (the project's intent) **or off a top-level side-quest's Tier-1-equivalent** (e.g. `P1` heading a `PT*` workstream). **Never off a T2 or T3.** A milestone is a *when-axis* node; its parent is the *intent* it sequences toward, not a theme. Crossing the axes — hanging a milestone off a theme — collapses the orthogonality the two axes exist to preserve.
+
+> **Sub-milestones nest on the milestone axis.** `Mn.p` hangs off `Mn`; `Mn.p.q` hangs off `Mn.p`; and so on. The dotted index reads "this is a finer-grained delivery slice of its parent milestone." Sub-milestones are the *only* milestones whose parent is another milestone.
+
+So the only legal spawn-parents of a milestone are: a Tier-1 plan, a top-level side-quest head, or (for a sub-milestone) its parent milestone. The dotted `Mn.p` scheme is the notation for *future* sub-milestones; existing flat indices (`M1`…`M6`) are grandfathered — a milestone that conceptually should have been `M1.1` keeps its flat label for historical honesty and instead **reattaches** to its true parent (see [[T2-ontology]] §3.6 `relationship.reattached`).
+
+> **Open (§5 Q9):** whether a T3's milestone *membership* (not just the milestone's own parent, above) should likewise become an event-sourced edge rather than frontmatter remains **open**. As shipped, membership stays frontmatter; only the milestone-parent rule became a graph edge. An earlier M1.2 draft asserted membership was already superseded to event-sourced — that overreached and is withdrawn here; the residual question is carried by `T3-event-sourced-relationships`.
 
 #### 2.4.1 The two axes in practice
 

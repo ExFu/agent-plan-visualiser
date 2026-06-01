@@ -46,7 +46,7 @@ def compute_milestone_progress(entities):
         if ent:
             if ent["derived_state"] == "live":
                 slot["live_t3_count"] += 1
-            elif ent["derived_state"] == "dead":
+            elif ent["derived_state"] == "closed":
                 slot["completed_t3_count"] += 1
     return progress
 
@@ -138,7 +138,7 @@ def main():
             "created_commit_recorded_event_id": row["created_commit_recorded_event_id"],
         }
 
-    state_counts = {s: 0 for s in ("live", "dormant", "dead", "orphaned", "unknown")}
+    state_counts = {s: 0 for s in ("live", "dormant", "closed", "orphaned", "unknown")}
     for row in conn.execute("SELECT derived_state, count(*) c FROM entities GROUP BY derived_state"):
         state_counts[row["derived_state"]] = row["c"]
     total_events = conn.execute("SELECT count(*) FROM events").fetchone()[0]
@@ -146,7 +146,7 @@ def main():
         "total_events": total_events,
         "live_count": state_counts["live"],
         "dormant_count": state_counts["dormant"],
-        "dead_count": state_counts["dead"],
+        "closed_count": state_counts["closed"],
         "orphaned_count": state_counts["orphaned"],
         "unknown_count": state_counts["unknown"],
     }

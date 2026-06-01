@@ -26,7 +26,7 @@ def main():
         f"**Total events:** {stats['total_events']}  ·  "
         f"**Live:** {stats['live_count']}  ·  "
         f"**Dormant:** {stats['dormant_count']}  ·  "
-        f"**Dead:** {stats['dead_count']}  ·  "
+        f"**Closed:** {stats['closed_count']}  ·  "
         f"**Orphaned:** {stats['orphaned_count']}"
     )
     lines.append("")
@@ -105,16 +105,16 @@ def main():
     lines.append("")
 
     # Recently closed
-    lines.append("## Recently closed (current dead state)")
+    lines.append("## Recently closed")
     lines.append("")
-    dead = sorted(
-        [e for e in entities.values() if e["derived_state"] == "dead"],
+    closed = sorted(
+        [e for e in entities.values() if e["derived_state"] == "closed"],
         key=lambda x: x["entity_id"],
     )
-    if not dead:
+    if not closed:
         lines.append("_None._")
     else:
-        for e in dead[:10]:
+        for e in closed[:10]:
             lines.append(f"- `{e['entity_id']}` ({e['entity_type']})")
     lines.append("")
 

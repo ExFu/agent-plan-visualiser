@@ -1,11 +1,11 @@
 -- audit-orphans.sql
--- Entities whose parent (via relationship.spawns) is dead, AND the child
+-- Entities whose parent (via relationship.spawns) is closed, AND the child
 -- has not been reattached/cancelled/superseded since.
 .headers on
 .mode column
 
-WITH dead_parents AS (
-  SELECT entity_type, entity_id FROM entities WHERE derived_state = 'dead'
+WITH closed_parents AS (
+  SELECT entity_type, entity_id FROM entities WHERE derived_state = 'closed'
 ),
 orphan_candidates AS (
   SELECT
@@ -14,7 +14,7 @@ orphan_candidates AS (
     r.from_entity_type AS parent_type,
     r.from_entity_id AS parent_id
   FROM relationships r
-  JOIN dead_parents p
+  JOIN closed_parents p
     ON r.from_entity_type = p.entity_type
    AND r.from_entity_id = p.entity_id
   WHERE r.relationship_type = 'spawns'
