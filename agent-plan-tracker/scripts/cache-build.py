@@ -21,10 +21,10 @@ STATE_FROM_EVENT = {
     "entity.extended": "live",
     "entity.renamed": "live",
     "entity.progressed": "live",
-    "entity.completed": "dead",
+    "entity.completed": "closed",
     "entity.parked": "dormant",
-    "entity.cancelled": "dead",
-    "entity.superseded": "dead",
+    "entity.cancelled": "closed",
+    "entity.superseded": "closed",
     "entity.reopened": "live",
 }
 RELATIONSHIP_TYPES = {
@@ -204,21 +204,66 @@ def main():
             ),
         )
 
+    # Pre-scan reattachments. A `relationship.reattached` event MOVES a child
+    # from from_parent to to_parent — the planning graph's rebase primitive. It
+    # rewrites the spawn graph: the prior `from_parent spawns child` edge is
+    # suppressed and a `to_parent spawns child` edge replaces it. Append-only
+    # re-reattachment is honoured by last-write-wins. The move itself is also
+    # kept as a `reattached` provenance row. (reattached carries from_parent/
+    # to_parent, NOT from_entity_id, so the generic loop below skips it.)
+    # See T3-milestone-parent-ontology.md §2 D3 + T2-ontology §3.6.
+    reattach_new = {}          # (child_type, child_id) -> (to_parent_id, source_event_id)
+    suppressed_spawns = set()  # {(from_parent_id, child_id)} spawn edges to drop
+    for ev in events:
+        if ev["type"] != "relationship.reattached":
+            continue
+        attrs = ev.get("attributes", {})
+        fp, tp = attrs.get("from_parent"), attrs.get("to_parent")
+        if not (fp and tp):
+            continue
+        reattach_new[(ev["entity_type"], ev["entity_id"])] = (tp, ev["event_id"])
+        suppressed_spawns.add((fp, ev["entity_id"]))
+
     # Materialise relationships — event-sourced edges first (source='event').
     for ev in events:
         rtype = RELATIONSHIP_TYPES.get(ev["type"])
         if not rtype:
             continue
         attrs = ev.get("attributes", {})
+        # reattached: record a provenance row (from_parent -> child, tagged
+        # 'reattached'); the spawn rewrite is applied in the dedicated pass below.
+        if rtype == "reattached":
+            fp, tp = attrs.get("from_parent"), attrs.get("to_parent")
+            if not (fp and tp):
+                continue
+            conn.execute(
+                """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
+                    to_entity_type, to_entity_id, relationship_type, source_event_id, source)
+                    VALUES (?,?,?,?,?,?,?)""",
+                ("plan", fp, ev["entity_type"], ev["entity_id"], "reattached", ev["event_id"], "event"),
+            )
+            continue
         from_type = attrs.get("from_entity_type", "plan")
         from_id = attrs.get("from_entity_id")
         if not from_id:
+            continue
+        # Drop spawn edges that a reattachment has since superseded.
+        if rtype == "spawns" and (from_id, ev["entity_id"]) in suppressed_spawns:
             continue
         conn.execute(
             """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
                 to_entity_type, to_entity_id, relationship_type, source_event_id, source)
                 VALUES (?,?,?,?,?,?,?)""",
             (from_type, from_id, ev["entity_type"], ev["entity_id"], rtype, ev["event_id"], "event"),
+        )
+
+    # Reattachment-introduced spawn edges (to_parent spawns child).
+    for (child_type, child_id), (tp_id, ev_id) in reattach_new.items():
+        conn.execute(
+            """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
+                to_entity_type, to_entity_id, relationship_type, source_event_id, source)
+                VALUES (?,?,?,?,?,?,?)""",
+            ("plan", tp_id, child_type, child_id, "spawns", ev_id, "event"),
         )
 
     # Frontmatter-derived edges (source='frontmatter').
@@ -235,9 +280,9 @@ def main():
         if et != "plan":
             continue
         a = e["attrs"] or {}
-        # T3 → T2 parent
+        # T3 → T2 parent (unless a reattachment has superseded this edge)
         t2p = a.get("t2_parent")
-        if t2p:
+        if t2p and (t2p, eid) not in suppressed_spawns:
             conn.execute(
                 """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
                     to_entity_type, to_entity_id, relationship_type, source_event_id, source)
@@ -246,7 +291,7 @@ def main():
             )
         # T3 → milestone (and any plan tagged with a milestone)
         m = a.get("milestone")
-        if m:
+        if m and (m, eid) not in suppressed_spawns:
             conn.execute(
                 """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
                     to_entity_type, to_entity_id, relationship_type, source_event_id, source)

@@ -55,7 +55,7 @@ async function main() {
     `${state.projection.summary_stats.total_events} events · ` +
     `${state.projection.summary_stats.live_count} live · ` +
     `${state.projection.summary_stats.dormant_count} dormant · ` +
-    `${state.projection.summary_stats.dead_count} dead · ` +
+    `${state.projection.summary_stats.closed_count} closed · ` +
     `${state.projection.summary_stats.orphaned_count} orphaned`;
 
   document.getElementById("btn-board").addEventListener("click", () => switchView("board"));
@@ -90,7 +90,7 @@ function switchView(view) {
 // ---------------------------------------------------------------------------
 
 function renderBoard(p, content) {
-  const states = ["live", "dormant", "orphaned", "unknown", "dead"];
+  const states = ["live", "dormant", "orphaned", "unknown", "closed"];
   for (const stateName of states) {
     const entries = Object.values(p.entities).filter(e => e.derived_state === stateName);
     if (!entries.length) continue;
@@ -214,8 +214,8 @@ function renderFlow(projection, events, content) {
   lcWrap.appendChild(document.createTextNode("show:"));
   for (const [val, label, title] of [
     ["all", "All", "Show every entity"],
-    ["open", "Open", "Hide closed (dead) entities — keep live / dormant / orphaned"],
-    ["closed", "Closed", "Show only closed (dead) entities"],
+    ["open", "Open", "Hide closed entities — keep live / dormant / orphaned"],
+    ["closed", "Closed", "Show only closed entities"],
   ]) {
     const b = document.createElement("button");
     b.textContent = label;
@@ -324,19 +324,26 @@ function buildSpawnAdjacency(projection) {
   return { parents, children };
 }
 
-// Entities that supersede something else — the live replacements named in the
-// `entity_ids` of entity.superseded events. These are exempt from cascade-hide
-// (hiding an old plan must not drag its newer replacement into hiding).
-function computeSuperseders(projection) {
+// For each superseding entity, the set of predecessors it replaces. Inverts the
+// entity.superseded events: the event's own entity_id is the (closed) predecessor;
+// each id in entity_ids is a superseder (live replacement). Used to scope the
+// cascade-hide exemption: hiding a closed predecessor must not drag its live
+// replacement into hiding — but only via the spawn edge it actually replaces,
+// not wholesale (supersession is not itself a spawn edge).
+function computeSupersededPredecessors(projection) {
   const byId = {};
   for (const [k, e] of Object.entries(projection.entities)) {
     if (!(e.entity_id in byId)) byId[e.entity_id] = k;
   }
-  const out = new Set();
+  const out = new Map();  // superseder-key -> Set(predecessor-key)
   for (const ev of (state.events || [])) {
     if (ev.type !== "entity.superseded") continue;
+    const predKey = byId[ev.entity_id];
+    if (!predKey) continue;
     for (const id of (ev.attributes?.entity_ids || [])) {
-      if (byId[id]) out.add(byId[id]);
+      const supKey = byId[id];
+      if (!supKey) continue;
+      (out.get(supKey) || out.set(supKey, new Set()).get(supKey)).add(predKey);
     }
   }
   return out;
@@ -370,9 +377,9 @@ function computeFlowVisibility(projection, filters, mode) {
 
   // 2. lifecycle filter — removes rows entirely.
   if (filters.lifecycle === "open") {
-    candidate = new Set([...candidate].filter(k => entities[k].derived_state !== "dead"));
+    candidate = new Set([...candidate].filter(k => entities[k].derived_state !== "closed"));
   } else if (filters.lifecycle === "closed") {
-    candidate = new Set([...candidate].filter(k => entities[k].derived_state === "dead"));
+    candidate = new Set([...candidate].filter(k => entities[k].derived_state === "closed"));
   }
 
   // 3. isolation — removes rows entirely (intersection with related set).
@@ -395,17 +402,22 @@ function computeFlowVisibility(projection, filters, mode) {
 
   // 4. eye-hide — stays laid out, marks suppressed, greyed row retained.
   // Hiding an entity cascades to its spawned descendants that have no surviving
-  // parent (every spawn-parent is also hidden). Superseding entities are never
-  // cascaded onto — hiding an old plan must not hide its newer replacement.
-  const superseders = computeSuperseders(projection);
+  // parent (every spawn-parent is also hidden). A node that supersedes one of
+  // its own spawn-parents drops only that superseded parent from the test —
+  // hiding a closed predecessor must not hide its live replacement — but the node
+  // still cascade-hides when its remaining (real) spawn-parents are all hidden.
+  const supPreds = computeSupersededPredecessors(projection);
   const closure = new Set(filters.hiddenEntities);
   let changed = true;
   while (changed) {
     changed = false;
     for (const k of allKeys) {
-      if (closure.has(k) || superseders.has(k)) continue;
+      if (closure.has(k)) continue;
       const ps = adj.parents[k];
-      if (ps && ps.size > 0 && [...ps].every(p => closure.has(p))) {
+      if (!ps || ps.size === 0) continue;
+      const sup = supPreds.get(k);
+      const eff = sup ? [...ps].filter(p => !sup.has(p)) : [...ps];
+      if (eff.length > 0 && eff.every(p => closure.has(p))) {
         closure.add(k);
         changed = true;
       }
@@ -522,6 +534,10 @@ function computeFlowLayout(projection, events, mode) {
     : ["_t1_root", "_t2_themselves", "T2-ontology", "T2-storage", "T2-projection", "T2-packaging", "T2-extraction", "T2-ingest", "_milestones", "_inbox", "_other"];
 
   swimlaneOrder.sort((a, b) => {
+    // Inbox-item lane always sorts to the very end, in both swimlane modes,
+    // regardless of priority-list position or any unlisted lane.
+    if (a === "_inbox" && b !== "_inbox") return 1;
+    if (b === "_inbox" && a !== "_inbox") return -1;
     const ai = priorityOrder.indexOf(a);
     const bi = priorityOrder.indexOf(b);
     if (ai === -1 && bi === -1) {
@@ -1074,11 +1090,17 @@ function renderFlowGutter(layout, gutter) {
     div.className = "flow-gutter-swimlane";
     div.style.top = (sl.top + 4) + "px";
 
+    const slIsIsolatedRoot = F.isolateRoot && F.isolateRoot.kind === "swimlane" && F.isolateRoot.key === sl.key;
     const ctrls = document.createElement("span");
     ctrls.className = "gctrls";
-    ctrls.appendChild(ctrl("gctrl-isolate", "⌖",
-      `Isolate "${sl.label}" + everything it links to`,
-      () => { F.isolateRoot = { kind: "swimlane", key: sl.key }; rerenderFlow(); }));
+    if (slIsIsolatedRoot) {
+      ctrls.appendChild(ctrl("gctrl-deisolate", "⊗", "Exit isolation (show everything again)",
+        () => { F.isolateRoot = null; rerenderFlow(); }));
+    } else {
+      ctrls.appendChild(ctrl("gctrl-isolate", "⌖",
+        `Isolate "${sl.label}" + everything it links to`,
+        () => { F.isolateRoot = { kind: "swimlane", key: sl.key }; rerenderFlow(); }));
+    }
     const slHidden = F.hiddenSwimlanes.has(sl.key);
     ctrls.appendChild(ctrl("gctrl-eye" + (slHidden ? " is-off" : ""), slHidden ? "◌" : "◉",
       slHidden ? "Show this section's nodes" : "Hide this section's nodes",
@@ -1089,7 +1111,7 @@ function renderFlowGutter(layout, gutter) {
     div.appendChild(ctrls);
 
     const label = document.createElement("span");
-    label.className = "gsl-label";
+    label.className = "gsl-label" + (slIsIsolatedRoot ? " is-isolated-root" : "");
     label.textContent = sl.collapsed ? `${sl.label} (${sl.memberCount})` : sl.label;
     div.appendChild(label);
     gutter.appendChild(div);
@@ -1121,17 +1143,24 @@ function renderFlowGutter(layout, gutter) {
       row.className = "flow-gutter-row" + (suppressed ? " is-suppressed" : "");
       row.style.top = (yMid - 9) + "px";  // center on the lifeline (height=18)
 
+      const isIsolatedRoot = F.isolateRoot && F.isolateRoot.kind === "entity" && F.isolateRoot.key === ek;
       const ctrls = document.createElement("span");
       ctrls.className = "gctrls";
-      ctrls.appendChild(ctrl("gctrl-isolate", "⌖", "Isolate to this entity + its parents/children",
-        () => { F.isolateRoot = { kind: "entity", key: ek }; rerenderFlow(); }));
+      if (isIsolatedRoot) {
+        // This row IS the current focus — offer the inverse (exit focus).
+        ctrls.appendChild(ctrl("gctrl-deisolate", "⊗", "Exit isolation (show everything again)",
+          () => { F.isolateRoot = null; rerenderFlow(); }));
+      } else {
+        ctrls.appendChild(ctrl("gctrl-isolate", "⌖", "Isolate to this entity + its parents/children",
+          () => { F.isolateRoot = { kind: "entity", key: ek }; rerenderFlow(); }));
+      }
       ctrls.appendChild(ctrl("gctrl-eye" + (suppressed ? " is-off" : ""), suppressed ? "◌" : "◉",
         suppressed ? "Show this entity's nodes" : "Hide this entity's nodes",
         () => { F.hiddenEntities.has(ek) ? F.hiddenEntities.delete(ek) : F.hiddenEntities.add(ek); rerenderFlow(); }));
       row.appendChild(ctrls);
 
       const name = document.createElement("span");
-      name.className = "grow-label";
+      name.className = "grow-label" + (isIsolatedRoot ? " is-isolated-root" : "");
       name.textContent = entity.entity_id;
       row.appendChild(name);
 
@@ -2051,10 +2080,10 @@ const ContextBuilder = {
       "",
       "Rules:",
       "- Reference events and entities by id when you can.",
-      "- If the entity is dead/complete, say so and keep outstanding empty.",
+      "- If the entity is closed/complete, say so and keep outstanding empty.",
       "- Do not hedge with 'I don't have access to X' — you have everything; reason from what's here.",
       "- Output JSON before prose, always.",
-      "- `derived_summaries` is OPTIONAL. Include one entry per 1-hop dependent you formed an opinion on. Skip dead entities. Empty array `[]` is fine. Don't pad — only include dependents where you have something concrete to say (one or two genuine outstanding/blocked/changed items, or a clear next_move).",
+      "- `derived_summaries` is OPTIONAL. Include one entry per 1-hop dependent you formed an opinion on. Skip closed entities. Empty array `[]` is fine. Don't pad — only include dependents where you have something concrete to say (one or two genuine outstanding/blocked/changed items, or a clear next_move).",
     ].join("\n");
   },
 };

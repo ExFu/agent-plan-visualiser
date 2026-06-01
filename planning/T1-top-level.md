@@ -109,6 +109,16 @@ Mn plans have their own lifecycle. They progress as their constituent T3s land. 
 
 A T3 carries its milestone as frontmatter (`milestone: M1-bootstrap` or similar). Scheduling is metadata, not a graph relationship — it's the kind of thing that adjusts naturally as work shapes up. Persisting it as a relationship event would create noise without proportional value.
 
+#### 2.4.0 What a milestone hangs off (the milestone-parent rule)
+
+A T3's *milestone membership* is frontmatter (above), but a milestone has its **own** spawn-parent — a graph edge — and that parent is constrained:
+
+> **A top-level milestone `Mn` hangs off a Tier-1 plan** (the project's intent) **or off a top-level side-quest's Tier-1-equivalent** (e.g. `P1` heading a `PT*` workstream). **Never off a T2 or T3.** A milestone is a *when-axis* node; its parent is the *intent* it sequences toward, not a theme. Crossing the axes — hanging a milestone off a theme — collapses the orthogonality the two axes exist to preserve.
+
+> **Sub-milestones nest on the milestone axis.** `Mn.p` hangs off `Mn`; `Mn.p.q` hangs off `Mn.p`; and so on. The dotted index reads "this is a finer-grained delivery slice of its parent milestone." Sub-milestones are the *only* milestones whose parent is another milestone.
+
+So the only legal spawn-parents of a milestone are: a Tier-1 plan, a top-level side-quest head, or (for a sub-milestone) its parent milestone. The dotted `Mn.p` scheme is the notation for *future* sub-milestones; existing flat indices (`M1`…`M6`) are grandfathered — a milestone that conceptually should have been `M1.1` keeps its flat label for historical honesty and instead **reattaches** to its true parent (see [[T2-ontology]] §3.6 `relationship.reattached`).
+
 #### 2.4.1 The two axes in practice
 
 ```

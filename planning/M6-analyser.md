@@ -92,3 +92,9 @@ Total candidate effort per T2-analyser §4: ~9h spread across phases. Phase A is
 - Sourced from T2-analyser §3 (architecture) and §4 (phase candidates).
 - Inbox item `2026-05-27.outstanding-work-analyser-endpoint` was the kernel; superseded by T2-analyser on the same day as this milestone is created.
 - Phase ordering matches T2-analyser §4 directly.
+
+## 9. Addendum — reparented to M1-bootstrap (2026-06-01)
+
+This milestone was originally recorded as spawned by `T2-analyser` (event `c2a00004`). That crossed the two orthogonal axes the methodology keeps separate ([[T1-top-level]] §2.4): a milestone (the *when*) must not hang off a theme (the *where*). Per the milestone-parent rule now codified in [[T1-top-level]] §2.4.0, a milestone hangs off a Tier-1 plan. Conceptually M6 is a sub-milestone of M1 — *"M6 should really have been M1.1"* — because the analyser shipped as part of getting this project working end-to-end.
+
+**Resolution:** `M6-analyser` is **reattached** to `M1-bootstrap` via a `relationship.reattached` event (the first real use of that primitive — designed in the bootstrap, never previously exercised). The label `M6-analyser` and `milestone_index: 6` are **kept** for historical honesty (the id is load-bearing as a filename, and renaming would churn ~20 events); the dotted `Mn.p` notation is forward-looking methodology for future sub-milestones, not a retro-rename. In derived projections the prior `T2-analyser spawns M6` edge is now suppressed and replaced by `M1-bootstrap spawns M6` (see [[T2-ontology]] §3.6). This is a parent correction only — none of the architecture, phases, or provenance above changes.

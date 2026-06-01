@@ -91,7 +91,7 @@ No `commit_ref` field in the JSONL — see T2-storage for git-blame-based resolu
 - `relationship.depends-on` — A blocks B's progress. Same convention: `entity_id` is the dependent; `attributes.from_*` is the dependency.
 - `relationship.addendum-to` — A is an addendum within B.
 - `relationship.alongside` — co-evolving without dependency (commutative; pick the "newer" side as `entity_id` deterministically — typically the later-created entity).
-- `relationship.reattached` — child moved from old parent to new parent (used in supersession cascade resolution). `entity_id` is the child; `attributes` carries `from_parent` and `to_parent`.
+- `relationship.reattached` — child moved from old parent to new parent (the planning graph's *rebase primitive*). `entity_id` is the child; `attributes` carries `from_parent` and `to_parent` (**not** `from_entity_*` — it is the sole `relationship.*` exception, see §3.8). It does more than annotate: in derived projections it **supersedes the prior `spawns` edge** — the `from_parent spawns child` edge is suppressed and a `to_parent spawns child` edge replaces it, so the node actually moves in the spawn graph the view and tree read. `cache-build` applies this rewrite (pre-scan reattachments → suppress old spawn → insert new spawn → keep a `reattached` provenance row). Used both for supersession cascade resolution and for the milestone-parent rule ([[T1-top-level]] §2.4.0: a milestone that crossed the theme/milestone axes reattaches to its true Tier-1 parent).
 
 ### 3.7 Meta (1)
 
@@ -131,9 +131,11 @@ Computed from event history; not directly emitted:
 |---|---|
 | `live` | created, extended, progressed, reopened |
 | `dormant` | parked (could revive via reopened) |
-| `dead` | completed, cancelled, superseded |
+| `closed` | completed, cancelled, superseded |
 | `orphaned` | Derived: parent superseded AND child has no subsequent `relationship.reattached` / `entity.cancelled` / `entity.superseded` |
 | `unknown` | Ambiguous event chain — needs human review |
+
+The terminal state was renamed `dead` → `closed` on 2026-06-01 for operator-facing clarity. This is a projection-vocabulary change only: the transition events (`entity.completed` / `entity.cancelled` / `entity.superseded`) are unchanged — `closed` is derived from them, never written to the log.
 
 Orphan derivation is the only non-trivially-mapped state: it's a graph-state computation, not a per-event mapping. Resolved by emitting one of the clearing events.
 
@@ -163,7 +165,7 @@ JSON Schema is the chosen spec format (resolved this T2).
 - `entity.superseded` requires `attributes.entity_ids[]` (one-to-many fork target).
 - `decision` requires `attributes.text` + `attributes.event_ids[]`.
 - `blocker.progressed` requires `attributes.note`.
-- `relationship.*` events require `attributes.from_entity_type` + `attributes.from_entity_id` (`entity_id` on the event is the focal/result entity).
+- `relationship.*` events require `attributes.from_entity_type` + `attributes.from_entity_id` (`entity_id` on the event is the focal/result entity) — **except `relationship.reattached`**, which instead requires `attributes.from_parent` + `attributes.to_parent` (it names a move between two parents, not a single spawner). The 0.2.0 schema encodes this exception in the `reattached` branch; the requirement above applies to the other four relationship types.
 - Fulcrum-with-decision pairing **cannot** be validated by JSON Schema (cross-event constraint). Caught at the cache build / projection layer instead.
 
 **Plan frontmatter schema shape.** Single `plan-frontmatter.schema.json` discriminated by `plan_kind`:
