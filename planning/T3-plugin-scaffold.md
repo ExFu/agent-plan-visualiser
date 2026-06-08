@@ -4,12 +4,12 @@ plan_kind: thematic
 tier: 3
 t2_parent: T2-packaging
 milestone: M1-bootstrap
-status: draft
+status: completed
 ---
 
 # T3-plugin-scaffold — Create plugin directory structure
 
-**Status**: Draft. Ready for execution.
+**Status**: Completed (commit `5068405`).
 **T2 parent**: T2-packaging
 **Milestone**: M1-bootstrap
 

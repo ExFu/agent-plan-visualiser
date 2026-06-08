@@ -7,10 +7,18 @@ status: draft
 
 # T2-extraction — Per-commit event extraction + merge lifecycle
 
-**Status**: Draft. First T3s scheduled for M2.
-**Theme**: The pipeline that turns commits into events automatically. Per-commit extraction agent, pre-commit hook, sub-agent recursion for large diffs, ambiguity-halt protocol, merge conflict handling, pre-merge-to-main cleanliness gate. **This T2 is the architectural source of truth for extraction**; T1 only summarises.
+**Status**: Draft. M2 reframed 2026-06-08 (skill-as-instructions, capture-guard hook, no extraction core module); T3s enumerated in [[M2-auto-extract]].
+**Theme**: The pipeline that turns commits into events automatically. In-session capture skill, capture-guard pre-commit hook, merge conflict handling, pre-merge-to-main cleanliness gate. **This T2 is the architectural source of truth for extraction**; T1 only summarises.
 
 ---
+
+> **Reframe (2026-06-08, supersedes the 2026-06-02 note and the original hook-as-primary framing).** Two corrections:
+>
+> **(1) A skill is instructions, not a program.** The 2026-06-02 reframe correctly rejected the autonomous `claude -p` hook but then proposed a "shared extraction core module" lifted from `backfill.py` with input/output contracts, delta detection, catch-up mode, and idempotency guards. That over-engineered it. A Claude Code skill is **instructions the in-session agent follows** — the agent already has full session context, knows what it just did, and appends events directly. No separate program, no `invoke_extractor`, no bundle builder. The `backfill.py` prototype stays self-contained for M5 (retroactive extraction over historical commits); M2 does not touch it.
+>
+> **(2) The pre-commit hook is a timestamp guard, not an LLM call.** M2 ships a tiny shell-script hook that rejects commits when staged files are newer than an untracked `.last-capture` timestamp (written by the skill on completion). No LLM, no network, no block. The *skill* does the thinking; the *hook* enforces "you can't commit without capturing."
+>
+> Consequences: §3.1–3.3 (sequential extraction, agent contracts) describe the **retroactive/backfill** model (`backfill.py`, M5) — not M2's in-session capture. §3.4 (autonomous `claude -p` hook) remains deferred. §3.6 (`needs-review/*.md`) is dropped for in-session (agent asks the operator) but retained for the deferred hook. §4 T3 candidates rewritten. Full M2 shape: [[M2-auto-extract]].
 
 ## 1. Why this T2 exists
 
@@ -63,7 +71,9 @@ Agent returns:
 
 Events are appended in order; the final event is the terminal `commit.recorded` carrying commit_meta (author / date / message_first_line).
 
-### 3.4 Pre-commit hook flow
+### 3.4 Pre-commit hook flow — **deferred out of M2** (see Reframe above)
+
+> Retained as the design for the *autonomous* trigger that lands in a later/M4-adjacent milestone for non-session committers. M2 itself uses `/apt-extract` (in-session) instead; the hook below reuses the same extractor `core` when it does land.
 
 Installed by the plugin's project-init slash command (T2-packaging M4). The hook:
 
@@ -140,13 +150,16 @@ Core extractor here is identical to pre-commit's — just invoked sequentially o
 
 ## 4. T3 candidates
 
-### M2-scheduled
-- `T3-extraction-prompt-template-v0` — the canonical agent prompt.
-- `T3-pre-commit-hook-installer` — slash command (or scripted install) that drops `pre-commit` into target's `.git/hooks/`.
-- `T3-extraction-input-contract` — finalise bundle.
-- `T3-sub-agent-recursion` — handle large diffs.
-- `T3-ambiguity-halt-protocol` — needs-review file format + recommendation generation.
-- `T3-idempotency-tests` — fixture-based tests confirming re-extraction is idempotent.
+### M2-scheduled (skill-as-instructions — see [[M2-auto-extract]] §5)
+- `T3-configurable-data-dir` — *(T2-storage-owned)* `APT_DATA_DIR`-aware path resolver; repoint all pipeline scripts; gitignore `.agent-plan-tracker-auto/`. Permanent product capability (M4 installs need it too).
+- `T3-apt-capture-skill` — the in-session skill codifying the event-capture discipline (ontology summary at `0.2.0`, entity ID rules, `entity.created`-first, fulcrum-decision pairing, `commit.recorded` as seal, append-only accumulation, `.last-capture` timestamp on completion). M2 headline deliverable.
+- `T3-capture-guard-hook` — tiny pre-commit hook (shell script, no LLM) that rejects commits when staged files are newer than `.last-capture`. No network, no block.
+- `T3-cutover-to-auto` — validate in shadow, operator eyeballs, flip config to canonical, record the cutover decision, dogfood forward.
+
+### Deferred out of M2 (later / M4-adjacent — autonomous trigger for non-session committers)
+- `T3-autonomous-extraction-hook` — the `claude -p` hook (§3.4) for humans/CI committing outside a Claude Code session. Reuses `backfill.py` machinery.
+- `T3-hook-installer` — drops hooks into a target's `.git/hooks/`; idempotent against existing hooks.
+- `T3-sub-agent-recursion` — large-diff overflow handling; pulled forward only if a real commit overflows.
 
 ### M3-scheduled
 - `T3-pre-merge-hook` — local pre-push.
