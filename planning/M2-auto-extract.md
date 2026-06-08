@@ -5,85 +5,109 @@ milestone_index: 2
 status: planned
 ---
 
-# M2-auto-extract — Automated extraction takes over
+# M2-auto-extract — Automated event capture takes over
 
-**Status**: Planned. Design validated 2026-06-02 (brainstorming pass); T3s enumerated below, files authored as each becomes active scope.
-**Sits at**: Second milestone in the sequence axis. Primary theme: T2-extraction. Touches T2-storage (configurable data dir), T2-ontology (prompt aligns to the `0.2.0` schema), T2-packaging (the skill ships in the plugin's `commands/`).
+**Status**: Planned. Design reframed 2026-06-08 (supersedes the 2026-06-02 draft which over-engineered the extraction as a separate program rather than agent instructions). T3s enumerated below; files authored as each becomes active scope.
+**Sits at**: Second milestone in the sequence axis. Primary theme: T2-extraction. Touches T2-storage (configurable data dir), T2-packaging (the skill ships in the plugin).
 
 ---
 
 ## 1. Why this milestone
 
-M1 proved the pipeline **hand-rolled** — events authored by hand in interactive sessions, then committed. That is untenable past bootstrap. M2 is the capability T1's steady-state vision turns on: **events get extracted from commits automatically, with no hand-authoring of each JSON line.** Real projects will never hand-roll; the tool exists to remove that cost.
+M1 proved the pipeline **hand-rolled** — events authored by hand in interactive sessions, each JSON line crafted manually, then committed. That is untenable past bootstrap. M2 is the capability T1's steady-state vision turns on: **the agent captures events as part of its normal workflow, guided by a skill, instead of the operator (or the agent) hand-authoring JSON.**
 
-M2 is **not greenfield.** The `agent-plan-tracker/scripts/backfill/` prototype already implements the sequential per-commit extractor — `extract-commit-prompt.md` (the agent brief) plus `backfill.py` (bundle builder → `claude` invocation → schema validation → append), batch-mode, resumable, ambiguity-halting. It was pulled forward to dogfood against a client project. M2's job is to **lift that proven core into a reusable module, harden it to schema `0.2.0`, and surface it as the in-session extraction the project actually uses.**
+## 2. The key insight: a skill is just instructions
 
-## 2. What M2 unlocks — and the two decisions that shape it
+The previous M2 draft (2026-06-02) designed a "shared extraction core module" lifted from `backfill.py`, with an `invoke_extractor` function, an input/output contract, delta detection, and idempotency guards. That was wrong. **A Claude Code skill is instructions the agent follows, not a separate program.**
 
-Two operator decisions (brainstorming, 2026-06-02) define M2's shape:
+When the agent runs `/apt-capture`, it reads the skill's instructions and then **does the work itself** — it already has full session context, knows what it just did, knows the ontology, knows the schema. The skill codifies the hand-rolling discipline that's currently spread across CLAUDE.md memory entries, the ontology T2, and tribal knowledge from dogfooding:
 
-### 2.1 Skill-only — no autonomous `claude -p` hook in M2
+- How to emit well-formed schema-`0.2.0` events.
+- The entity-type identification rules (plan ID from frontmatter, inbox-item from date.slug, etc.).
+- The `entity.created`-must-come-first rule (with frontmatter attributes).
+- Fulcrum-decision pairing (which 5 events require a paired `decision`).
+- `commit.recorded` as the seal — always last, carries author/date/message_first_line.
+- Append-only — just keep appending; events accumulate until the commit seals them.
 
-The original T2-extraction design centred on a **pre-commit hook** that fires a headless `claude -p` extractor on every commit. That has two costs: a **separate, metered API call** per commit (real money) and a **~10–20s block** on every `git commit`.
+The `backfill.py` prototype (which *does* call `claude -p` headlessly over historical commits) stays as-is for M5 territory. M2 does not touch it.
 
-M2 instead ships extraction as a **slash-command, `/apt-extract`, run by the agent already in the Claude Code session.** No separate metered call (it's the session you're already running), no commit block, and it runs whatever model the session runs (often Opus — free-er *and* higher-quality than a Sonnet headless call). This is the natural path for any Claude-Code-driven project — including this one, which is built entirely in-session.
+## 3. The three decisions that shape M2
 
-The autonomous `claude -p` pre-commit hook is **deferred** (not cancelled). It is the right tool for committers *outside* a session — a human committing directly, CI, a teammate without Claude Code — which is really an adoption/packaging concern. It lands in a later milestone (M4-adjacent), reusing the same core. See T2-extraction (reframed 2026-06-02).
+### 3.1 Skill-only — no autonomous LLM hook
 
-### 2.2 Shadow-dev, then full cutover
+The original T2-extraction design centred on a **pre-commit hook** that fires a headless `claude -p` extractor on every commit. That costs a **separate metered API call** per commit and **blocks `git commit` ~10–20s**. M2 instead ships a **skill** — instructions the in-session agent follows. No separate metered call, no commit block.
 
-The end state is **full cutover**: `/apt-extract` becomes the canonical producer of this project's events. But the canonical hand-rolled log (223 rich events) must not be corrupted while the extractor is still being tuned. So:
+The autonomous `claude -p` pre-commit hook is **deferred** (not cancelled) to a later/M4-adjacent milestone for committers outside a Claude Code session (humans, CI, teammates). It would reuse the `backfill.py` machinery.
 
-- **Shadow phase** — the extractor writes to a *configurable* data directory (`APT_DATA_DIR=.agent-plan-tracker-auto/`, gitignored, throwaway). Iterate the prompt against real apt commits; build cache/projection/summary/view from the shadow dir; the canonical `.agent-plan-tracker/` is never touched.
-- **Cutover** — once trusted, drop the override so the default returns to `.agent-plan-tracker/`. From the cutover commit forward, `/apt-extract` writes the **canonical** log. The existing 223 hand-rolled events are **preserved** as history (append-only — we do **not** re-extract the past). Steady-state events become shallower-but-automatic; bootstrap richness was the exception, not the rule, and the in-session skill recovers much of it anyway (full context + enrich-before-seal).
+### 3.2 Shadow-dev, then full cutover
 
-The configurable data dir is also **permanent product capability** — M4 installs need it — not just a dev-safety hack.
+The canonical hand-rolled log (228 events as of M1 closure) must not be corrupted while the skill is being tuned. So:
 
-## 3. What M2 explicitly does NOT include
+- **Shadow phase** — a **configurable data directory** (`APT_DATA_DIR=.agent-plan-tracker-auto/`, gitignored) lets the agent run `/apt-capture` into a throwaway dir. Build cache/projection/summary/view from it; the canonical `.agent-plan-tracker/` is never touched.
+- **Cutover** — once the operator eyeballs the shadow output and is satisfied, drop the override. From then on, `/apt-capture` writes the **canonical** log. Existing hand-rolled events are preserved (append-only). Cutover is recorded as a `decision` event.
 
-- **Autonomous `claude -p` pre-commit hook + installer** — deferred (see §2.1); later/M4-adjacent.
-- **Merge-to-main cleanliness gate, merge-conflict handler** — that's M3 (already scheduled in T2-extraction §3.7–3.8 / §4).
+The configurable data dir is also **permanent product capability** (M4 installs need it), not just a dev-safety hack.
+
+### 3.3 Capture-guard pre-commit hook (tiny, no LLM)
+
+A **pre-commit hook** enforces the discipline — but it's not an LLM-calling hook. It's a tiny shell script that checks a **timestamp**:
+
+1. When the agent completes `/apt-capture`, it writes an untracked timestamp file (e.g. `.agent-plan-tracker/.last-capture`). This is written **last**, after all events are appended, so it genuinely means "events are current as of this instant."
+2. The pre-commit hook checks: are any staged files newer than `.last-capture`? If yes → reject with "run `/apt-capture` first." If no → commit proceeds.
+3. `.last-capture` is **gitignored** — it's local machine state, not project state.
+
+This enforces "you can't commit without capturing events" at near-zero cost (a timestamp comparison, no LLM call, no network, no block). The *skill* does the thinking; the *hook* just refuses to let you forget.
+
+## 4. What M2 explicitly does NOT include
+
+- **Autonomous `claude -p` pre-commit hook** — deferred to later/M4-adjacent (see §3.1). The `backfill.py` prototype already exists for this path; M2 doesn't touch it.
+- **Retroactive extraction / catch-up mode / backfill** — extracting events from *already-committed* history is M5. M2 is about capturing events for *current* work, before it's committed.
+- **Merge-to-main cleanliness gate, merge-conflict handler** — M3.
 - **Fresh-project install / packaging** — M4.
-- **Foreign-project backfill + retrospective mapping note** — M5 (though M2 hardens the core M5 reuses).
-- **Sub-agent recursion for oversized diffs** — only if a real commit overflows the in-session context; the in-session agent has a large window and can spawn sub-agents itself. Out of M2 v1 unless friction surfaces.
-- **`needs-review/*.md` ambiguity protocol** — *dropped* for the in-session path: when the agent is unsure it simply **asks the operator mid-session**. (The filesystem-note protocol was only needed because a headless hook had no human to ask; it remains relevant if/when the deferred hook lands, and for unattended catch-up runs — see §7 Q4.)
+- **Sub-agent recursion** — the in-session agent has a large context window and can manage its own sub-agents if needed. Not an M2 concern.
+- **`needs-review/*.md` ambiguity protocol** — the agent is in-session and simply asks the operator. No filesystem protocol needed.
+- **Extraction "core module"** — the 2026-06-02 draft proposed lifting `backfill.py`'s functions into a shared module. That was based on a wrong model (skill-as-program). The skill is instructions; `backfill.py` stays self-contained for M5.
+- **Delta detection / idempotency guards** — events are append-only. The agent keeps appending; there's no "re-extraction" to guard against. The `commit.recorded` seal is what closes a block, and the capture-guard hook is what prevents committing without capturing.
 
-## 4. How M2 delivers — T3 tasks
+## 5. How M2 delivers — T3 tasks
 
-Dependency order in brackets. Theme owner in italics.
+Four T3s. Dependency order in brackets.
 
-1. **`T3-extraction-core`** [foundation] — *T2-extraction.* Lift `backfill.py`'s reusable functions (`build_bundle`, `invoke_extractor`, `parse_events_response`, `validate_events`) into a shared `core` module both the skill and `backfill.py` import. Update the extraction prompt **`0.1.0 → 0.2.0`**: it predates the `analysis.*` events, the `relationship.reattached` `from_parent`/`to_parent` shape, the `dead → closed` term, the "agents emit `entity.created` for plans" rule, and the milestone-parent rule. No logic fork between triggers.
-2. **`T3-configurable-data-dir`** [parallel to #1] — *T2-storage.* A shared path resolver (`APT_DATA_DIR` env → optional committed default → `.agent-plan-tracker/`). Repoint `cache-build.py`, `projection-emit.py`, `summary-emit.py`, `serve.py`, `backfill.py` to use it instead of hardcoding. Gitignore `.agent-plan-tracker-auto/`.
-3. **`T3-apt-extract-skill`** [depends #1, #2] — *T2-extraction.* The `/apt-extract` command in the plugin's `commands/`. **Pending mode** (default): extract events for the staged diff + intended message, show the agent the events already pending in the open block, emit only the **delta**, append to the configured dir, review-before-seal. **Catch-up mode** (`/apt-extract HEAD~N..HEAD`): the backfill primitive surfaced interactively, over already-sealed commits. Ambiguity → ask the operator in-session.
-4. **`T3-extraction-idempotency`** [depends #3] — *T2-extraction.* Idempotency at the granularity of a **sealed commit's event block** (the run terminated by its `commit.recorded`). The **open (pending) block is deliberately accumulative** — repeated `/apt-extract` appends are legitimate (work → extract → more work → extract → one commit seals all); no guard fires there. The skip-guard applies **only** to re-extracting an *already-sealed* commit in catch-up mode (`--force` to override). Fixture tests cover both.
-5. **`T3-cutover-to-auto`** [depends #3, #4] — *T2-extraction.* Validate `/apt-extract` in the shadow dir over a representative range of apt's own commits; judge quality (§7 Q1); flip the config to the canonical dir; record the cutover `decision`; produce ≥1 real commit's events via the skill into the canonical log; confirm `repack-validate` green.
+1. **`T3-configurable-data-dir`** [foundation, parallel to #2] — *T2-storage.* A shared path resolver: `APT_DATA_DIR` env var → optional committed config default → `.agent-plan-tracker/`. Repoint `cache-build.py`, `projection-emit.py`, `summary-emit.py`, `serve.py` to use it instead of hardcoding. Gitignore `.agent-plan-tracker-auto/`. Permanent product capability (M4 installs need it too).
 
-## 5. Definition of done
+2. **`T3-apt-capture-skill`** [foundation, parallel to #1] — *T2-extraction.* The skill (or command) that codifies the event-capture discipline for the in-session agent. Contains: the ontology summary at schema `0.2.0`, entity identification rules, the `entity.created`-first rule, fulcrum-decision pairing rules, `commit.recorded` semantics, the append-only accumulation model, and the instruction to write `.last-capture` on completion. **This is the M2 headline deliverable.** Name TBD — `/apt-capture` is the working candidate; `/apt-save` is an alternative.
+
+3. **`T3-capture-guard-hook`** [depends #2] — *T2-extraction.* A pre-commit hook (tiny shell script, no LLM) that rejects commits when staged files are newer than `.last-capture`. Installation instructions in the skill; automated installer deferred to M4. `.last-capture` is gitignored and untracked.
+
+4. **`T3-cutover-to-auto`** [depends #1, #2, #3] — *T2-extraction.* Run `/apt-capture` in the shadow dir for a stretch of real work on this project; operator eyeballs the output; flip the config to canonical; record the cutover `decision`; produce ≥1 real commit's events via the skill into the canonical log; confirm `repack-validate.sh` green.
+
+## 6. Definition of done
 
 M2 is complete when:
 
-- A shared extractor **`core`** module exists; the extraction prompt is at schema **`0.2.0`**; both `/apt-extract` and `backfill.py` use the core (no logic fork).
-- The data directory is **configurable** via `APT_DATA_DIR`; every script honours it; the shadow dir works end-to-end (cache/projection/summary/view all build from it).
-- **`/apt-extract`** works in-session in both modes: pending (delta-aware, accumulative-safe, review-before-seal) and catch-up (sealed-commit skip-guard, `--force`). Ambiguity asks the operator.
-- The extractor is **validated in shadow** against a range of apt's own commits — events are sensible (entities, types, relationships correct).
-- **Cutover performed**: config points at the canonical `.agent-plan-tracker/`; the existing 223 hand-rolled events are preserved; ≥1 real commit's events are produced by `/apt-extract` into the canonical log; `repack-validate.sh` passes end-to-end; the cutover is recorded as a `decision`.
-
-## 6. Dependencies
-
-- **M1-bootstrap** (complete) — the pipeline M2 feeds (cache/projection/summary/view) already exists and is green.
-- **T2-ontology** — the `0.2.0` schema the hardened prompt targets.
-- **T2-storage** — owns `T3-configurable-data-dir`; M2's extractor appends in storage's format.
-- **T2-packaging** — the skill ships in the plugin's `commands/`.
-- The `scripts/backfill/` prototype — the proven core M2 refactors and hardens (not rebuilt from scratch).
+- The data directory is **configurable** via `APT_DATA_DIR`; every pipeline script honours it.
+- The `/apt-capture` skill exists and the in-session agent can follow it to produce well-formed schema-`0.2.0` events — including `entity.created` with attributes, fulcrum-decision pairing, and `commit.recorded` as seal.
+- The **capture-guard hook** rejects commits when staged changes postdate `.last-capture`.
+- **Cutover performed**: the operator has eyeballed shadow output, config points at the canonical `.agent-plan-tracker/`, ≥1 real commit's events are captured via the skill, `repack-validate.sh` passes, and the cutover is recorded as a `decision`.
 
 ## 7. Open questions (M2-specific)
 
-1. **Cutover quality bar.** What is "good enough" to cut over? We chose *not* to build a formal precision/recall comparison harness against the hand-rolled log. Open: is an operator eyeball sufficient, or do we want a light spot-check diff (auto vs hand-rolled for a handful of overlapping commits)? Resolve in `T3-cutover-to-auto`.
-2. **Open-block delta detection.** On a second `/apt-extract` of an open block, the staged diff is cumulative (A+B). Does the skill tree-diff since the last extract, or rely on the in-session agent reading the pending events and emitting only the new ones? Lean agent-judgment first; add tooling only if it proves unreliable. Resolve in `T3-apt-extract-skill`.
-3. **Skill naming / location.** `/apt-extract` is the working name; lives in the plugin's `commands/`. Confirm naming against any future command-namespace convention (T2-packaging).
-4. **Unattended catch-up ambiguity.** In-session ambiguity = ask the operator. But a long unattended catch-up run has no one watching — does catch-up mode retain a lightweight halt-and-record fallback (a slim version of the dropped `needs-review` note) so it doesn't silently guess? Lean yes for catch-up only. Resolve in `T3-apt-extract-skill`.
-5. **Extraction model.** In-session uses whatever the session runs (often Opus). Acceptable and arguably better than forcing Sonnet. No action unless cost/consistency bites.
+1. **Skill naming.** `/apt-capture`, `/apt-save`, or something else? The name should convey "record what just happened as events" rather than "extract from history." Resolve in `T3-apt-capture-skill`.
+2. **Timestamp granularity.** Does `.last-capture` need sub-second precision, or is second-level sufficient for the guard hook? Lean second-level; filesystem timestamps are typically second-granularity anyway.
+3. **Hook installation.** M2 documents how to install the capture-guard hook manually (copy into `.git/hooks/pre-commit`). Automated idempotent installation is M4 scope. Should M2 also ship a one-liner install script as a convenience? Lean yes.
+4. **Skill location.** `skills/` or `commands/`? A skill is passive instructions the agent reads when invoked; a command can carry executable logic. `/apt-capture` is instructions — leans `skills/`. Resolve alongside T2-packaging conventions.
 
-## 8. After M2
+## 8. Dependencies
 
-M3 adds the merge-to-main cleanliness gate over the projections M1 produces (orphans, fulcrum-without-decision, etc.). M4 packages for distribution and onboarding to fresh projects — and is where the deferred autonomous `claude -p` pre-commit hook naturally lands (for non-Claude-Code committers), reusing M2's `core`. M5 backfills existing/foreign projects, reusing the same core via `backfill.py`.
+- **M1-bootstrap** (complete) — the pipeline M2 feeds (cache/projection/summary/view) already works.
+- **T2-ontology** — the `0.2.0` schema the skill targets.
+- **T2-storage** — owns `T3-configurable-data-dir`.
+- **T2-packaging** — the skill ships in the plugin.
+
+## 9. After M2
+
+**M3** adds the merge-to-main cleanliness gate (orphans, fulcrum-without-decision, etc.). **M4** packages for distribution — and is where the deferred autonomous `claude -p` pre-commit hook naturally lands (for non-Claude-Code committers), reusing `backfill.py`. **M5** backfills existing/foreign projects via the same `backfill.py` orchestrator.
+
+## 10. Provenance
+
+The first M2 draft (2026-06-02, commit `caa3940`) over-engineered the design around a wrong model: treating the skill as a program that calls an "extraction core module" lifted from `backfill.py`, with input/output contracts, delta detection, catch-up mode over historical commits, and idempotency guards. A 2026-06-08 brainstorming correction surfaced the simpler truth: a skill is just instructions the agent follows; the agent already has full context; events are append-only; retroactive extraction is M5 not M2; and the capture-guard hook is a timestamp check, not an LLM call. This rewrite reflects that correction.
