@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-08T16:54:10Z
+# Project state — generated 2026-06-08T17:13:12Z
 
-**Total events:** 232  ·  **Live:** 21  ·  **Dormant:** 0  ·  **Closed:** 26  ·  **Orphaned:** 0
+**Total events:** 241  ·  **Live:** 25  ·  **Dormant:** 0  ·  **Closed:** 26  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -19,7 +19,7 @@
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(milestone)**
-  - `M2-auto-extract` (5 events): commit.recorded → entity.extended → commit.recorded
+  - `M2-auto-extract` (6 events): entity.extended → commit.recorded → commit.recorded
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -35,10 +35,24 @@
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
   - `2026-05-30.progressed-after-completed-state-flip` (1 events): entity.created
 
+- **T2-extraction**
+  - `T3-apt-capture-skill` (2 events): entity.created → relationship.spawns
+  - `T3-capture-guard-hook` (2 events): entity.created → relationship.spawns
+  - `T3-cutover-to-auto` (2 events): entity.created → relationship.spawns
+
+- **T2-storage**
+  - `T3-configurable-data-dir` (2 events): entity.created → relationship.spawns
+
 ### By milestone
 
 - **(self: M2-auto-extract)**
   - `M2-auto-extract`
+
+- **M2-auto-extract**
+  - `T3-apt-capture-skill`
+  - `T3-capture-guard-hook`
+  - `T3-configurable-data-dir`
+  - `T3-cutover-to-auto`
 
 ## Blocked
 
@@ -69,7 +83,8 @@ _No flapping closures._
 
 - **M1-bootstrap**: 15/15 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
+- **M2-auto-extract**: 0/4 T3 complete (0%); 4 live
 - **M6-analyser**: 6/6 T3 complete (100%); 0 live
 
 ---
-_47 entities · 58 relationships · 6 decisions._
+_51 entities · 66 relationships · 6 decisions._
