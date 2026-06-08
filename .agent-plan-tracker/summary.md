@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-01T20:01:02Z
+# Project state — generated 2026-06-08T15:56:01Z
 
-**Total events:** 223  ·  **Live:** 20  ·  **Dormant:** 0  ·  **Closed:** 26  ·  **Orphaned:** 0
+**Total events:** 228  ·  **Live:** 21  ·  **Dormant:** 0  ·  **Closed:** 26  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -11,12 +11,15 @@
 
 - **(T2 itself)**
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
-  - `T2-extraction` (2 events): entity.created → relationship.spawns
+  - `T2-extraction` (3 events): entity.created → relationship.spawns → entity.extended
   - `T2-ingest` (2 events): entity.created → relationship.spawns
   - `T2-ontology` (5 events): entity.extended → entity.progressed → entity.extended
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
   - `T2-projection` (13 events): entity.progressed → analysis.invalidated → entity.progressed
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
+
+- **(milestone)**
+  - `M2-auto-extract` (3 events): entity.created → relationship.spawns → commit.recorded
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -31,6 +34,11 @@
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
   - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
   - `2026-05-30.progressed-after-completed-state-flip` (1 events): entity.created
+
+### By milestone
+
+- **(self: M2-auto-extract)**
+  - `M2-auto-extract`
 
 ## Blocked
 
@@ -64,4 +72,4 @@ _No flapping closures._
 - **M6-analyser**: 6/6 T3 complete (100%); 0 live
 
 ---
-_46 entities · 57 relationships · 4 decisions._
+_47 entities · 58 relationships · 5 decisions._

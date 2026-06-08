@@ -7,10 +7,12 @@ status: draft
 
 # T2-extraction — Per-commit event extraction + merge lifecycle
 
-**Status**: Draft. First T3s scheduled for M2.
-**Theme**: The pipeline that turns commits into events automatically. Per-commit extraction agent, pre-commit hook, sub-agent recursion for large diffs, ambiguity-halt protocol, merge conflict handling, pre-merge-to-main cleanliness gate. **This T2 is the architectural source of truth for extraction**; T1 only summarises.
+**Status**: Draft. M2 reframed skill-primary (2026-06-02); T3s enumerated in [[M2-auto-extract]].
+**Theme**: The pipeline that turns commits into events automatically. Per-commit extraction agent, sub-agent recursion for large diffs, ambiguity-halt protocol, merge conflict handling, pre-merge-to-main cleanliness gate. **This T2 is the architectural source of truth for extraction**; T1 only summarises.
 
 ---
+
+> **Reframe (2026-06-02, M2 brainstorming — supersedes the hook-as-primary framing below).** M2's primary trigger is an **in-session slash-command, `/apt-extract`**, *not* an autonomous `claude -p` pre-commit hook. Reason: a headless `claude -p` hook spends a **separate metered API call** per commit and **blocks `git commit` ~10–20s**; an in-session skill reuses the session you are already running (no separate metered call, no block, runs the session's model — often Opus). The two triggers share one extractor `core`; only the invocation differs. **The autonomous pre-commit hook (§3.4) and its installer are deferred out of M2** to a later/M4-adjacent milestone serving committers *outside* a Claude Code session (humans committing directly, CI, teammates). Consequences threaded below: §3.4 is deferred; §3.6's `needs-review/*.md` protocol is dropped for the in-session path (the agent asks the operator directly) but retained for the deferred hook + unattended catch-up runs. Full M2 shape: [[M2-auto-extract]].
 
 ## 1. Why this T2 exists
 
@@ -63,7 +65,9 @@ Agent returns:
 
 Events are appended in order; the final event is the terminal `commit.recorded` carrying commit_meta (author / date / message_first_line).
 
-### 3.4 Pre-commit hook flow
+### 3.4 Pre-commit hook flow — **deferred out of M2** (see Reframe above)
+
+> Retained as the design for the *autonomous* trigger that lands in a later/M4-adjacent milestone for non-session committers. M2 itself uses `/apt-extract` (in-session) instead; the hook below reuses the same extractor `core` when it does land.
 
 Installed by the plugin's project-init slash command (T2-packaging M4). The hook:
 
@@ -140,13 +144,17 @@ Core extractor here is identical to pre-commit's — just invoked sequentially o
 
 ## 4. T3 candidates
 
-### M2-scheduled
-- `T3-extraction-prompt-template-v0` — the canonical agent prompt.
-- `T3-pre-commit-hook-installer` — slash command (or scripted install) that drops `pre-commit` into target's `.git/hooks/`.
-- `T3-extraction-input-contract` — finalise bundle.
-- `T3-sub-agent-recursion` — handle large diffs.
-- `T3-ambiguity-halt-protocol` — needs-review file format + recommendation generation.
-- `T3-idempotency-tests` — fixture-based tests confirming re-extraction is idempotent.
+### M2-scheduled (skill-primary — see [[M2-auto-extract]] §4)
+- `T3-extraction-core` — lift `backfill.py`'s reusable functions into a shared `core` module; bump the extraction prompt `0.1.0 → 0.2.0`. Both `/apt-extract` and `backfill.py` import it.
+- `T3-configurable-data-dir` — *(T2-storage-owned)* `APT_DATA_DIR`-aware path resolver so the extractor can develop into a shadow dir; prerequisite for the shadow→cutover flow.
+- `T3-apt-extract-skill` — the in-session `/apt-extract` command: pending mode (delta-aware, accumulative-safe) + catch-up mode; ambiguity asks the operator.
+- `T3-extraction-idempotency` — sealed-commit skip-guard + `--force`; open-block accumulation; fixture tests.
+- `T3-cutover-to-auto` — validate in shadow, flip config to canonical, record the cutover decision, dogfood forward.
+
+### Deferred out of M2 (later / M4-adjacent — autonomous trigger for non-session committers)
+- `T3-pre-commit-hook` — the `claude -p` hook (§3.4) for humans/CI committing outside a Claude Code session. Reuses M2's `core`.
+- `T3-pre-commit-hook-installer` — drops the hook into a target's `.git/hooks/`; idempotent against existing hooks.
+- `T3-sub-agent-recursion` — large-diff overflow handling; pulled forward only if a real commit overflows.
 
 ### M3-scheduled
 - `T3-pre-merge-hook` — local pre-push.
