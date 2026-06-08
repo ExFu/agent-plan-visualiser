@@ -9,11 +9,16 @@ const state = {
   projection: null,
   events: null,
   currentView: "board",
-  flowMode: "milestone", // "milestone" | "t2"
+  // Flow view — T3 (leaf) rows are grouped into bands by `flowAggregate`,
+  // INDEPENDENT of which parent bands are shown. "none" = one flat T3 band.
+  flowAggregate: "milestone", // "milestone" | "t2" | "none"
+  flowShowMilestones: true,    // show the Milestones parent band
+  flowShowDomains: true,       // show the T2 Domains parent band
   // Flow-view focus filters (T3-flow-view-filtering). Persist across switchView
   // re-renders. Entity-keyed members (hiddenEntities, entity isolateRoot,
-  // lifecycle) are mode-independent; swimlane-keyed members are cleared on a
-  // milestone<->t2 mode switch (swimlane keys differ between modes).
+  // lifecycle) are aggregate-independent; band-keyed members (hiddenSwimlanes,
+  // collapsedSwimlanes, swimlane isolateRoot) are cleared when the aggregation
+  // axis changes (T3 band keys differ between axes).
   flowFilters: {
     hiddenEntities: new Set(),     // entity keys muted via eye toggle — keep a greyed row
     hiddenSwimlanes: new Set(),    // swimlane keys muted via section eye toggle
@@ -67,7 +72,7 @@ async function main() {
     // rename (e.g. M6-analyser -> M1.1-analyser, or a milestone re-tag):
     // cache-build rewrites the *relationship edges* last-write-wins but leaves
     // the seed copy in attributes untouched. milestone_progress already reads
-    // the fold (M1.2 D-C); swimlaneKey() reads attributes.milestone/.t2_parent,
+    // the fold (M1.2 D-C); bandKey() reads attributes.milestone/.t2_parent,
     // so without this the flow view lanes renamed/reattached plans under their
     // stale seed (a phantom "M6-analyser" lane). Mirror the fold here so every
     // view groups consistently with milestone_progress and the hierarchy tree.
@@ -232,17 +237,20 @@ function renderFlow(projection, events, content) {
   // Sub-mode toggle
   const sub = document.createElement("div");
   sub.className = "sub-toolbar";
-  for (const [mode, label] of [
-    ["milestone", "Milestone swimlanes"],
-    ["t2", "T2-domain swimlanes"],
+  // Aggregate-by selector — groups ONLY the tier-3 leaf rows.
+  sub.appendChild(document.createTextNode("aggregate:"));
+  for (const [agg, label] of [
+    ["milestone", "Milestones"],
+    ["t2", "T2 Domains"],
+    ["none", "None"],
   ]) {
     const b = document.createElement("button");
     b.textContent = label;
-    if (mode === state.flowMode) b.classList.add("active");
+    if (agg === state.flowAggregate) b.classList.add("active");
     b.addEventListener("click", () => {
-      if (state.flowMode !== mode) {
-        state.flowMode = mode;
-        // swimlane-keyed filters don't map across modes — clear them.
+      if (state.flowAggregate !== agg) {
+        state.flowAggregate = agg;
+        // T3 band keys differ between axes — clear band-keyed filters.
         F.hiddenSwimlanes.clear();
         F.collapsedSwimlanes.clear();
         if (F.isolateRoot && F.isolateRoot.kind === "swimlane") F.isolateRoot = null;
@@ -251,6 +259,23 @@ function renderFlow(projection, events, content) {
     });
     sub.appendChild(b);
   }
+
+  // Parent-band visibility toggles — show/hide a whole parent tier without
+  // reflowing the T3 grouping.
+  const parentToggles = document.createElement("span");
+  parentToggles.className = "parent-toggles";
+  for (const [field, label] of [
+    ["flowShowMilestones", "Milestones"],
+    ["flowShowDomains", "T2 Domains"],
+  ]) {
+    const b = document.createElement("button");
+    b.textContent = (state[field] ? "☑ " : "☐ ") + label;
+    b.title = `Show/hide the ${label} parent band`;
+    if (state[field]) b.classList.add("active");
+    b.addEventListener("click", () => { state[field] = !state[field]; switchView("flow"); });
+    parentToggles.appendChild(b);
+  }
+  sub.appendChild(parentToggles);
 
   // Lifecycle filter (T3-flow-view-filtering D1): All / Open / Closed.
   const lcWrap = document.createElement("span");
@@ -275,7 +300,7 @@ function renderFlow(projection, events, content) {
     const banner = document.createElement("span");
     banner.className = "isolate-banner";
     const what = F.isolateRoot.kind === "swimlane"
-      ? swimlaneLabel(F.isolateRoot.key, state.flowMode)
+      ? bandLabel(F.isolateRoot.key)
       : (F.isolateRoot.key.split(":")[1] || F.isolateRoot.key);
     banner.appendChild(document.createTextNode(`Isolated: ${what} `));
     const clear = document.createElement("button");
@@ -306,7 +331,7 @@ function renderFlow(projection, events, content) {
   content.appendChild(legend);
 
   // Compute layout
-  const layout = computeFlowLayout(projection, events, state.flowMode);
+  const layout = computeFlowLayout(projection, events, state.flowAggregate);
 
   // Two-pane split: SVG + drag handle + sidebar
   const split = document.createElement("div");
@@ -412,7 +437,7 @@ function relatedSetForEntity(ekey, adj) {
 
 // Computes which entities get a row (laidOut), which of those have their SVG
 // marks suppressed (eye-hide), and which swimlanes are collapsed. Pure.
-function computeFlowVisibility(projection, filters, mode) {
+function computeFlowVisibility(projection, filters, aggregate, show) {
   const entities = projection.entities;
   const allKeys = Object.keys(entities);
   const adj = buildSpawnAdjacency(projection);
@@ -426,6 +451,18 @@ function computeFlowVisibility(projection, filters, mode) {
     candidate = new Set([...candidate].filter(k => entities[k].derived_state === "closed"));
   }
 
+  // 2.5 parent-band visibility — hide a whole parent tier (its rows + arcs)
+  // without touching the T3 grouping. Removed from `candidate` entirely (no
+  // greyed row), so toggling never reflows the aggregated T3 bands.
+  // Key off bandKey so these stay consistent with banding (e.g. a leaf
+  // mis-tagged tier:2 is NOT removed when domains are hidden).
+  if (show && !show.milestones) {
+    candidate = new Set([...candidate].filter(k => bandKey(entities[k], aggregate) !== "_milestones"));
+  }
+  if (show && !show.domains) {
+    candidate = new Set([...candidate].filter(k => bandKey(entities[k], aggregate) !== "_t2domains"));
+  }
+
   // 3. isolation — removes rows entirely (intersection with related set).
   if (filters.isolateRoot) {
     let related;
@@ -434,7 +471,7 @@ function computeFlowVisibility(projection, filters, mode) {
     } else {
       related = new Set();
       for (const k of allKeys) {
-        if (swimlaneKey(entities[k], mode) === filters.isolateRoot.key) {
+        if (bandKey(entities[k], aggregate) === filters.isolateRoot.key) {
           for (const r of relatedSetForEntity(k, adj)) related.add(r);
         }
       }
@@ -471,7 +508,7 @@ function computeFlowVisibility(projection, filters, mode) {
   const suppressed = new Set();
   for (const k of laidOut) {
     if (closure.has(k) ||
-        filters.hiddenSwimlanes.has(swimlaneKey(entities[k], mode))) {
+        filters.hiddenSwimlanes.has(bandKey(entities[k], aggregate))) {
       suppressed.add(k);
     }
   }
@@ -479,14 +516,14 @@ function computeFlowVisibility(projection, filters, mode) {
   // 5. collapse — keep only collapsed swimlanes that still have >=1 laid-out member.
   const collapsed = new Set();
   for (const k of laidOut) {
-    const sl = swimlaneKey(entities[k], mode);
+    const sl = bandKey(entities[k], aggregate);
     if (filters.collapsedSwimlanes.has(sl)) collapsed.add(sl);
   }
 
   return { laidOut, suppressed, collapsed, adj };
 }
 
-function computeFlowLayout(projection, events, mode) {
+function computeFlowLayout(projection, events, aggregate) {
   // LEFT_MARGIN now small — the sticky HTML gutter (Task A) holds entity +
   // swimlane labels, so the SVG no longer needs to reserve space for them.
   // TOP_MARGIN larger to give vertical commit labels (Task B, rotate -90)
@@ -535,7 +572,8 @@ function computeFlowLayout(projection, events, mode) {
 
   // 2.5. Visibility (T3-flow-view-filtering): which entities get rows, which
   // are mark-suppressed (eye-hide), which swimlanes are collapsed.
-  const vis = computeFlowVisibility(projection, state.flowFilters, mode);
+  const vis = computeFlowVisibility(projection, state.flowFilters, aggregate,
+    { milestones: state.flowShowMilestones, domains: state.flowShowDomains });
   const isCollapsedSwimlane = (sl) => vis.collapsed.has(sl);
   // entity key -> collapsed swimlane key it belongs to (for edge rerouting).
   const memberCollapsedSwimlane = {};
@@ -559,7 +597,7 @@ function computeFlowLayout(projection, events, mode) {
   const collapsedMembers = {}; // sl -> [ekey] laid-out members of a collapsed swimlane
   for (const [ekey, entity] of Object.entries(entities)) {
     if (!vis.laidOut.has(ekey)) continue;
-    const sl = swimlaneKey(entity, mode);
+    const sl = bandKey(entity, aggregate);
     if (!swimlaneEntities[sl]) {
       swimlaneEntities[sl] = [];
       swimlaneOrder.push(sl);
@@ -572,28 +610,22 @@ function computeFlowLayout(projection, events, mode) {
     }
   }
 
-  // Sort swimlane order by priority.
-  const priorityOrder = mode === "milestone"
-    ? ["_spine_t1", "_spine_t2", "_milestones", "_other", "_inbox"]
-    : ["_t1_root", "_t2_themselves", "T2-ontology", "T2-storage", "T2-projection", "T2-packaging", "T2-extraction", "T2-ingest", "_milestones", "_inbox", "_other"];
-
+  // Sort bands: parent bands first (fixed order), then the aggregated T3 bands
+  // (numeric so M1 < M1.1 < M1.2 < M2, and T2-* alpha), then the catch-alls,
+  // with inbox always last.
+  const HEAD = ["_t1", "_milestones", "_t2domains"];
+  const TAIL = { "_unassigned": 1, "_other": 2, "_inbox": 3 };
+  const rank = (k) => {
+    const h = HEAD.indexOf(k);
+    if (h !== -1) return [0, h];
+    if (TAIL[k] !== undefined) return [2, TAIL[k]];
+    return [1, 0]; // an aggregated T3 band (milestone id / t2 id / _t3flat)
+  };
   swimlaneOrder.sort((a, b) => {
-    // Inbox-item lane always sorts to the very end, in both swimlane modes,
-    // regardless of priority-list position or any unlisted lane.
-    if (a === "_inbox" && b !== "_inbox") return 1;
-    if (b === "_inbox" && a !== "_inbox") return -1;
-    const ai = priorityOrder.indexOf(a);
-    const bi = priorityOrder.indexOf(b);
-    if (ai === -1 && bi === -1) {
-      // For milestone mode, M1/M2/M3 should be in numeric order.
-      if (mode === "milestone" && a.startsWith("M") && b.startsWith("M")) {
-        return a.localeCompare(b, undefined, { numeric: true });
-      }
-      return a.localeCompare(b);
-    }
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
+    const ra = rank(a), rb = rank(b);
+    if (ra[0] !== rb[0]) return ra[0] - rb[0];
+    if (ra[0] !== 1) return ra[1] - rb[1];                    // HEAD / TAIL: fixed order
+    return a.localeCompare(b, undefined, { numeric: true });  // T3 bands: numeric
   });
 
   // 5. Within each swimlane, sort entities by index-of-first-event.
@@ -630,7 +662,7 @@ function computeFlowLayout(projection, events, mode) {
     y += SWIMLANE_PADDING;
     swimlaneSpans.push({
       key: sl,
-      label: swimlaneLabel(sl, mode),
+      label: bandLabel(sl),
       top: slTop,
       bottom: y - SWIMLANE_PADDING / 2,
       entities: ents,
@@ -705,6 +737,11 @@ function computeFlowLayout(projection, events, mode) {
   // first/last node, or its collapsed swimlane's placeholder. null if the
   // entity has no drawable endpoint (suppressed or filtered out).
   const endpointNode = (ekey, which) => {
+    // Hidden (eye-hide, or hidden section) wins over collapse: a hidden entity
+    // is not a drawable arc endpoint even when its band is collapsed. Without
+    // this, arcs into a collapsed+hidden band still aggregate to the placeholder
+    // — the reported bug (collapsed+hidden must show no arcs, like open+hidden).
+    if (vis.suppressed.has(ekey)) return null;
     const sl = memberCollapsedSwimlane[ekey];
     if (sl && placeholderNodes[sl]) return placeholderNodes[sl];
     const ns = entityNodes[ekey];
@@ -786,34 +823,38 @@ function computeFlowLayout(projection, events, mode) {
   };
 }
 
-function swimlaneKey(entity, mode) {
+// Which band an entity belongs to. Parent entities (T1 / milestones / T2s) get
+// fixed structural bands, independent of the aggregation axis. Only tier-3 leaf
+// work is grouped by the chosen `aggregate` axis (its fold-reconciled
+// attributes.milestone / .t2_parent). This is what lets parent visibility and
+// T3 aggregation be toggled independently.
+function bandKey(entity, aggregate) {
   const a = entity.attributes || {};
-  if (mode === "milestone") {
-    if (entity.entity_type === "inbox-item") return "_inbox";
-    if (a.plan_kind === "milestone") return "_milestones";
-    if (a.milestone) return a.milestone;
-    if (a.tier === 1) return "_spine_t1";
-    if (a.tier === 2) return "_spine_t2";
-    return "_other";
-  } else {
-    if (entity.entity_type === "inbox-item") return "_inbox";
-    if (a.plan_kind === "milestone") return "_milestones";
-    if (a.t2_parent) return a.t2_parent;
-    if (a.tier === 2) return "_t2_themselves";
-    if (a.tier === 1) return "_t1_root";
-    return "_other";
+  if (entity.entity_type === "inbox-item") return "_inbox";
+  if (a.plan_kind === "milestone") return "_milestones";
+  // A leaf (tier-3 work) is identified by having a `t2_parent` (it points up to
+  // a T2) OR an explicit tier 3 — checked BEFORE the tier===2 bucket so a plan
+  // mis-tagged tier:2 in its frozen entity.created attrs (e.g. T3-plugin-scaffold)
+  // still groups as a leaf, not as a T2 domain. Leaves group by the aggregate axis.
+  if (a.t2_parent || a.tier === 3) {
+    if (aggregate === "milestone") return a.milestone || "_unassigned";
+    if (aggregate === "t2") return a.t2_parent || "_unassigned";
+    return "_t3flat"; // aggregate === "none"
   }
+  if (a.tier === 2) return "_t2domains"; // a real T2 domain (no t2_parent)
+  if (a.tier === 1) return "_t1";
+  return "_other";
 }
 
-function swimlaneLabel(key, mode) {
+function bandLabel(key) {
   const labels = {
-    "_inbox": "Inbox items",
-    "_milestones": "Milestone plans (Mn)",
-    "_spine_t1": "T1 (main spine)",
-    "_spine_t2": "T2s without milestone tag",
-    "_t1_root": "T1 root",
-    "_t2_themselves": "T2 plans (themselves)",
+    "_t1": "T1 (root)",
+    "_milestones": "Milestones",
+    "_t2domains": "T2 Domains",
+    "_t3flat": "Tier-3 work",
+    "_unassigned": "— unassigned —",
     "_other": "Other",
+    "_inbox": "Inbox items",
   };
   return labels[key] || key;
 }
@@ -1080,7 +1121,7 @@ function renderFlowSVG(layout) {
     });
     const titleEl = createNS("title");
     titleEl.textContent =
-      `${swimlaneLabel(sl, state.flowMode)} — ${p.memberCount} entit${p.memberCount === 1 ? "y" : "ies"} collapsed\n` +
+      `${bandLabel(sl)} — ${p.memberCount} entit${p.memberCount === 1 ? "y" : "ies"} collapsed\n` +
       p.members.map(k => "• " + k).join("\n") + "\n(click to expand)";
     rect.appendChild(titleEl);
     const expand = () => { state.flowFilters.collapsedSwimlanes.delete(sl); rerenderFlow(); };
