@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-01T18:13:51Z
+# Project state — generated 2026-06-08T16:02:42Z
 
-**Total events:** 220  ·  **Live:** 21  ·  **Dormant:** 0  ·  **Closed:** 25  ·  **Orphaned:** 0
+**Total events:** 223  ·  **Live:** 21  ·  **Dormant:** 0  ·  **Closed:** 25  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -51,8 +51,8 @@ _No orphaned entities._
 ## Recently closed
 
 - `2026-05-27.outstanding-work-analyser-endpoint` (inbox-item)
+- `M1.1-analyser` (plan)
 - `M1.2-relationship-ssot` (plan)
-- `M6-analyser` (plan)
 - `T3-analyser-live-model-catalog` (plan)
 - `T3-analyser-phase-a-ephemeral` (plan)
 - `T3-analyser-phase-b-persistence` (plan)
@@ -68,8 +68,8 @@ _No flapping closures._
 ## Milestone progress
 
 - **M1-bootstrap**: 15/15 T3 complete (100%); 0 live
+- **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
-- **M6-analyser**: 6/6 T3 complete (100%); 0 live
 
 ---
-_46 entities · 57 relationships · 4 decisions._
+_46 entities · 57 relationships · 5 decisions._

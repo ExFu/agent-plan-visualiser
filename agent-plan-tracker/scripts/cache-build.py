@@ -19,7 +19,10 @@ SCHEMA_DDL = REPO_ROOT / "agent-plan-tracker/schemas/0.2.0/cache.schema.sql"
 STATE_FROM_EVENT = {
     "entity.created": "live",
     "entity.extended": "live",
-    "entity.renamed": "live",
+    # entity.renamed is intentionally ABSENT: it is state-neutral (an identity
+    # migration, not a lifecycle transition), so renaming a closed entity must
+    # NOT flip it back to live. See the rename pre-scan in main() and
+    # T2-ontology §3.10/§3.11.
     "entity.progressed": "live",
     "entity.completed": "closed",
     "entity.parked": "dormant",
@@ -105,6 +108,39 @@ def main():
     init_db(conn)
     blame = resolve_blame()
 
+    # Pre-scan renames. An `entity.renamed` event MIGRATES an entity's canonical
+    # id (from_name -> to_name) — the planning graph's identity-migration
+    # primitive. Unlike reattach (which moves a child to a new PARENT), rename
+    # rewrites the entity KEY itself everywhere it appears: the entity's own
+    # events, and every relationship endpoint / frontmatter seed that referenced
+    # the old id. Consequences: (1) the renamed entity carries its full history
+    # forward under the new id; (2) children follow for free — no per-child
+    # events — because their frozen `milestone`/`t2_parent` seed pointing at the
+    # old id is remapped here; (3) no phantom row survives under the old id.
+    # Any non-(from_name/to_name) attributes on the rename event patch the
+    # migrated entity's materialised attributes (e.g. a milestone_index/title
+    # change carried with the rename). entity.renamed is state-neutral (absent
+    # from STATE_FROM_EVENT) so renaming a closed entity does not resurrect it.
+    # Generic: keyed off whatever from_name/to_name a rename event carries — not
+    # hardwired to any specific id. See T2-ontology §3.10/§3.11.
+    id_remap = {}              # old_entity_id -> new_entity_id
+    rename_attr_patch = {}     # new_entity_id -> {attr: value} (excludes from/to_name)
+    for ev in events:
+        if ev["type"] != "entity.renamed":
+            continue
+        attrs = ev.get("attributes", {})
+        old_id, new_id = attrs.get("from_name"), attrs.get("to_name")
+        if not (old_id and new_id):
+            continue
+        id_remap[old_id] = new_id
+        patch = {k: v for k, v in attrs.items() if k not in ("from_name", "to_name")}
+        if patch:
+            rename_attr_patch[new_id] = patch
+
+    def rid(eid):
+        """Resolve an entity id through the rename map (identity migration)."""
+        return id_remap.get(eid, eid) if eid is not None else eid
+
     # Build commit-boundaries lookup for positional rollup.
     # Each entry: (line_no_of_commit_recorded, commit.recorded event_id, attributes dict)
     commit_boundaries = [
@@ -135,7 +171,7 @@ def main():
                 commit_message_first_line, commit_recorded_event_id)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                ev["event_id"], ev["type"], ev.get("entity_type"), ev.get("entity_id"),
+                ev["event_id"], ev["type"], ev.get("entity_type"), rid(ev.get("entity_id")),
                 ev["actor"], ev["confidence"], ev["schema_version"],
                 json.dumps(ev.get("attributes", {}), separators=(",", ":")),
                 line_no, cref, cauthor, cdate, csum, cre_id,
@@ -146,7 +182,7 @@ def main():
     entities = {}
     for ev in events:
         et = ev.get("entity_type")
-        eid = ev.get("entity_id")
+        eid = rid(ev.get("entity_id"))
         if not et or not eid:
             continue
         key = (et, eid)
@@ -163,6 +199,11 @@ def main():
             e["state"] = new_state
         if ev["type"] == "entity.created":
             e["attrs"] = ev.get("attributes", {})
+        elif ev["type"] == "entity.renamed":
+            # identity migration: merge any non-(from_name/to_name) attributes
+            # (e.g. a milestone_index/title change carried with the rename) onto
+            # the migrated entity's materialised attrs. `eid` is already the new id.
+            e["attrs"].update(rename_attr_patch.get(eid, {}))
 
     # Fallback: for plan entities with empty attrs (no entity.created event
     # in the log), read frontmatter directly from the plan file. The
@@ -218,11 +259,12 @@ def main():
         if ev["type"] != "relationship.reattached":
             continue
         attrs = ev.get("attributes", {})
-        fp, tp = attrs.get("from_parent"), attrs.get("to_parent")
+        fp, tp = rid(attrs.get("from_parent")), rid(attrs.get("to_parent"))
+        child = rid(ev["entity_id"])
         if not (fp and tp):
             continue
-        reattach_new[(ev["entity_type"], ev["entity_id"])] = (tp, ev["event_id"])
-        suppressed_spawns.add((fp, ev["entity_id"]))
+        reattach_new[(ev["entity_type"], child)] = (tp, ev["event_id"])
+        suppressed_spawns.add((fp, child))
 
     # Materialise relationships — event-sourced edges first (source='event').
     for ev in events:
@@ -233,28 +275,30 @@ def main():
         # reattached: record a provenance row (from_parent -> child, tagged
         # 'reattached'); the spawn rewrite is applied in the dedicated pass below.
         if rtype == "reattached":
-            fp, tp = attrs.get("from_parent"), attrs.get("to_parent")
+            fp, tp = rid(attrs.get("from_parent")), rid(attrs.get("to_parent"))
+            child = rid(ev["entity_id"])
             if not (fp and tp):
                 continue
             conn.execute(
                 """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
                     to_entity_type, to_entity_id, relationship_type, source_event_id, source)
                     VALUES (?,?,?,?,?,?,?)""",
-                ("plan", fp, ev["entity_type"], ev["entity_id"], "reattached", ev["event_id"], "event"),
+                ("plan", fp, ev["entity_type"], child, "reattached", ev["event_id"], "event"),
             )
             continue
         from_type = attrs.get("from_entity_type", "plan")
-        from_id = attrs.get("from_entity_id")
+        from_id = rid(attrs.get("from_entity_id"))
+        child = rid(ev["entity_id"])
         if not from_id:
             continue
         # Drop spawn edges that a reattachment has since superseded.
-        if rtype == "spawns" and (from_id, ev["entity_id"]) in suppressed_spawns:
+        if rtype == "spawns" and (from_id, child) in suppressed_spawns:
             continue
         conn.execute(
             """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
                 to_entity_type, to_entity_id, relationship_type, source_event_id, source)
                 VALUES (?,?,?,?,?,?,?)""",
-            (from_type, from_id, ev["entity_type"], ev["entity_id"], rtype, ev["event_id"], "event"),
+            (from_type, from_id, ev["entity_type"], child, rtype, ev["event_id"], "event"),
         )
 
     # Reattachment-introduced spawn edges (to_parent spawns child).
@@ -281,7 +325,7 @@ def main():
             continue
         a = e["attrs"] or {}
         # T3 → T2 parent (unless a reattachment has superseded this edge)
-        t2p = a.get("t2_parent")
+        t2p = rid(a.get("t2_parent"))
         if t2p and (t2p, eid) not in suppressed_spawns:
             conn.execute(
                 """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
@@ -290,7 +334,7 @@ def main():
                 ("plan", t2p, "plan", eid, "spawns", None, "frontmatter"),
             )
         # T3 → milestone (and any plan tagged with a milestone)
-        m = a.get("milestone")
+        m = rid(a.get("milestone"))
         if m and (m, eid) not in suppressed_spawns:
             conn.execute(
                 """INSERT OR IGNORE INTO relationships (from_entity_type, from_entity_id,
@@ -358,7 +402,7 @@ def main():
             (
                 ev["event_id"],
                 ev.get("entity_type"),
-                ev.get("entity_id"),
+                rid(ev.get("entity_id")),
                 attrs.get("source", "primary"),
                 attrs.get("model", ""),
                 attrs.get("origin_summary_event_id"),

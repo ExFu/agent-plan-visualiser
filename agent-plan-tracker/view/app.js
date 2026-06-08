@@ -38,7 +38,51 @@ async function main() {
     if (!eRes.ok) throw new Error(`events.jsonl: HTTP ${eRes.status}`);
     state.projection = await pRes.json();
     const eText = await eRes.text();
-    state.events = eText.trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+    const rawEvents = eText.trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+    // Apply the rename identity-migration to raw events so the view's identity
+    // model matches the cache/projection. events.jsonl is the append-only
+    // canonical log: an `entity.renamed` event does NOT rewrite the old events'
+    // entity_id in the log — cache-build folds `from_name -> to_name` when it
+    // materialises entities/relationships. The view ALSO reads raw events
+    // directly (for full event objects projection.json doesn't carry), so it
+    // must apply the SAME fold; otherwise a renamed entity splits into a phantom
+    // lane under the old id plus an empty lane under the new id. Single-hop,
+    // last-write-wins — mirrors cache-build.py's id_remap (see its rename
+    // pre-scan + T2-ontology §3.11). Original ids are preserved in each rename
+    // event's attributes.from_name for history.
+    const renameMap = {};
+    for (const ev of rawEvents) {
+      if (ev.type !== "entity.renamed") continue;
+      const from = ev.attributes?.from_name, to = ev.attributes?.to_name;
+      if (from && to) renameMap[from] = to;
+    }
+    for (const ev of rawEvents) {
+      if (ev.entity_id && renameMap[ev.entity_id]) ev.entity_id = renameMap[ev.entity_id];
+    }
+    state.events = rawEvents;
+
+    // Reconcile denormalized membership (attributes.milestone / .t2_parent)
+    // from the relationship fold — the single source of truth. An entity's
+    // frozen entity.created seed can be STALE vs the fold after a reattach or
+    // rename (e.g. M6-analyser -> M1.1-analyser, or a milestone re-tag):
+    // cache-build rewrites the *relationship edges* last-write-wins but leaves
+    // the seed copy in attributes untouched. milestone_progress already reads
+    // the fold (M1.2 D-C); swimlaneKey() reads attributes.milestone/.t2_parent,
+    // so without this the flow view lanes renamed/reattached plans under their
+    // stale seed (a phantom "M6-analyser" lane). Mirror the fold here so every
+    // view groups consistently with milestone_progress and the hierarchy tree.
+    {
+      const ents = state.projection.entities;
+      for (const rel of state.projection.relationships || []) {
+        if (rel.type !== "spawns") continue;
+        const parent = ents[rel.from], child = ents[rel.to];
+        if (!parent || !child) continue;
+        const pa = parent.attributes || {};
+        child.attributes = child.attributes || {};
+        if (pa.plan_kind === "milestone") child.attributes.milestone = parent.entity_id;
+        else if (pa.tier === 2) child.attributes.t2_parent = parent.entity_id;
+      }
+    }
   } catch (e) {
     document.getElementById("content").innerHTML =
       `<p>Failed to load data: ${escapeHtml(e.message)}</p>

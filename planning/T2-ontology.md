@@ -58,7 +58,7 @@ No `commit_ref` field in the JSONL — see T2-storage for git-blame-based resolu
 |---|---|---|
 | `entity.created` | First appearance | No |
 | `entity.extended` | Content added; includes non-additive plan edits (plan changes are inherently additive by methodology) | No |
-| `entity.renamed` | Filename/canonical name moved; identity preserved | **Yes** — decision required |
+| `entity.renamed` | Canonical id migrated old→new (identity migration: history preserved, no phantom, state-neutral). See §3.10, §3.11. | **Yes** — decision required |
 | `entity.progressed` | Work was done but didn't reach closure | No |
 | `entity.completed` | All per-file changes landed; verification claimed | No |
 | `entity.parked` | Explicitly deferred | **Yes** — decision required |
@@ -139,6 +139,8 @@ The terminal state was renamed `dead` → `closed` on 2026-06-01 for operator-fa
 
 Orphan derivation is the only non-trivially-mapped state: it's a graph-state computation, not a per-event mapping. Resolved by emitting one of the clearing events.
 
+`entity.renamed` is **state-neutral** — it is an identity migration, not a lifecycle transition, so it is absent from the event→state map (`cache-build` `STATE_FROM_EVENT`) and never changes `derived_state`. Renaming a `closed` entity keeps it `closed` (no resurrection); renaming a `live` one keeps it `live`. (Added 2026-06-08 with the canonical-id rename capability — see §3.11.)
+
 ### 3.11 ID scheme summary
 
 | Type | Derivation | Example |
@@ -152,7 +154,7 @@ Orphan derivation is the only non-trivially-mapped state: it's a graph-state com
 
 Decisions and persons don't follow per-entity ID schemes — decisions have their `event_id`, persons live in the `actor` field as values.
 
-Renames: canonical ID established at `entity.created` and persists across `entity.renamed`. The rename event records the filename/name change as metadata; the entity ID itself does not change. Enforced by frontmatter-declared `id` on plans — moving the file doesn't change the id inside.
+Renames (corrected 2026-06-08 — **supersedes** the prior "id never changes across rename" rule). `entity.renamed` is an **identity migration**: it MAY change an entity's canonical id, carried in `attributes.from_name` → `attributes.to_name`. `cache-build` folds the rename last-write-wins across (a) the renamed entity's own events, (b) every relationship endpoint (`from_entity_id`/`to_entity_id`, `from_parent`/`to_parent`), and (c) frozen frontmatter seeds (`t2_parent`/`milestone`). Consequences: the entity carries its full history forward under the new id; **children follow for free** (no per-child events — their seed pointing at the old id is remapped); and **no phantom row survives** under the old id. Any non-(`from_name`/`to_name`) attributes on the rename event patch the migrated entity's materialised attrs (e.g. a `milestone_index` change accompanying a renumber). Because the filename is load-bearing (filename = id), a canonical-id rename also moves the plan file. The withdrawn rule ("canonical ID established at entity.created persists across rename; the id itself does not change") made the primitive inert — a renamed entity split into a phantom under the old id. First exercised by the `M6-analyser` → `M1.1-analyser` renumber (2026-06-08). A rename that changes only a human-facing title while *intentionally pinning* the id is still expressible — just keep the id unchanged; pinned-id is now a special case of the general migration, not the universal rule.
 
 Sequential task numbering (e.g. `task-1`, `task-2`) is avoided in favour of semantic slugs to prevent parallel-branch collisions.
 

@@ -97,3 +97,7 @@ This is general — any future reparent (the methodology's "rebase primitive for
 3. **Tree view**: `M6-analyser` renders under `M1-bootstrap` on the milestone axis.
 4. **Schema/validate**: the new events pass `events.schema.json` 0.2.0; full validate chain green.
 5. **Generality smoke**: a throwaway second reattachment of a test child rewrites correctly (last-wins), then removed — confirms the logic isn't M6-special.
+
+---
+
+> **Reversal note (2026-06-08) — appended, not rewritten.** The decision recorded in this plan to **drop the `M6-analyser` → `M1.1-analyser` renumber** and grandfather the flat `M6` label was **reversed** on 2026-06-08. With the `entity.renamed` identity-migration fold now built in `cache-build.py` (old id → new id, folded last-write-wins across the entity's own events, relationship endpoints, and frontmatter seeds; state-neutral, no phantom, children follow for free), the milestone was renumbered to `M1.1-analyser` via a real `entity.renamed` event paired with a `decision`. The reasons this plan gave for dropping it — `entity.renamed` was inert, and churn — no longer hold (the primitive exists; the canonical log is append-only so only 3 events were added). The narrative above is preserved as honest history of the earlier call. See [[T2-ontology]] §3.11, [[T1-top-level]] §2.4/§2.4.0, and [[M1.1-analyser]].
