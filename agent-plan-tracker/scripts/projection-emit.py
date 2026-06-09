@@ -10,8 +10,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE = REPO_ROOT / ".agent-plan-tracker/cache.sqlite"
 OUT = REPO_ROOT / ".agent-plan-tracker/projection.json"
 
-SCHEMA_VERSION = "0.2.0"
-ONTOLOGY_VERSION = "0.2.0"
+SCHEMA_VERSION = "0.3.0"
+ONTOLOGY_VERSION = "0.3.0"
 
 
 def compute_milestone_progress(entities, relationships):
@@ -146,12 +146,13 @@ def main():
             "created_commit_recorded_event_id": row["created_commit_recorded_event_id"],
         }
 
-    state_counts = {s: 0 for s in ("live", "dormant", "closed", "orphaned", "unknown")}
+    state_counts = {s: 0 for s in ("draft", "live", "dormant", "closed", "orphaned", "unknown")}
     for row in conn.execute("SELECT derived_state, count(*) c FROM entities GROUP BY derived_state"):
         state_counts[row["derived_state"]] = row["c"]
     total_events = conn.execute("SELECT count(*) FROM events").fetchone()[0]
     summary_stats = {
         "total_events": total_events,
+        "draft_count": state_counts["draft"],
         "live_count": state_counts["live"],
         "dormant_count": state_counts["dormant"],
         "closed_count": state_counts["closed"],

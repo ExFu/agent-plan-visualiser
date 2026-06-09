@@ -24,6 +24,7 @@ def main():
     lines.append("")
     lines.append(
         f"**Total events:** {stats['total_events']}  ·  "
+        f"**Draft:** {stats['draft_count']}  ·  "
         f"**Live:** {stats['live_count']}  ·  "
         f"**Dormant:** {stats['dormant_count']}  ·  "
         f"**Closed:** {stats['closed_count']}  ·  "
@@ -81,6 +82,22 @@ def main():
             for e in sorted(by_milestone[m], key=lambda x: x["entity_id"]):
                 lines.append(f"  - `{e['entity_id']}`")
             lines.append("")
+
+    # Draft
+    lines.append("## Draft")
+    lines.append("")
+    drafts = [e for e in entities.values() if e["derived_state"] == "draft"]
+    if not drafts:
+        lines.append("_No draft entities._")
+    else:
+        by_type = defaultdict(list)
+        for e in drafts:
+            by_type[e["entity_type"]].append(e)
+        for et in sorted(by_type.keys()):
+            lines.append(f"- **{et}**")
+            for e in sorted(by_type[et], key=lambda x: x["entity_id"]):
+                lines.append(f"  - `{e['entity_id']}`")
+    lines.append("")
 
     # Blocked
     blocked = [e for e in entities.values() if e["entity_type"] == "blocker" and e["derived_state"] == "live"]

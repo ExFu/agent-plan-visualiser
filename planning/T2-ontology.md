@@ -52,12 +52,13 @@ Every event carries:
 
 No `commit_ref` field in the JSONL — see T2-storage for git-blame-based resolution.
 
-### 3.2 Entity lifecycle events (9)
+### 3.2 Entity lifecycle events (10)
 
 | Event | Meaning | Fulcrum? |
 |---|---|---|
 | `entity.created` | First appearance | No |
-| `entity.extended` | Content added; includes non-additive plan edits (plan changes are inherently additive by methodology) | No |
+| `entity.extended` | Content added; includes non-additive plan edits (plan changes are inherently additive by methodology). Draft-preserving: extending a `draft` entity keeps it `draft`; from any other state → `live` (reopens closed/dormant, same as progressed). See §3.10. | No |
+| `entity.accepted` | Entity confirmed as real and actionable; transitions `draft` → `live`. Valid on all 5 entity types. A natural forward confirmation, not a pivot — no paired decision. | No |
 | `entity.renamed` | Canonical id migrated old→new (identity migration: history preserved, no phantom, state-neutral). See §3.10, §3.11. | **Yes** — decision required |
 | `entity.progressed` | Work was done but didn't reach closure | No |
 | `entity.completed` | All per-file changes landed; verification claimed | No |
@@ -97,9 +98,9 @@ No `commit_ref` field in the JSONL — see T2-storage for git-blame-based resolu
 
 - `commit.recorded` — emitted once per commit as the terminal event of that commit's group. Carries `author`, `date`, `message_first_line` in attributes. All preceding events back to the previous `commit.recorded` (or log start) belong to this commit by positional rollup — no explicit event-id list required. Does not carry `entity_type`/`entity_id` (it has no subject entity; it's a boundary marker). An incomplete trailing run of events with no closing `commit.recorded` represents in-progress extraction not yet sealed.
 
-### 3.8 Total: 23 event types
+### 3.8 Total: 26 event types
 
-9 entity lifecycle + 1 decision + 3 blockers + 4 verification + 5 relationships + 1 meta = **23 events**.
+10 entity lifecycle + 1 decision + 3 blockers + 4 verification + 5 relationships + 1 meta + 2 analysis = **26 events**. (The 2 analysis events — `analysis.live-summary`, `analysis.invalidated` — were added in 0.2.0 by the analyser and are specified in [[T2-analyser]], not in a §3.x section here.)
 
 ### 3.9 Graph node taxonomy
 
@@ -123,13 +124,14 @@ The graph contains three categories:
 
 - **persons** — handle or canonical slug in the `actor` field on every event. Searchable as values; not nodes with edges. A person is a fact in a register, not a thing being worked on.
 
-### 3.10 Derived entity states (5)
+### 3.10 Derived entity states (6)
 
 Computed from event history; not directly emitted:
 
 | State | After event(s) |
 |---|---|
-| `live` | created, extended, progressed, reopened |
+| `draft` | created (entity exists and is being authored; awaiting acceptance) |
+| `live` | accepted, extended (except from `draft` — see below), progressed, reopened |
 | `dormant` | parked (could revive via reopened) |
 | `closed` | completed, cancelled, superseded |
 | `orphaned` | Derived: parent superseded AND child has no subsequent `relationship.reattached` / `entity.cancelled` / `entity.superseded` |
@@ -140,6 +142,8 @@ The terminal state was renamed `dead` → `closed` on 2026-06-01 for operator-fa
 Orphan derivation is the only non-trivially-mapped state: it's a graph-state computation, not a per-event mapping. Resolved by emitting one of the clearing events.
 
 `entity.renamed` is **state-neutral** — it is an identity migration, not a lifecycle transition, so it is absent from the event→state map (`cache-build` `STATE_FROM_EVENT`) and never changes `derived_state`. Renaming a `closed` entity keeps it `closed` (no resurrection); renaming a `live` one keeps it `live`. (Added 2026-06-08 with the canonical-id rename capability — see §3.11.)
+
+`entity.extended` is **draft-preserving** — extending a `draft` entity keeps it `draft` (still authoring, not bypassing the acceptance gate). From any other state it maps to `live` as before, reopening closed/dormant entities the same as `entity.progressed`. Implemented as the `DRAFT_PRESERVING` exception set in the `cache-build` state-machine loop rather than a flat map entry, since the outcome depends on the entity's current state. (Added 2026-06-09 with the draft→accepted lifecycle, schema 0.3.0 — see [[T3-entity-accepted]].)
 
 ### 3.11 ID scheme summary
 

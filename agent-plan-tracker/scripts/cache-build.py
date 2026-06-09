@@ -14,11 +14,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVENTS = REPO_ROOT / ".agent-plan-tracker/events.jsonl"
 CACHE = REPO_ROOT / ".agent-plan-tracker/cache.sqlite"
-SCHEMA_DDL = REPO_ROOT / "agent-plan-tracker/schemas/0.2.0/cache.schema.sql"
+SCHEMA_DDL = REPO_ROOT / "agent-plan-tracker/schemas/0.3.0/cache.schema.sql"
 
 STATE_FROM_EVENT = {
-    "entity.created": "live",
+    "entity.created": "draft",
     "entity.extended": "live",
+    "entity.accepted": "live",
     # entity.renamed is intentionally ABSENT: it is state-neutral (an identity
     # migration, not a lifecycle transition), so renaming a closed entity must
     # NOT flip it back to live. See the rename pre-scan in main() and
@@ -30,6 +31,11 @@ STATE_FROM_EVENT = {
     "entity.superseded": "closed",
     "entity.reopened": "live",
 }
+# Draft-preserving events: extending a draft entity keeps it draft (still
+# authoring, not bypassing the acceptance gate). From any other state,
+# entity.extended maps to live as usual (reopening closed/dormant entities,
+# same as entity.progressed). See T2-ontology §3.10 / T3-entity-accepted.
+DRAFT_PRESERVING = {"entity.extended"}
 RELATIONSHIP_TYPES = {
     "relationship.spawns": "spawns",
     "relationship.depends-on": "depends-on",
@@ -195,7 +201,9 @@ def main():
         e["sequence"].append(ev["type"])
         e["last_event_id"] = ev["event_id"]
         new_state = STATE_FROM_EVENT.get(ev["type"])
-        if new_state:
+        # Draft-preserving exception: entity.extended on a draft entity keeps
+        # it draft (authoring continues; acceptance is a separate gate).
+        if new_state and not (ev["type"] in DRAFT_PRESERVING and e["state"] == "draft"):
             e["state"] = new_state
         if ev["type"] == "entity.created":
             e["attrs"] = ev.get("attributes", {})
