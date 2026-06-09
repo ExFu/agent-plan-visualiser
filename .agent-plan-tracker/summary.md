@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-09T21:43:02Z
+# Project state — generated 2026-06-09T21:51:00Z
 
-**Total events:** 306  ·  **Draft:** 15  ·  **Live:** 7  ·  **Dormant:** 0  ·  **Closed:** 35  ·  **Orphaned:** 0
+**Total events:** 311  ·  **Draft:** 11  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 35  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -17,6 +17,26 @@
   - `T2-projection` (14 events): analysis.invalidated → entity.progressed → entity.extended
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
 
+- **(milestone)**
+  - `M3-clean-gate` (3 events): entity.created → relationship.spawns → entity.accepted
+
+- **T2-extraction**
+  - `T3-apt-merge-skill` (3 events): entity.created → relationship.spawns → entity.accepted
+  - `T3-gate-core` (3 events): entity.created → relationship.spawns → entity.accepted
+
+- **T2-projection**
+  - `T3-integrity-composite` (3 events): entity.created → relationship.spawns → entity.accepted
+
+### By milestone
+
+- **(self: M3-clean-gate)**
+  - `M3-clean-gate`
+
+- **M3-clean-gate**
+  - `T3-apt-merge-skill`
+  - `T3-gate-core`
+  - `T3-integrity-composite`
+
 ## Draft
 
 - **inbox-item**
@@ -31,11 +51,7 @@
   - `2026-05-23.snapshot-trigger-config`
   - `2026-05-23.verification-overhaul-candidate-model`
 - **plan**
-  - `M3-clean-gate`
   - `T2-ingest`
-  - `T3-apt-merge-skill`
-  - `T3-gate-core`
-  - `T3-integrity-composite`
 
 ## Blocked
 
@@ -68,7 +84,7 @@ _No flapping closures._
 - **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
-- **M3-clean-gate**: 0/3 T3 complete (0%); 0 live
+- **M3-clean-gate**: 0/3 T3 complete (0%); 3 live
 
 ---
 _57 entities · 75 relationships · 13 decisions._
