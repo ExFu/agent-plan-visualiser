@@ -61,7 +61,7 @@ You (the in-session agent) are the extractor. You have full session context: you
 
 ### Meta (1)
 
-`commit.recorded` — the seal. Always **last** in the block. Attributes: `author`, `date` (YYYY-MM-DD), `message_first_line` — which must match the upcoming git commit's first line **exactly**. Recent practice also sets `entity_type`/`entity_id` to the commit's primary entity (ontology §3.7 says omit; ruling pending — see inbox `2026-06-09.commit-recorded-entity-subject-drift`; follow recent practice until ruled).
+`commit.recorded` — the seal. Always **last** in the block. Attributes: `author`, `date` (YYYY-MM-DD), `message_first_line` — which must match the upcoming git commit's first line **exactly**. Carries **no** `entity_type`/`entity_id` (ruled 2026-06-09): a commit may affect many entities and none is privileged at write time — commit↔plan grouping is projection-time work over the positional rollup, not a write-time annotation. (16 seals from the 0.2.0–0.3.0 era do carry entity fields; that is historic drift, preserved append-only — do not imitate.)
 
 ### Analysis (2)
 
@@ -90,7 +90,7 @@ You (the in-session agent) are the extractor. You have full session context: you
 
 ## 4. The draft gate ⛔
 
-**No implementation work may be recorded against a `draft` entity.** Before emitting `entity.progressed`, check the entity's current derived state:
+**No implementation work may be recorded against a `draft` entity.** Before emitting `entity.progressed` **or `entity.completed`** (both record implementation work — a draft must not be progressed *or* sealed closed unreviewed), check the entity's current derived state:
 
 ```bash
 sqlite3 "$DATA_DIR/cache.sqlite" "SELECT derived_state FROM entities WHERE entity_id='<id>';"
@@ -98,7 +98,7 @@ sqlite3 "$DATA_DIR/cache.sqlite" "SELECT derived_state FROM entities WHERE entit
 
 (If the cache is stale, rebuild via `python3 agent-plan-tracker/scripts/cache-build.py`, or scan the entity's event history in the log tail.)
 
-- State `draft` → **stop**. Ask the operator to accept the plan. On their confirmation, emit `entity.accepted` (their say-so is the event), *then* `entity.progressed`. Never silently progress a draft, and never self-accept.
+- State `draft` → **stop**. Ask the operator to accept the entity. On their confirmation, emit `entity.accepted` (their say-so is the event), *then* the lifecycle event. Never silently progress or complete a draft, and never self-accept. **One carve-out**: `implicit-work` created-and-completed in the same block (the planless-commit pattern) passes through draft transiently by design — no acceptance needed.
 - `entity.extended` (refining the entity's own document) is valid in any state, including draft — authoring is not implementation.
 - Code changes serving a draft plan with no operator available ⇒ the work waits, or the operator's standing instructions govern. The gate exists so plans are reviewed before they steer implementation.
 
@@ -108,7 +108,7 @@ Every event:
 
 - `event_id` — fresh UUID v4. Never reuse.
 - `type` — from §2.
-- `entity_type` / `entity_id` — required for all events **except** `decision` and (per pending ruling) `commit.recorded`.
+- `entity_type` / `entity_id` — required for all events **except** `decision` and `commit.recorded` (both subject-less).
 - `actor` — who did/decided the work (handle, e.g. `"al"`). Acceptance events carry the accepting operator.
 - `confidence` — `explicit` (stated in plan/commit/conversation) or `derived` (inferred).
 - `schema_version` — `"0.3.0"`.
@@ -129,20 +129,26 @@ with open(EVENTS_PATH, "a") as f:
 ## 6. Validate, then timestamp
 
 1. `bash agent-plan-tracker/scripts/repack-validate.sh` — must pass end-to-end (honours `APT_DATA_DIR`). A failure means your block is malformed: fix by appending nothing further until you understand it; ask the operator if unclear. (Pre-seal you may correct an uncommitted block only by consulting the operator — the default remains append-only.)
-2. Write the capture timestamp — **the very last action**, consumed by the capture-guard pre-commit hook (gitignored local state):
+2. Sanity-check derived states for the entities your block touched — closures show `closed`, new untriaged items show `draft`:
+
+```bash
+sqlite3 "$DATA_DIR/cache.sqlite" "SELECT entity_id, derived_state FROM entities WHERE entity_id IN ('<id1>','<id2>');"
+```
+
+3. Write the capture timestamp — **the very last action**, consumed by the capture-guard pre-commit hook (gitignored local state):
 
 ```bash
 date +%s > "$DATA_DIR/.last-capture"
 ```
 
-Then commit. The git commit's first line must match your seal's `message_first_line`.
+Then commit. The git commit's first line must match your seal's `message_first_line`. **Touch nothing after writing `.last-capture`** — the guard hook rejects staged files newer than it. If something must change anyway: substantive change → append events, re-validate, re-timestamp; mechanical fix-up → re-validate, re-timestamp.
 
 ## 7. What NOT to do
 
 - **Don't emit lifecycle events on closed entities just because their files were touched** (the `2026-05-30.progressed-after-completed-state-flip` lesson — `progressed` would resurrect them). Post-completion theme work targets the live T2 parent; genuine continuation needs `entity.reopened` + decision; bug-fix follow-on spawns a new T3.
 - **Don't emit events for derived artefacts** — `cache.sqlite`, `projection.json`, `summary.md` are rebuilt, not tracked.
 - **Don't guess entity IDs** — read frontmatter or the log.
-- **Don't progress a draft** (§4) and **don't self-accept**.
+- **Don't progress or complete a draft** (§4) and **don't self-accept**.
 - **Don't edit or reorder prior lines, ever.** Append-only.
 - **Don't seal with a message you don't then use** — seal and commit message must match.
 
@@ -154,7 +160,7 @@ Work done: extended plan `T3-foo` (accepted, live) and completed it after a gree
 {"event_id": "<uuid4>", "type": "entity.extended", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"summary": "Resolved open question 2 (chose X over Y) while implementing."}}
 {"event_id": "<uuid4>", "type": "verification.tested", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"test_type": "smoke", "command": "bash scripts/run-checks.sh", "result": "pass", "summary": "All checks green after the change."}}
 {"event_id": "<uuid4>", "type": "entity.completed", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"summary": "T3-foo delivered: X implemented, checks green."}}
-{"event_id": "<uuid4>", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"author": "al", "date": "2026-06-09", "message_first_line": "feat(T3-foo): implement X; checks green"}}
+{"event_id": "<uuid4>", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-06-09", "message_first_line": "feat(T3-foo): implement X; checks green"}}
 ```
 
 Then: repack-validate green → write `.last-capture` → `git commit`.

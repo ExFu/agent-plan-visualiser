@@ -7,7 +7,7 @@ status: planned
 
 # M2-auto-extract — Automated event capture takes over
 
-**Status**: Planned. Design reframed 2026-06-08 (supersedes the 2026-06-02 draft which over-engineered the extraction as a separate program rather than agent instructions). T3s enumerated below; files authored as each becomes active scope.
+**Status**: Done (2026-06-09). All five T3s delivered; cutover performed via the organic-evidence variant (see T3-cutover-to-auto) with the capture-guard hook live. Design reframed 2026-06-08 (supersedes the 2026-06-02 draft which over-engineered the extraction as a separate program rather than agent instructions).
 **Sits at**: Second milestone in the sequence axis. Primary theme: T2-extraction. Touches T2-storage (configurable data dir), T2-packaging (the skill ships in the plugin).
 
 ---
@@ -93,12 +93,12 @@ M2 is complete when:
 - The **capture-guard hook** rejects commits when staged changes postdate `.last-capture`.
 - **Cutover performed**: the operator has eyeballed shadow output, config points at the canonical `.agent-plan-tracker/`, ≥1 real commit's events are captured via the skill, `repack-validate.sh` passes, and the cutover is recorded as a `decision`.
 
-## 7. Open questions (M2-specific)
+## 7. Resolved questions (M2-specific)
 
-1. **Skill naming.** `/apt-capture`, `/apt-save`, or something else? The name should convey "record what just happened as events" rather than "extract from history." Resolve in `T3-apt-capture-skill`.
-2. **Timestamp granularity.** Does `.last-capture` need sub-second precision, or is second-level sufficient for the guard hook? Lean second-level; filesystem timestamps are typically second-granularity anyway.
-3. **Hook installation.** M2 documents how to install the capture-guard hook manually (copy into `.git/hooks/pre-commit`). Automated idempotent installation is M4 scope. Should M2 also ship a one-liner install script as a convenience? Lean yes.
-4. **Skill location.** `skills/` or `commands/`? A skill is passive instructions the agent reads when invoked; a command can carry executable logic. `/apt-capture` is instructions — leans `skills/`. Resolve alongside T2-packaging conventions.
+1. ~~**Skill naming.**~~ **RESOLVED** (T3-apt-capture-skill): `/apt-capture` — conveys "record what just happened as events" and matches the guard's `.last-capture` vocabulary.
+2. ~~**Timestamp granularity.**~~ **RESOLVED** (T3-capture-guard-hook): second-level — `date +%s` and `stat` epoch-seconds match filesystem mtime granularity.
+3. ~~**Hook installation.**~~ **RESOLVED** (T3-capture-guard-hook): yes — `scripts/install-hook.sh` shipped (idempotent; never clobbers a differing existing hook). Automated install at project-init remains M4.
+4. ~~**Skill location.**~~ **RESOLVED** (T3-apt-capture-skill): `skills/` — purely instructional, no executable payload.
 
 ## 8. Dependencies
 

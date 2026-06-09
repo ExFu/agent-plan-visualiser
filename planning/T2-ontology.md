@@ -96,7 +96,7 @@ No `commit_ref` field in the JSONL — see T2-storage for git-blame-based resolu
 
 ### 3.7 Meta (1)
 
-- `commit.recorded` — emitted once per commit as the terminal event of that commit's group. Carries `author`, `date`, `message_first_line` in attributes. All preceding events back to the previous `commit.recorded` (or log start) belong to this commit by positional rollup — no explicit event-id list required. Does not carry `entity_type`/`entity_id` (it has no subject entity; it's a boundary marker). An incomplete trailing run of events with no closing `commit.recorded` represents in-progress extraction not yet sealed.
+- `commit.recorded` — emitted once per commit as the terminal event of that commit's group. Carries `author`, `date`, `message_first_line` in attributes. All preceding events back to the previous `commit.recorded` (or log start) belong to this commit by positional rollup — no explicit event-id list required. Does not carry `entity_type`/`entity_id` (it has no subject entity; it's a boundary marker). An incomplete trailing run of events with no closing `commit.recorded` represents in-progress extraction not yet sealed. **Historic drift note (ruled 2026-06-09)**: 16 seals from the 0.2.0–0.3.0 era carry `entity_type`/`entity_id` — write-time drift, ruled invalid (a commit may affect many entities; none is privileged at write time; commit↔plan grouping is projection-time work — see inbox `2026-06-09.commit-recorded-entity-subject-drift`). Those seals are preserved append-only; projections must not rely on seal subjects.
 
 ### 3.8 Total: 26 event types
 

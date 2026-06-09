@@ -9,7 +9,7 @@ status: draft
 
 # T3-cutover-to-auto — Validate in shadow, eyeball, flip to canonical
 
-**Status**: Draft.
+**Status**: Done (2026-06-09). Executed via the **organic-evidence variant**: reality outpaced the designed shadow phase — the skill's first two uses (`3acb6b0` self-referential, `b9dd4b7` fresh-context agent) were already canonical and repack-green, so the operator blessed those as the validation evidence instead of synthetic shadow commits. Guard hook installed live before the close-out commit; cutover decision recorded; shadow dir already clean.
 **Sits at**: T2-extraction theme, M2-auto-extract milestone. Final T3 — depends on the other three.
 
 ---

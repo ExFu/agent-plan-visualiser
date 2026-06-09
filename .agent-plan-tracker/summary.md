@@ -1,35 +1,21 @@
-# Project state — generated 2026-06-09T19:54:12Z
+# Project state — generated 2026-06-09T20:26:49Z
 
-**Total events:** 283  ·  **Draft:** 12  ·  **Live:** 9  ·  **Dormant:** 0  ·  **Closed:** 32  ·  **Orphaned:** 0
+**Total events:** 294  ·  **Draft:** 11  ·  **Live:** 7  ·  **Dormant:** 0  ·  **Closed:** 35  ·  **Orphaned:** 0
 
 ## Live work
 
 ### By thematic parent
 
 - **(T1 itself)**
-  - `T1-top-level` (34 events): entity.extended → entity.extended → entity.accepted
+  - `T1-top-level` (35 events): entity.extended → entity.accepted → entity.extended
 
 - **(T2 itself)**
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
-  - `T2-extraction` (5 events): entity.extended → entity.extended → entity.accepted
-  - `T2-ontology` (7 events): entity.extended → entity.extended → entity.extended
+  - `T2-extraction` (6 events): entity.extended → entity.accepted → entity.progressed
+  - `T2-ontology` (8 events): entity.extended → entity.extended → entity.extended
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
   - `T2-projection` (13 events): entity.progressed → analysis.invalidated → entity.progressed
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
-
-- **(milestone)**
-  - `M2-auto-extract` (9 events): entity.extended → entity.accepted → commit.recorded
-
-- **T2-extraction**
-  - `T3-cutover-to-auto` (3 events): entity.created → relationship.spawns → entity.accepted
-
-### By milestone
-
-- **(self: M2-auto-extract)**
-  - `M2-auto-extract`
-
-- **M2-auto-extract**
-  - `T3-cutover-to-auto`
 
 ## Draft
 
@@ -44,7 +30,6 @@
   - `2026-05-23.side-quest-formalisation`
   - `2026-05-23.snapshot-trigger-config`
   - `2026-05-23.verification-overhaul-candidate-model`
-  - `2026-06-09.commit-recorded-entity-subject-drift`
 - **plan**
   - `T2-ingest`
 
@@ -61,13 +46,13 @@ _No orphaned entities._
 - `2026-05-27.agents-emit-entity-created-for-plans` (inbox-item)
 - `2026-05-27.outstanding-work-analyser-endpoint` (inbox-item)
 - `2026-05-30.progressed-after-completed-state-flip` (inbox-item)
+- `2026-06-09.commit-recorded-entity-subject-drift` (inbox-item)
 - `M1-bootstrap` (plan)
 - `M1.1-analyser` (plan)
 - `M1.2-relationship-ssot` (plan)
+- `M2-auto-extract` (plan)
 - `T3-analyser-live-model-catalog` (plan)
 - `T3-analyser-phase-a-ephemeral` (plan)
-- `T3-analyser-phase-b-persistence` (plan)
-- `T3-analyser-phase-c-flow-rendering` (plan)
 
 ## Notable patterns
 
@@ -78,7 +63,7 @@ _No flapping closures._
 - **M1-bootstrap**: 15/15 T3 complete (100%); 0 live
 - **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
-- **M2-auto-extract**: 4/5 T3 complete (80%); 1 live
+- **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 
 ---
-_53 entities · 68 relationships · 10 decisions._
+_53 entities · 68 relationships · 12 decisions._
