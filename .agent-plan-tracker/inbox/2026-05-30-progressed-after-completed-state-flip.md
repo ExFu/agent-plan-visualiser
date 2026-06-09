@@ -2,7 +2,7 @@
 id: 2026-05-30.progressed-after-completed-state-flip
 entity_type: inbox-item
 created_at: 2026-05-30
-status: open
+status: closed
 candidate_fate: methodology-note
 ---
 

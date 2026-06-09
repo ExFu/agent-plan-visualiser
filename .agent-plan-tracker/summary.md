@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-09T12:36:30Z
+# Project state — generated 2026-06-09T18:07:11Z
 
-**Total events:** 244  ·  **Live:** 25  ·  **Dormant:** 0  ·  **Closed:** 26  ·  **Orphaned:** 0
+**Total events:** 248  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Closed:** 28  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -32,8 +32,6 @@
   - `2026-05-23.side-quest-formalisation` (1 events): entity.created
   - `2026-05-23.snapshot-trigger-config` (1 events): entity.created
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
-  - `2026-05-27.agents-emit-entity-created-for-plans` (1 events): entity.created
-  - `2026-05-30.progressed-after-completed-state-flip` (1 events): entity.created
 
 - **T2-extraction**
   - `T3-apt-capture-skill` (2 events): entity.created → relationship.spawns
@@ -64,7 +62,9 @@ _No orphaned entities._
 
 ## Recently closed
 
+- `2026-05-27.agents-emit-entity-created-for-plans` (inbox-item)
 - `2026-05-27.outstanding-work-analyser-endpoint` (inbox-item)
+- `2026-05-30.progressed-after-completed-state-flip` (inbox-item)
 - `M1-bootstrap` (plan)
 - `M1.1-analyser` (plan)
 - `M1.2-relationship-ssot` (plan)
@@ -72,8 +72,6 @@ _No orphaned entities._
 - `T3-analyser-phase-a-ephemeral` (plan)
 - `T3-analyser-phase-b-persistence` (plan)
 - `T3-analyser-phase-c-flow-rendering` (plan)
-- `T3-analyser-phase-d-cascade-invalidation` (plan)
-- `T3-analyser-phase-e-global-mode` (plan)
 
 ## Notable patterns
 
@@ -87,4 +85,4 @@ _No flapping closures._
 - **M2-auto-extract**: 0/4 T3 complete (0%); 4 live
 
 ---
-_51 entities · 66 relationships · 7 decisions._
+_51 entities · 66 relationships · 8 decisions._

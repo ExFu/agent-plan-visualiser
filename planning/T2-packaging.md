@@ -113,12 +113,12 @@ Version bumps to `0.1.0` when M1 lands fully; semver from there.
 - For ontology/schema questions, go to `skills/using-agent-plan-tracker/SKILL.md` (the formal spec). For common operations, `cheatsheet/cheatsheet.md`. For worked scenarios, `cheatsheet/worked-examples/`. The formal spec is the floor, not the everyday surface.
 - The `philosophies/` content grounds judgement calls when instructions don't anticipate something.
 
-### 3.5 Repack-and-test loop (M1)
+### 3.5 Repack-and-test loop
 
-- `scripts/repack-validate.sh` — checks plugin structure, validates schemas, parses manifest, confirms no broken refs. Runs after each substantive change to catch bugs early.
+- `scripts/repack-validate.sh` — orchestrates the full pipeline validation+build (events → frontmatter → cache → projection → summary → SQL audits). Runs after each substantive change to catch bugs early.
 - M1 keeps this local-only; M4 makes it part of CI.
 
-Smoke validations:
+Plugin-structure smoke validations (M2-scoped — vacuously true until skills/hooks/commands are populated):
 - `plugin.json` parses as JSON.
 - Every skill has a `SKILL.md` (no orphan `skills/<name>/` dirs).
 - Every hook script referenced in `hooks.json` exists.

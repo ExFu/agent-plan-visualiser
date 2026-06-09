@@ -2,7 +2,7 @@
 id: 2026-05-27.agents-emit-entity-created-for-plans
 entity_type: inbox-item
 created_at: 2026-05-27
-status: open
+status: closed
 candidate_fate: t3
 ---
 
