@@ -22,7 +22,7 @@ The previous M2 draft (2026-06-02) designed a "shared extraction core module" li
 
 When the agent runs `/apt-capture`, it reads the skill's instructions and then **does the work itself** — it already has full session context, knows what it just did, knows the ontology, knows the schema. The skill codifies the hand-rolling discipline that's currently spread across CLAUDE.md memory entries, the ontology T2, and tribal knowledge from dogfooding:
 
-- How to emit well-formed schema-`0.2.0` events.
+- How to emit well-formed schema-`0.3.0` events.
 - The entity-type identification rules (plan ID from frontmatter, inbox-item from date.slug, etc.).
 - The `entity.created`-must-come-first rule (with frontmatter attributes).
 - Fulcrum-decision pairing (which 5 events require a paired `decision`).
@@ -71,22 +71,25 @@ This enforces "you can't commit without capturing events" at near-zero cost (a t
 
 ## 5. How M2 delivers — T3 tasks
 
-Four T3s. Dependency order in brackets.
+Five T3s. Dependency order in brackets.
 
-1. **`T3-configurable-data-dir`** [foundation, parallel to #2] — *T2-storage.* A shared path resolver: `APT_DATA_DIR` env var → optional committed config default → `.agent-plan-tracker/`. Repoint `cache-build.py`, `projection-emit.py`, `summary-emit.py`, `serve.py` to use it instead of hardcoding. Gitignore `.agent-plan-tracker-auto/`. Permanent product capability (M4 installs need it too).
+1. **`T3-entity-accepted`** [foundation, parallel to #2] — *T2-ontology.* Add the draft→accepted lifecycle for all planning entities: new `entity.accepted` standard event (draft→live, all 5 entity types, not a fulcrum), new `draft` derived state (`entity.created` now lands `draft`, was `live`), `entity.extended` becomes draft-preserving (otherwise unchanged — still reopens closed entities, same as `entity.progressed`). Schema bump `0.2.0`→`0.3.0`. The capture skill consumes this to enforce "no implementation work on draft entities."
 
-2. **`T3-apt-capture-skill`** [foundation, parallel to #1] — *T2-extraction.* The skill (or command) that codifies the event-capture discipline for the in-session agent. Contains: the ontology summary at schema `0.2.0`, entity identification rules, the `entity.created`-first rule, fulcrum-decision pairing rules, `commit.recorded` semantics, the append-only accumulation model, and the instruction to write `.last-capture` on completion. **This is the M2 headline deliverable.** Name TBD — `/apt-capture` is the working candidate; `/apt-save` is an alternative.
+2. **`T3-configurable-data-dir`** [foundation, parallel to #1] — *T2-storage.* A shared path resolver: `APT_DATA_DIR` env var → optional committed config default → `.agent-plan-tracker/`. Repoint `cache-build.py`, `projection-emit.py`, `summary-emit.py`, `serve.py` to use it instead of hardcoding. Gitignore `.agent-plan-tracker-auto/`. Permanent product capability (M4 installs need it too).
 
-3. **`T3-capture-guard-hook`** [depends #2] — *T2-extraction.* A pre-commit hook (tiny shell script, no LLM) that rejects commits when staged files are newer than `.last-capture`. Installation instructions in the skill; automated installer deferred to M4. `.last-capture` is gitignored and untracked.
+3. **`T3-apt-capture-skill`** [depends #1] — *T2-extraction.* The skill (or command) that codifies the event-capture discipline for the in-session agent. Contains: the ontology summary at schema `0.3.0`, entity identification rules, the `entity.created`-first rule, the **draft gate** (no `entity.progressed` against draft entities — implementation work requires acceptance; `entity.extended` is valid any time), fulcrum-decision pairing rules, `commit.recorded` semantics, the append-only accumulation model, and the instruction to write `.last-capture` on completion. **This is the M2 headline deliverable.** Name TBD — `/apt-capture` is the working candidate; `/apt-save` is an alternative.
 
-4. **`T3-cutover-to-auto`** [depends #1, #2, #3] — *T2-extraction.* Run `/apt-capture` in the shadow dir for a stretch of real work on this project; operator eyeballs the output; flip the config to canonical; record the cutover `decision`; produce ≥1 real commit's events via the skill into the canonical log; confirm `repack-validate.sh` green.
+4. **`T3-capture-guard-hook`** [depends #3] — *T2-extraction.* A pre-commit hook (tiny shell script, no LLM) that rejects commits when staged files are newer than `.last-capture`. Installation instructions in the skill; automated installer deferred to M4. `.last-capture` is gitignored and untracked.
+
+5. **`T3-cutover-to-auto`** [depends #1–#4] — *T2-extraction.* Run `/apt-capture` in the shadow dir for a stretch of real work on this project; operator eyeballs the output; flip the config to canonical; record the cutover `decision`; produce ≥1 real commit's events via the skill into the canonical log; confirm `repack-validate.sh` green.
 
 ## 6. Definition of done
 
 M2 is complete when:
 
+- The **draft→accepted lifecycle** is live: `entity.accepted` exists at schema `0.3.0`, `entity.created` lands entities in `draft`, `entity.extended` is draft-preserving, and the pipeline (cache/projection/summary) reports draft state.
 - The data directory is **configurable** via `APT_DATA_DIR`; every pipeline script honours it.
-- The `/apt-capture` skill exists and the in-session agent can follow it to produce well-formed schema-`0.2.0` events — including `entity.created` with attributes, fulcrum-decision pairing, and `commit.recorded` as seal.
+- The `/apt-capture` skill exists and the in-session agent can follow it to produce well-formed schema-`0.3.0` events — including `entity.created` with attributes (landing in `draft`), the draft gate (no `entity.progressed` on drafts), fulcrum-decision pairing, and `commit.recorded` as seal.
 - The **capture-guard hook** rejects commits when staged changes postdate `.last-capture`.
 - **Cutover performed**: the operator has eyeballed shadow output, config points at the canonical `.agent-plan-tracker/`, ≥1 real commit's events are captured via the skill, `repack-validate.sh` passes, and the cutover is recorded as a `decision`.
 
@@ -100,7 +103,7 @@ M2 is complete when:
 ## 8. Dependencies
 
 - **M1-bootstrap** (complete) — the pipeline M2 feeds (cache/projection/summary/view) already works.
-- **T2-ontology** — the `0.2.0` schema the skill targets.
+- **T2-ontology** — the `0.3.0` schema the skill targets (bumped from `0.2.0` by `T3-entity-accepted`).
 - **T2-storage** — owns `T3-configurable-data-dir`.
 - **T2-packaging** — the skill ships in the plugin.
 

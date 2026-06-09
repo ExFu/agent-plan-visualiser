@@ -190,6 +190,9 @@ JSON Schema is the chosen spec format (resolved this T2).
 - `T3-events-schema-json` — draft `schemas/0.1.0/events.schema.json` covering all 23 event types. Acceptance: validates `.agent-plan-tracker/events.jsonl` after retro-migration of prehistoric events.
 - `T3-plan-frontmatter-schema` — draft `schemas/0.1.0/plan-frontmatter.schema.json`. Acceptance: validates frontmatter of every plan file currently in `planning/`.
 
+### M2-scheduled
+- `T3-entity-accepted` — first deliberate ontology evolution (`0.2.0`→`0.3.0`): new `entity.accepted` standard event (draft→live, all 5 entity types, not a fulcrum), new `draft` derived state (`entity.created` lands `draft`), `entity.extended` becomes draft-preserving (otherwise still reopens). Authored; see plan file.
+
 ### Later
 - `T3-schema-versioning-discipline` (M2) — formal versioning + migration rules once first schema evolution arrives.
 - `T3-ontology-prose-sync` — script diffs T2-ontology prose against schema, flags divergence (M1 stretch or M3).

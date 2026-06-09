@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-09T18:07:11Z
+# Project state — generated 2026-06-09T19:11:32Z
 
-**Total events:** 248  ·  **Live:** 23  ·  **Dormant:** 0  ·  **Closed:** 28  ·  **Orphaned:** 0
+**Total events:** 254  ·  **Live:** 24  ·  **Dormant:** 0  ·  **Closed:** 28  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -13,13 +13,13 @@
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
   - `T2-extraction` (4 events): relationship.spawns → entity.extended → entity.extended
   - `T2-ingest` (2 events): entity.created → relationship.spawns
-  - `T2-ontology` (5 events): entity.extended → entity.progressed → entity.extended
+  - `T2-ontology` (6 events): entity.progressed → entity.extended → entity.extended
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
   - `T2-projection` (13 events): entity.progressed → analysis.invalidated → entity.progressed
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(milestone)**
-  - `M2-auto-extract` (6 events): entity.extended → commit.recorded → commit.recorded
+  - `M2-auto-extract` (7 events): commit.recorded → commit.recorded → entity.extended
 
 - **(non-plan: inbox-item)**
   - `2026-05-23.autopilot-misuse-meta-observation` (1 events): entity.created
@@ -34,9 +34,12 @@
   - `2026-05-23.verification-overhaul-candidate-model` (1 events): entity.created
 
 - **T2-extraction**
-  - `T3-apt-capture-skill` (2 events): entity.created → relationship.spawns
+  - `T3-apt-capture-skill` (3 events): entity.created → relationship.spawns → entity.extended
   - `T3-capture-guard-hook` (2 events): entity.created → relationship.spawns
   - `T3-cutover-to-auto` (2 events): entity.created → relationship.spawns
+
+- **T2-ontology**
+  - `T3-entity-accepted` (3 events): entity.created → relationship.spawns → commit.recorded
 
 - **T2-storage**
   - `T3-configurable-data-dir` (2 events): entity.created → relationship.spawns
@@ -51,6 +54,7 @@
   - `T3-capture-guard-hook`
   - `T3-configurable-data-dir`
   - `T3-cutover-to-auto`
+  - `T3-entity-accepted`
 
 ## Blocked
 
@@ -82,7 +86,7 @@ _No flapping closures._
 - **M1-bootstrap**: 15/15 T3 complete (100%); 0 live
 - **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
-- **M2-auto-extract**: 0/4 T3 complete (0%); 4 live
+- **M2-auto-extract**: 0/5 T3 complete (0%); 5 live
 
 ---
-_51 entities · 66 relationships · 8 decisions._
+_52 entities · 68 relationships · 8 decisions._
