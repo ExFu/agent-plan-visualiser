@@ -4,6 +4,7 @@
 - Inserts raw events; applies state-machine to materialise entities/relationships/decisions/commits.
 - Runs `git blame --line-porcelain` to populate commit_ref + denormalised commit_meta on events.
 - Idempotent: wipes tables before rebuild.
+- Data dir defaults to .agent-plan-tracker/; override with APT_DATA_DIR (aptlib.apt_data_dir).
 """
 import datetime
 import json
@@ -11,9 +12,12 @@ import sqlite3
 import subprocess
 from pathlib import Path
 
+import aptlib
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVENTS = REPO_ROOT / ".agent-plan-tracker/events.jsonl"
-CACHE = REPO_ROOT / ".agent-plan-tracker/cache.sqlite"
+DATA_DIR = aptlib.apt_data_dir(REPO_ROOT)
+EVENTS = DATA_DIR / "events.jsonl"
+CACHE = DATA_DIR / "cache.sqlite"
 SCHEMA_DDL = REPO_ROOT / "agent-plan-tracker/schemas/0.3.0/cache.schema.sql"
 
 STATE_FROM_EVENT = {

@@ -3,7 +3,10 @@
 # Usage: validate-events.sh [schema-path] [events-path]
 set -uo pipefail
 SCHEMA="${1:-agent-plan-tracker/schemas/0.3.0/events.schema.json}"
-EVENTS="${2:-.agent-plan-tracker/events.jsonl}"
+# Data dir defaults to .agent-plan-tracker/; override with APT_DATA_DIR
+# (relative paths resolve against the cwd, expected to be the repo root).
+DATA_DIR="${APT_DATA_DIR:-.agent-plan-tracker}"
+EVENTS="${2:-${DATA_DIR}/events.jsonl}"
 
 if ! command -v check-jsonschema >/dev/null 2>&1; then
   echo "check-jsonschema not installed; trying python3 fallback..." >&2

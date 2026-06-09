@@ -25,14 +25,18 @@ run_step() {
 
 cd "$(dirname "$0")/../.." || exit 2
 
+# Data dir defaults to .agent-plan-tracker/; override with APT_DATA_DIR
+# (the Python steps resolve it themselves via aptlib.apt_data_dir).
+DATA_DIR="${APT_DATA_DIR:-.agent-plan-tracker}"
+
 run_step "validate events.jsonl"          bash agent-plan-tracker/scripts/validate-events.sh           || exit 1
 run_step "validate plan frontmatter"      bash agent-plan-tracker/scripts/validate-plan-frontmatter.sh || exit 1
 run_step "rebuild SQLite cache"           python3 agent-plan-tracker/scripts/cache-build.py            || exit 1
 run_step "emit projection.json"           python3 agent-plan-tracker/scripts/projection-emit.py        || exit 1
 run_step "emit summary.md"                python3 agent-plan-tracker/scripts/summary-emit.py           || exit 1
-run_step "audit-stalled"                  sh -c "sqlite3 .agent-plan-tracker/cache.sqlite < agent-plan-tracker/scripts/audit-stalled.sql" || exit 1
-run_step "audit-fulcrum-without-decision" sh -c "sqlite3 .agent-plan-tracker/cache.sqlite < agent-plan-tracker/scripts/audit-fulcrum-without-decision.sql" || exit 1
-run_step "audit-orphans"                  sh -c "sqlite3 .agent-plan-tracker/cache.sqlite < agent-plan-tracker/scripts/audit-orphans.sql" || exit 1
+run_step "audit-stalled"                  sh -c "sqlite3 ${DATA_DIR}/cache.sqlite < agent-plan-tracker/scripts/audit-stalled.sql" || exit 1
+run_step "audit-fulcrum-without-decision" sh -c "sqlite3 ${DATA_DIR}/cache.sqlite < agent-plan-tracker/scripts/audit-fulcrum-without-decision.sql" || exit 1
+run_step "audit-orphans"                  sh -c "sqlite3 ${DATA_DIR}/cache.sqlite < agent-plan-tracker/scripts/audit-orphans.sql" || exit 1
 
 echo
 echo "${GREEN}All ${#PASS[@]} steps passed.${RESET}"

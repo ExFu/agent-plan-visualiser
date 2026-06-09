@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""Read .agent-plan-tracker/projection.json -> emit summary.md."""
+"""Read .agent-plan-tracker/projection.json -> emit summary.md.
+
+Data dir defaults to .agent-plan-tracker/; override with APT_DATA_DIR (aptlib.apt_data_dir).
+"""
 import json
 from collections import defaultdict
 from pathlib import Path
 
+import aptlib
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PROJECTION = REPO_ROOT / ".agent-plan-tracker/projection.json"
-OUT = REPO_ROOT / ".agent-plan-tracker/summary.md"
+DATA_DIR = aptlib.apt_data_dir(REPO_ROOT)
+PROJECTION = DATA_DIR / "projection.json"
+OUT = DATA_DIR / "summary.md"
 
 
 def main():

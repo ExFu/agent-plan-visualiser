@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Emit .agent-plan-tracker/projection.json from cache.sqlite."""
+"""Emit .agent-plan-tracker/projection.json from cache.sqlite.
+
+Data dir defaults to .agent-plan-tracker/; override with APT_DATA_DIR (aptlib.apt_data_dir).
+"""
 import datetime
 import json
 import re
 import sqlite3
 from pathlib import Path
 
+import aptlib
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CACHE = REPO_ROOT / ".agent-plan-tracker/cache.sqlite"
-OUT = REPO_ROOT / ".agent-plan-tracker/projection.json"
+DATA_DIR = aptlib.apt_data_dir(REPO_ROOT)
+CACHE = DATA_DIR / "cache.sqlite"
+OUT = DATA_DIR / "projection.json"
 
 SCHEMA_VERSION = "0.3.0"
 ONTOLOGY_VERSION = "0.3.0"

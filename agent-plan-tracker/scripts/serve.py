@@ -27,9 +27,19 @@ import uuid
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+import aptlib
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVENTS = REPO_ROOT / ".agent-plan-tracker/events.jsonl"
-SUMMARIES_DIR = REPO_ROOT / ".agent-plan-tracker/summaries"
+DATA_DIR = aptlib.apt_data_dir(REPO_ROOT)
+# Repo-root-relative form, used for freeform_path values recorded in events
+# (consumed as REPO_ROOT / freeform_path). Falls back to the absolute path if
+# APT_DATA_DIR points outside the repo.
+try:
+    DATA_DIR_PREFIX = str(DATA_DIR.relative_to(REPO_ROOT))
+except ValueError:
+    DATA_DIR_PREFIX = str(DATA_DIR)
+EVENTS = DATA_DIR / "events.jsonl"
+SUMMARIES_DIR = DATA_DIR / "summaries"
 SCHEMA_PATH = REPO_ROOT / "agent-plan-tracker/schemas/0.2.0/events.schema.json"
 
 
@@ -327,7 +337,7 @@ class APTHandler(SimpleHTTPRequestHandler):
         # We only consider event-sourced spawns (source='event'), not
         # frontmatter-derived edges — those are timeless and would over-cascade.
         try:
-            proj = json.loads((REPO_ROOT / ".agent-plan-tracker/projection.json").read_text())
+            proj = json.loads((DATA_DIR / "projection.json").read_text())
             event_spawn_edges = [
                 r for r in proj.get("relationships", [])
                 if r.get("type") == "spawns" and r.get("source") == "event"
@@ -451,7 +461,7 @@ class APTHandler(SimpleHTTPRequestHandler):
 
         # Compute freeform_path from event_id. Always overwrite — client can't
         # be trusted to invent paths that match the storage convention.
-        attrs["freeform_path"] = f".agent-plan-tracker/summaries/{entity_id}-{ev['event_id']}.md"
+        attrs["freeform_path"] = f"{DATA_DIR_PREFIX}/summaries/{entity_id}-{ev['event_id']}.md"
 
         # origin_summary_event_id — only meaningful for derived.
         if source_required == "derived":

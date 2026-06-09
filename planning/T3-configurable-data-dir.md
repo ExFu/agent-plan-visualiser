@@ -9,7 +9,7 @@ status: draft
 
 # T3-configurable-data-dir — Make the data directory configurable via `APT_DATA_DIR`
 
-**Status**: Draft.
+**Status**: Done (2026-06-09).
 **Sits at**: T2-storage theme, M2-auto-extract milestone. Foundation T3 — prerequisite for shadow-dev and eventually for M4 fresh-project installs.
 
 ---
@@ -73,4 +73,4 @@ Each script replaces its hardcoded `REPO_ROOT / ".agent-plan-tracker/..."` with 
 
 ## 7. Open questions
 
-1. **Resolver location.** Inline in each script (simplest, some duplication) vs shared `scripts/aptlib.py` (DRYer, one more import). Lean shared module since 4+ scripts need it.
+1. **Resolver location.** RESOLVED: shared module `agent-plan-tracker/scripts/aptlib.py`. Import ergonomics are fine — Python puts a script's own directory on `sys.path` when the script is invoked by path, so `import aptlib` just works for all four pipeline scripts. Inline duplication rejected: 4+ scripts need the same resolution rule today and M2 capture tooling will too. Shell scripts (`validate-events.sh`, `repack-validate.sh`, and the `CACHE` defaults in `trace-decision-history.sh` / `timeline-for-entity.sh`) use the equivalent `${APT_DATA_DIR:-.agent-plan-tracker}` expansion.

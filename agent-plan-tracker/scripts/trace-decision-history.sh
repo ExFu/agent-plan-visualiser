@@ -3,7 +3,7 @@
 # Usage: trace-decision-history.sh <entity_id>
 set -euo pipefail
 ENTITY_ID="${1:?usage: $0 <entity_id>}"
-CACHE="${CACHE:-.agent-plan-tracker/cache.sqlite}"
+CACHE="${CACHE:-${APT_DATA_DIR:-.agent-plan-tracker}/cache.sqlite}"
 
 sqlite3 -header -column "$CACHE" <<SQL
 WITH related_events AS (
