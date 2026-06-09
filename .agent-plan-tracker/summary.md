@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-09T19:34:18Z
+# Project state — generated 2026-06-09T19:45:11Z
 
-**Total events:** 274  ·  **Draft:** 11  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 30  ·  **Orphaned:** 0
+**Total events:** 279  ·  **Draft:** 12  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 31  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -21,7 +21,6 @@
   - `M2-auto-extract` (9 events): entity.extended → entity.accepted → commit.recorded
 
 - **T2-extraction**
-  - `T3-apt-capture-skill` (4 events): relationship.spawns → entity.extended → entity.accepted
   - `T3-capture-guard-hook` (3 events): entity.created → relationship.spawns → entity.accepted
   - `T3-cutover-to-auto` (3 events): entity.created → relationship.spawns → entity.accepted
 
@@ -31,7 +30,6 @@
   - `M2-auto-extract`
 
 - **M2-auto-extract**
-  - `T3-apt-capture-skill`
   - `T3-capture-guard-hook`
   - `T3-cutover-to-auto`
 
@@ -48,6 +46,7 @@
   - `2026-05-23.side-quest-formalisation`
   - `2026-05-23.snapshot-trigger-config`
   - `2026-05-23.verification-overhaul-candidate-model`
+  - `2026-06-09.commit-recorded-entity-subject-drift`
 - **plan**
   - `T2-ingest`
 
@@ -81,7 +80,7 @@ _No flapping closures._
 - **M1-bootstrap**: 15/15 T3 complete (100%); 0 live
 - **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
-- **M2-auto-extract**: 2/5 T3 complete (40%); 3 live
+- **M2-auto-extract**: 3/5 T3 complete (60%); 2 live
 
 ---
-_52 entities · 68 relationships · 10 decisions._
+_53 entities · 68 relationships · 10 decisions._

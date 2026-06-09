@@ -9,7 +9,7 @@ status: draft
 
 # T3-apt-capture-skill — Codify the event-capture discipline as a skill
 
-**Status**: Draft.
+**Status**: Done (2026-06-09). Skill shipped at `agent-plan-tracker/skills/apt-capture/SKILL.md`; verified self-referentially by following its instructions to capture its own delivery commit.
 **Sits at**: T2-extraction theme, M2-auto-extract milestone. M2 headline deliverable — depends on `T3-entity-accepted` (draft/accepted semantics); parallel to `T3-configurable-data-dir`.
 
 ---
@@ -22,7 +22,7 @@ A skill packages these rules as **instructions the in-session agent reads and fo
 
 ## 2. What
 
-A skill file (in the plugin's `skills/` directory) that the agent invokes via `/apt-capture` (working name; `/apt-save` is an alternative — see §7 Q1). The skill contains:
+A skill file (in the plugin's `skills/` directory) that the agent invokes via `/apt-capture` (naming resolved — see §7 Q1). The skill contains:
 
 ### Content outline
 
@@ -94,8 +94,8 @@ The skill references the schema files (`schemas/0.3.0/events.schema.json`, `sche
 - `T3-entity-accepted` — defines the draft/accepted semantics the draft gate enforces. Must land first.
 - Parallel to `T3-configurable-data-dir` (the skill should write to the configured dir, but can hardcode `.agent-plan-tracker/` initially and adopt the resolver once both T3s land).
 
-## 7. Open questions
+## 7. Resolved questions
 
-1. **Naming.** `/apt-capture`, `/apt-save`, or something else? "Capture" conveys "record what happened"; "save" is more casual. The name sets expectations for every future user of the plugin.
-2. **Seal-or-not UX.** Should the skill always emit `commit.recorded` (sealing the block), or should it ask "are you about to commit, or will you do more work first?" and only seal when the agent is about to commit? Lean: always seal — the agent can run `/apt-capture` again and a new block starts. Simpler than managing open blocks.
-3. **Skill vs command.** `skills/` (passive instructions) vs `commands/` (can carry executable logic). This is purely instructional — leans `skills/`. Resolve alongside T2-packaging conventions.
+1. ~~**Naming.**~~ **RESOLVED**: `/apt-capture`. "Capture" conveys "record what happened as events" and matches the guard hook's vocabulary (`.last-capture`).
+2. ~~**Seal-or-not UX.**~~ **RESOLVED**: always seal. One capture = one sealed block = one commit. No open-block management; a missed event folds into the **next** capture (skill §1), never edits prior lines.
+3. ~~**Skill vs command.**~~ **RESOLVED**: `skills/`. The capture discipline is purely instructional — the agent does the thinking; there is no executable payload. Lives at `agent-plan-tracker/skills/apt-capture/SKILL.md` with plugin-standard frontmatter.
