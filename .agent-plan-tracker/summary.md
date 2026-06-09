@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-09T20:26:49Z
+# Project state — generated 2026-06-09T21:43:02Z
 
-**Total events:** 294  ·  **Draft:** 11  ·  **Live:** 7  ·  **Dormant:** 0  ·  **Closed:** 35  ·  **Orphaned:** 0
+**Total events:** 306  ·  **Draft:** 15  ·  **Live:** 7  ·  **Dormant:** 0  ·  **Closed:** 35  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -11,10 +11,10 @@
 
 - **(T2 itself)**
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
-  - `T2-extraction` (6 events): entity.extended → entity.accepted → entity.progressed
+  - `T2-extraction` (7 events): entity.accepted → entity.progressed → entity.extended
   - `T2-ontology` (8 events): entity.extended → entity.extended → entity.extended
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
-  - `T2-projection` (13 events): entity.progressed → analysis.invalidated → entity.progressed
+  - `T2-projection` (14 events): analysis.invalidated → entity.progressed → entity.extended
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
 
 ## Draft
@@ -31,7 +31,11 @@
   - `2026-05-23.snapshot-trigger-config`
   - `2026-05-23.verification-overhaul-candidate-model`
 - **plan**
+  - `M3-clean-gate`
   - `T2-ingest`
+  - `T3-apt-merge-skill`
+  - `T3-gate-core`
+  - `T3-integrity-composite`
 
 ## Blocked
 
@@ -64,6 +68,7 @@ _No flapping closures._
 - **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
+- **M3-clean-gate**: 0/3 T3 complete (0%); 0 live
 
 ---
-_53 entities · 68 relationships · 12 decisions._
+_57 entities · 75 relationships · 13 decisions._

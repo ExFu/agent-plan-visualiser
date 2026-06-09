@@ -128,6 +128,8 @@ Two layers:
 
 This split — extraction at commit, cleanliness at merge — accommodates sub-agents committing freely while keeping main canonical.
 
+> **Correction (2026-06-09, M3 design — supersedes the framing above in part).** The gate protects the **record**, not the plan's tidiness: blocking = integrity defects that break a cold read (schema violations, dangling references, unsealed tails, implementation-on-draft, resurrection-without-reopen, fulcrum-without-decision); orphans, unclosed claims, and in-progress mess are *visible true state* and merge freely (dashboard signal, warn tier at most). Enforcement is a stance-neutral `gate-check` core with pluggable adapters (pre-push default; skill-procedural via `/apt-merge` is primary; CI adapters are future M4-adjacent callers — no GitHub Actions dependency). The override path is dropped: integrity defects are repaired, never overridden. See [[M3-clean-gate]] §2–3.
+
 ### 3.8 Merge conflict handling
 
 Merge commits run through extraction like any other. When two branches' event logs produce contradictions (one closed a plan, the other extended it; competing renames for one entity), the hook:
@@ -137,6 +139,8 @@ Merge commits run through extraction like any other. When two branches' event lo
 3. Re-attempts commit with resolved event log.
 
 9-in-10 case: human reads recommendation, says "looks good", merge proceeds. 1-in-10 case: human knows context the agent doesn't, redirects. No silent drift past commit boundary.
+
+> **Correction (2026-06-09, M3 design).** Merge handling ships as **doctrine, not program**: the `/apt-merge` skill ([[T3-apt-merge-skill]]) has the in-session agent reconcile branch-side — main's log stays a prefix, the branch's blocks append after; contradictions surface to the operator; their ruling becomes reconciliation events sealed by the merge commit. The refuse-and-write-files protocol above is not needed in-session (it may resurface for the autonomous/CI path, M4-adjacent).
 
 ### 3.9 Backfill primitive
 
@@ -161,10 +165,10 @@ Core extractor here is identical to pre-commit's — just invoked sequentially o
 - `T3-hook-installer` — drops hooks into a target's `.git/hooks/`; idempotent against existing hooks.
 - `T3-sub-agent-recursion` — large-diff overflow handling; pulled forward only if a real commit overflows.
 
-### M3-scheduled
-- `T3-pre-merge-hook` — local pre-push.
-- `T3-server-side-cleanliness-gate` — CI integration (GitHub Actions template).
-- `T3-merge-conflict-handler` — merge-time arbitration flow.
+### M3-scheduled (authored 2026-06-09 — see [[M3-clean-gate]] §5)
+- `T3-gate-core` — `gate-check` entry point + enforcement adapters (supersedes `T3-pre-merge-hook` and `T3-server-side-cleanliness-gate`; the CI template defers to a future thin adapter, M4-adjacent).
+- `T3-apt-merge-skill` — branch-side reconciliation doctrine as a skill (supersedes `T3-merge-conflict-handler` — doctrine, not arbitration program).
+- (`T3-integrity-composite` — the check itself — is T2-projection-owned.)
 
 ## 5. Dependencies
 
@@ -180,8 +184,8 @@ Core extractor here is identical to pre-commit's — just invoked sequentially o
 
 ## 7. Open questions
 
-1. **Atomicity of supersession + orphan resolution.** Must orphans be resolved in same commit as the supersession that created them, or can supersession land and orphan resolution land in subsequent commits before the merge-to-main gate fires? Lean toward the latter; confirm in `T3-pre-merge-hook`.
-2. **Pre-merge gate strictness defaults.** Which smells block automatically vs warn vs ignore? Configurable default-block list with project-level overrides.
+1. ~~**Atomicity of supersession + orphan resolution.**~~ **RESOLVED (2026-06-09, M3 design)**: dissolved by the cold-read reframe — orphans don't block the gate, so resolution may trail the supersession by any number of commits. ([[M3-clean-gate]] §7.)
+2. ~~**Pre-merge gate strictness defaults.**~~ **RESOLVED (2026-06-09, M3 design)**: blocking/warn lists live in committed `.apt-config.toml` at repo root (hardcoding rejected as the riskier option). ([[M3-clean-gate]] §3.3, [[T3-integrity-composite]] §2.3.)
 3. **Extractor LLM choice.** Probably Sonnet for routine, escalate to Opus on ambiguity-halt re-runs.
 4. **Hook installation idempotency.** Re-running project-init should not break existing hooks. Handle existing `pre-commit` files (chain via prefix? refuse? warn?).
 5. **Token budget per commit.** What's the practical ceiling for a commit's input bundle? Defines when sub-agent recursion kicks in.

@@ -118,6 +118,8 @@ Default-warn smells (visible but not blocking):
 
 Override path: explicit `decision` event listing the smell's offending event_ids with a `reason` attribute explaining the deferral.
 
+> **Correction (2026-06-09, M3 design — supersedes the lists above).** Reframed from tidiness to **record integrity** (protect the cold read): blocking = schema violations, dangling references, unsealed trailing runs, implementation-on-draft, resurrection-without-reopen, fulcrum-without-decision. Orphans, unresolved-HITL-on-completed, and reopened-without-follow-up demote to **warn/dashboard** — visible true state merges freely; surfacing it is the tracker succeeding. The override path is dropped (integrity defects are repaired, not overridden). Blocking/warn lists live in committed `.apt-config.toml`. Spec: [[M3-clean-gate]] §2; build: [[T3-integrity-composite]].
+
 ## 4. Swap-out points
 
 - **Pure HTML + vanilla JS for the view layer.** Zero dependencies. Trigger to revisit: views need significant interactive complexity that vanilla JS makes painful. Then consider a minimal framework (lit-html, Preact) — but avoid a build-step-required SPA.
@@ -131,7 +133,7 @@ Override path: explicit `decision` event listing the smell's offending event_ids
 - `T3-projection-queries-v0` — initial SQL catalogue in `scripts/`.
 
 ### Later
-- `T3-cleanliness-gate-projection` (M3) — composite query the merge gate invokes.
+- `T3-integrity-composite` (M3 — authored 2026-06-09, supersedes the `T3-cleanliness-gate-projection` candidate) — integrity composite the merge gate invokes.
 - `T3-time-travel-snapshots` (M2/M3) — snapshot selector in HTML view, once snapshots exist.
 - `T3-html-view-interactivity` (M3+) — filter, search, snapshot selector polish.
 - `T3-projection-incremental-emit` (M3+) — performance optimisation.
