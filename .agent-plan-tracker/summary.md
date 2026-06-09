@@ -1,24 +1,46 @@
-# Project state — generated 2026-06-09T19:19:03Z
+# Project state — generated 2026-06-09T19:25:58Z
 
-**Total events:** 258  ·  **Draft:** 18  ·  **Live:** 6  ·  **Dormant:** 0  ·  **Closed:** 28  ·  **Orphaned:** 0
+**Total events:** 267  ·  **Draft:** 11  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 28  ·  **Orphaned:** 0
 
 ## Live work
 
 ### By thematic parent
 
+- **(T1 itself)**
+  - `T1-top-level` (34 events): entity.extended → entity.extended → entity.accepted
+
 - **(T2 itself)**
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
+  - `T2-extraction` (5 events): entity.extended → entity.extended → entity.accepted
   - `T2-ontology` (7 events): entity.extended → entity.extended → entity.extended
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
   - `T2-projection` (13 events): entity.progressed → analysis.invalidated → entity.progressed
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
 
+- **(milestone)**
+  - `M2-auto-extract` (9 events): entity.extended → entity.accepted → commit.recorded
+
+- **T2-extraction**
+  - `T3-apt-capture-skill` (4 events): relationship.spawns → entity.extended → entity.accepted
+  - `T3-capture-guard-hook` (3 events): entity.created → relationship.spawns → entity.accepted
+  - `T3-cutover-to-auto` (3 events): entity.created → relationship.spawns → entity.accepted
+
 - **T2-ontology**
   - `T3-entity-accepted` (5 events): commit.recorded → entity.progressed → commit.recorded
 
+- **T2-storage**
+  - `T3-configurable-data-dir` (3 events): entity.created → relationship.spawns → entity.accepted
+
 ### By milestone
 
+- **(self: M2-auto-extract)**
+  - `M2-auto-extract`
+
 - **M2-auto-extract**
+  - `T3-apt-capture-skill`
+  - `T3-capture-guard-hook`
+  - `T3-configurable-data-dir`
+  - `T3-cutover-to-auto`
   - `T3-entity-accepted`
 
 ## Draft
@@ -35,14 +57,7 @@
   - `2026-05-23.snapshot-trigger-config`
   - `2026-05-23.verification-overhaul-candidate-model`
 - **plan**
-  - `M2-auto-extract`
-  - `T1-top-level`
-  - `T2-extraction`
   - `T2-ingest`
-  - `T3-apt-capture-skill`
-  - `T3-capture-guard-hook`
-  - `T3-configurable-data-dir`
-  - `T3-cutover-to-auto`
 
 ## Blocked
 
@@ -74,7 +89,7 @@ _No flapping closures._
 - **M1-bootstrap**: 15/15 T3 complete (100%); 0 live
 - **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
-- **M2-auto-extract**: 0/5 T3 complete (0%); 1 live
+- **M2-auto-extract**: 0/5 T3 complete (0%); 5 live
 
 ---
-_52 entities · 68 relationships · 9 decisions._
+_52 entities · 68 relationships · 10 decisions._
