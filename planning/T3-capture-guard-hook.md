@@ -9,7 +9,7 @@ status: draft
 
 # T3-capture-guard-hook — Pre-commit hook that enforces capture-before-commit
 
-**Status**: Draft.
+**Status**: Done (2026-06-09). Shipped `agent-plan-tracker/hooks/capture-guard.sh` (POSIX-sh pre-commit guard) plus the idempotent `agent-plan-tracker/scripts/install-hook.sh`, sandbox-verified end-to-end in a throwaway repo; installation into this repo is deliberately deferred to cutover (`T3-cutover-to-auto`).
 **Sits at**: T2-extraction theme, M2-auto-extract milestone. Depends on `T3-apt-capture-skill` (which writes `.last-capture`).
 
 ---
@@ -96,8 +96,8 @@ The hook reads `APT_DATA_DIR` from the environment if set; otherwise defaults to
 - `T3-apt-capture-skill` — writes `.last-capture`.
 - `T3-configurable-data-dir` — defines `APT_DATA_DIR` resolution (but the hook can ship with a simple fallback if this T3 lands first).
 
-## 7. Open questions
+## 7. Resolved questions
 
-1. **Timestamp precision.** Second-level should be sufficient — filesystem mtimes are typically second-granularity. Sub-second would add complexity for no practical gain.
-2. **Derived files.** Should the hook exclude known derived files (cache.sqlite, projection.json, summary.md) from the mtime check? They're rebuilt by the pipeline and may be newer than `.last-capture` legitimately. Lean yes — maintain a small exclude list in the hook.
-3. **events.jsonl itself.** The capture skill appends to events.jsonl *before* writing `.last-capture`. So events.jsonl's mtime should be ≤ `.last-capture`. But if the agent hand-edits events.jsonl after capture (correcting a typo), the hook would reject. Is that the right behaviour? Lean yes — re-run `/apt-capture` to update the timestamp, even if the edit was manual.
+1. ~~**Timestamp precision.**~~ **RESOLVED**: second-level precision suffices. `date +%s` and the `stat` epoch-seconds comparison match filesystem mtime granularity in practice; sub-second would add complexity for no practical gain.
+2. ~~**Derived files.**~~ **RESOLVED**: yes — the hook excludes exactly three derived artefacts (`cache.sqlite`, `projection.json`, `summary.md`, under the resolved data dir). They are rebuilt by repack-validate *after* capture, so their mtimes legitimately postdate `.last-capture`; without the exclusion every post-capture rebuild would false-reject.
+3. ~~**events.jsonl itself.**~~ **RESOLVED**: no special case — `events.jsonl` stays checked. Hand-editing it after capture means the log changed after the timestamp was sealed; the hook rejecting until `/apt-capture` is re-run (refreshing the timestamp) is exactly the desired behaviour.
