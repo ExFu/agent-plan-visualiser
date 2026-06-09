@@ -3,7 +3,7 @@ id: T3-analyser-phase-d-cascade-invalidation
 plan_kind: thematic
 tier: 3
 t2_parent: T2-analyser
-milestone: M6-analyser
+milestone: M1.1-analyser
 status: completed
 ---
 

@@ -153,3 +153,7 @@ Only needed if M6 is renamed to M1.1. `main` grandfathered the label and reparen
 - `entity.completed` on T3-event-sourced-relationships.
 - `entity.progressed` on M1.2-relationship-ssot (host milestone) as this lands.
 - `commit.recorded` (LAST).
+
+---
+
+> **Reversal note (2026-06-08) — appended, not rewritten.** The decision recorded in this plan to **drop the `M6-analyser` → `M1.1-analyser` renumber** and grandfather the flat `M6` label was **reversed** on 2026-06-08. With the `entity.renamed` identity-migration fold now built in `cache-build.py` (old id → new id, folded last-write-wins across the entity's own events, relationship endpoints, and frontmatter seeds; state-neutral, no phantom, children follow for free), the milestone was renumbered to `M1.1-analyser` via a real `entity.renamed` event paired with a `decision`. The reasons this plan gave for dropping it — `entity.renamed` was inert, and churn — no longer hold (the primitive exists; the canonical log is append-only so only 3 events were added). The narrative above is preserved as honest history of the earlier call. See [[T2-ontology]] §3.11, [[T1-top-level]] §2.4/§2.4.0, and [[M1.1-analyser]].

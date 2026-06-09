@@ -110,6 +110,17 @@ def latest_summary_for(entity_type, entity_id):
 class APTHandler(SimpleHTTPRequestHandler):
     schema_cache = None
 
+    def end_headers(self):
+        # Dev review server: disable caching for ALL responses (static assets +
+        # JSON). SimpleHTTPRequestHandler sets no Cache-Control, so browsers
+        # apply heuristic freshness and serve a stale app.js / projection.json
+        # after a rebuild — a normal reload won't revalidate a heuristically
+        # fresh subresource, so reviewers silently see old code/data. no-store
+        # sidesteps that entirely. This is a local dev tool; caching buys
+        # nothing here.
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     # --- response helpers -------------------------------------------------
 
     def _send_json(self, code, body):
@@ -117,8 +128,7 @@ class APTHandler(SimpleHTTPRequestHandler):
         self.send_response(code)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(payload)))
-        # No-cache so the browser always gets a fresh clean-check.
-        self.send_header("cache-control", "no-store")
+        # Cache-Control: no-store is added centrally in end_headers().
         self.end_headers()
         self.wfile.write(payload)
 
