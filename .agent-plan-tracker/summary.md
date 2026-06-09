@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-09T19:25:58Z
+# Project state — generated 2026-06-09T19:26:37Z
 
-**Total events:** 267  ·  **Draft:** 11  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 28  ·  **Orphaned:** 0
+**Total events:** 270  ·  **Draft:** 11  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 29  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -25,9 +25,6 @@
   - `T3-capture-guard-hook` (3 events): entity.created → relationship.spawns → entity.accepted
   - `T3-cutover-to-auto` (3 events): entity.created → relationship.spawns → entity.accepted
 
-- **T2-ontology**
-  - `T3-entity-accepted` (5 events): commit.recorded → entity.progressed → commit.recorded
-
 - **T2-storage**
   - `T3-configurable-data-dir` (3 events): entity.created → relationship.spawns → entity.accepted
 
@@ -41,7 +38,6 @@
   - `T3-capture-guard-hook`
   - `T3-configurable-data-dir`
   - `T3-cutover-to-auto`
-  - `T3-entity-accepted`
 
 ## Draft
 
@@ -89,7 +85,7 @@ _No flapping closures._
 - **M1-bootstrap**: 15/15 T3 complete (100%); 0 live
 - **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
-- **M2-auto-extract**: 0/5 T3 complete (0%); 5 live
+- **M2-auto-extract**: 1/5 T3 complete (20%); 4 live
 
 ---
 _52 entities · 68 relationships · 10 decisions._
