@@ -224,7 +224,10 @@ def check_schema(ctx):
     for ev in ctx.events:
         groups.setdefault(str(ev.get("schema_version")), []).append(ev)
     for sv, evs in sorted(groups.items()):
-        schema = ctx.repo_root / "agent-plan-tracker" / "schemas" / sv / "events.schema.json"
+        # Schemas are plugin content (code, not data): they resolve against
+        # the toolchain home, NOT --repo-root — a gated repo (sandbox, any
+        # adopting project) carries a log, not a copy of the schemas.
+        schema = SCRIPT_DIR.parent / "schemas" / sv / "events.schema.json"
         if not schema.exists():
             instances.append(
                 f"unknown schema_version '{sv}' ({len(evs)} event(s), first at "

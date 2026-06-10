@@ -58,3 +58,14 @@ Extend the M2 installer pattern (`install-hook.sh` or sibling `install-gate.sh`)
 ## 6. Open questions
 
 1. **pre-push scoping** — the hook receives updated refs on stdin; gate only when `refs/heads/main` moves, or on every push? Lean: only main (branch pushes are work-in-flight by doctrine).
+
+## 7. Build notes (2026-06-10)
+
+Shipped: `scripts/gate-check.sh` (the contract, two modes), `hooks/gate-prepush.sh`, `scripts/install-gate.sh`, `tests/gate/run-gatecheck-sandbox.sh`. All three §4 items green (9 sandbox cases, 36 assertions); composite fixture suite + repack-validate stay green. Decisions settled during the build:
+
+- **gate-check owns the seal↔commit half** (T3-integrity-composite §6 Q1, confirmed as leaned): every committed `commit.recorded` seal's `message_first_line` must match the subject of a commit reachable from the checked ref. Log→git direction only (unsealed commits are sanctioned `--no-verify` trivia); message-not-SHA matching keeps it rebase-tolerant; what it catches is squash/reword orphaning the record.
+- **The epoch doctrine extends to the seal discipline**, keyed on the seal's own `schema_version` (offending-event keying, mirroring resurrection). The dogfood log made the case empirically: 7 pre-0.3.0 seals are loosely-worded summaries of commits that exist under slightly different subjects — hand-written seals predate the exact-match law (/apt-capture, 0.3.0). They NOTICE; a ≥0.3.0 mismatch blocks.
+- **Mid-flow tolerance** (filesystem mode): seals on log lines beyond HEAD's committed extent name the commit *to come* — capture-before-commit means the seal precedes its commit by design. NOTICE, never block. `--ref` mode (what pre-push calls on the outgoing sha) is strict.
+- **§6 Q1 resolved: only main.** The adapter gates `refs/heads/main` updates, skips deletions (nothing outgoing), and lets branch pushes through untouched — sandbox-asserted. Resolution order for finding the check: `APT_GATE_CHECK` env → `agent-plan-tracker/scripts/` relative to the repo root → PATH.
+- **Schemas resolve against the toolchain home, never `--repo-root`** — gate-composite fix surfaced by the sandbox, the first non-dogfood repo the gate ran against. Plugin content is code, not data (aptlib's doctrine made executable); a gated repo carries a log, not a copy of the schemas.
+- Pre-adoption history (no log blob at the ref) passes with a notice — the gate guards the log's integrity; no log, no integrity claim. Documented impurity: the drift check reads the *working* `planning/` even in `--ref` mode (warn-only blast radius).
