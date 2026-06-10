@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-10T12:21:18Z
+# Project state — generated 2026-06-10T12:32:33Z
 
-**Total events:** 326  ·  **Draft:** 11  ·  **Live:** 8  ·  **Dormant:** 0  ·  **Closed:** 38  ·  **Orphaned:** 0
+**Total events:** 331  ·  **Draft:** 11  ·  **Live:** 8  ·  **Dormant:** 0  ·  **Closed:** 38  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -18,7 +18,7 @@
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(milestone)**
-  - `M3-clean-gate` (3 events): entity.created → relationship.spawns → entity.accepted
+  - `M3-clean-gate` (6 events): entity.extended → entity.progressed → verification.tested
 
 ### By milestone
 
@@ -75,4 +75,4 @@ _No flapping closures._
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
 
 ---
-_57 entities · 75 relationships · 16 decisions._
+_57 entities · 75 relationships · 17 decisions._

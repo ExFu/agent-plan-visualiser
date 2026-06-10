@@ -1,26 +1,34 @@
 #!/usr/bin/env bash
-# install-gate.sh — install the gate's pre-push adapter, idempotently.
+# install-gate.sh — install the gate's enforcement adapters, idempotently.
 #
 # Usage (from the repo root):
-#   bash agent-plan-tracker/scripts/install-gate.sh [--at=pre-push|--at=manual]
+#   bash agent-plan-tracker/scripts/install-gate.sh [--at=pre-push|--at=ref-update|--at=manual]
 #
 # --at=pre-push (default): install hooks/gate-prepush.sh as the repo's
-#   pre-push hook, with the same idempotency contract as install-hook.sh:
-#     - no pre-push hook yet         -> install gate-prepush.sh, chmod +x
-#     - identical hook already there -> no-op ("already installed"), exit 0
-#     - a DIFFERENT pre-push exists  -> refuse (never clobber), exit 1
+#   pre-push hook — gates pushes that update refs/heads/main.
+# --at=ref-update: install hooks/gate-refupdate.sh as the repo's
+#   reference-transaction hook — gates LOCAL moves of refs/heads/main
+#   (merges including fast-forward, direct commits, amends, resets; the
+#   only hook class that sees a fast-forward merge). Operator ruling
+#   2026-06-10: local merges gate, not just pushes.
 # --at=manual: install nothing — verify gate-check.sh is present and print
 #   how to call it. The stance-neutral story: the check is one contract,
 #   where it fires is installation choice (T3-gate-core §2.2).
+#
+# Idempotency contract (same as install-hook.sh), per adapter:
+#   - no hook of that name yet      -> install, chmod +x
+#   - identical hook already there  -> no-op ("already installed"), exit 0
+#   - a DIFFERENT hook exists       -> refuse (never clobber), exit 1
 set -uo pipefail
 
 AT="pre-push"
 for arg in "$@"; do
   case "$arg" in
-    --at=pre-push) AT="pre-push" ;;
-    --at=manual)   AT="manual" ;;
+    --at=pre-push)   AT="pre-push" ;;
+    --at=ref-update) AT="ref-update" ;;
+    --at=manual)     AT="manual" ;;
     *)
-      echo "usage: install-gate.sh [--at=pre-push|--at=manual]" >&2
+      echo "usage: install-gate.sh [--at=pre-push|--at=ref-update|--at=manual]" >&2
       exit 2
       ;;
   esac
@@ -38,7 +46,11 @@ if [ "$AT" = "manual" ]; then
   exit 0
 fi
 
-SRC="$(dirname "$0")/../hooks/gate-prepush.sh"
+case "$AT" in
+  pre-push)   LABEL="gate-prepush";   HOOK_NAME="pre-push" ;;
+  ref-update) LABEL="gate-refupdate"; HOOK_NAME="reference-transaction" ;;
+esac
+SRC="$(dirname "$0")/../hooks/$LABEL.sh"
 if [ ! -f "$SRC" ]; then
   echo "install-gate: source hook not found at $SRC" >&2
   exit 1
@@ -48,13 +60,13 @@ fi
 # worktrees (where hooks live in the shared common git dir), and honours
 # core.hooksPath if set.
 HOOKS_DIR="$(git rev-parse --git-path hooks)" || exit 1
-DEST="$HOOKS_DIR/pre-push"
+DEST="$HOOKS_DIR/$HOOK_NAME"
 
 if [ ! -e "$DEST" ] && [ ! -L "$DEST" ]; then
   mkdir -p "$HOOKS_DIR"
   cp "$SRC" "$DEST"
   chmod +x "$DEST"
-  echo "install-gate: installed gate-prepush as $DEST"
+  echo "install-gate: installed $LABEL as $DEST"
   exit 0
 fi
 

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # run-gatecheck-sandbox.sh — sandbox verification for gate-check.sh,
-# gate-prepush.sh and install-gate.sh (T3-gate-core §4, all three items).
-# Mirrors the capture-guard sandbox pattern: throwaway repo under /tmp plus
-# a bare remote, pushed through the installed hook. Exits 0 when every case
-# passes; 1 on the first failure.
+# gate-prepush.sh, gate-refupdate.sh and install-gate.sh (T3-gate-core §4,
+# all three items, plus the ref-update local adapter — operator ruling
+# 2026-06-10: local merges gate, not just pushes). Mirrors the capture-guard
+# sandbox pattern: throwaway repos under /tmp plus a bare remote, pushed
+# through the installed hook. Exits 0 when every case passes; 1 on the
+# first failure.
 set -uo pipefail
 cd "$(dirname "$0")" || exit 2
 WT_ROOT="$(cd ../../.. && pwd)"
@@ -180,6 +182,63 @@ run bash "$GATE_CHECK"
 check "exit 0 against this repo"        [ "$CODE" -eq 0 ]
 check "PASS verdict"                    grep -q '^gate-check: PASS' <<<"$OUT"
 check_absent "no BLOCK lines"           '^BLOCK'
+
+# --- Case 10: ref-update adapter — the local belt-and-braces --------------
+# reference-transaction is the only hook class that sees a fast-forward
+# merge (no merge or commit hook runs on an ff) — and ff is the standard
+# /apt-merge landing. Fresh repo: the hook gates main from its first commit.
+echo "== ref-update: installer fresh + identical no-op"
+git init -q -b main "$SANDBOX/work2"
+cd "$SANDBOX/work2" || exit 2
+git config user.email sandbox@example.invalid
+git config user.name "apt sandbox"
+mkdir -p .agent-plan-tracker
+run bash "$INSTALL" --at=ref-update
+check "fresh install exits 0"           [ "$CODE" -eq 0 ]
+check "reports gate-refupdate"          grep -q "installed gate-refupdate" <<<"$OUT"
+check "reference-transaction hook +x"   [ -x .git/hooks/reference-transaction ]
+run bash "$INSTALL" --at=ref-update
+check "identical re-run is a no-op"     grep -q "already installed" <<<"$OUT"
+
+echo "== ref-update: clean commit on main passes the local gate"
+append_ev   0010 entity.created  SBX-C "sandbox plan C, born draft"
+append_ev   0011 entity.accepted SBX-C "operator acceptance"
+append_seal 0012 "sandbox2: adopt tracker"
+git add -A
+run git commit -m "sandbox2: adopt tracker"
+check "gated main commit succeeds"      [ "$CODE" -eq 0 ]
+
+echo "== ref-update: corrupt branch refused at the local ff merge"
+git checkout -qb wip
+append_ev   0013 entity.created    SBX-D "sandbox plan D, born draft"
+append_ev   0014 entity.progressed SBX-D "implementation against a draft entity"
+append_seal 0015 "sandbox2: corrupt step"
+git add -A && git commit -qm "sandbox2: corrupt step"   # branch commits are never gated
+git checkout -q main
+BEFORE2="$(git rev-parse refs/heads/main)"
+run git merge wip
+check "local ff merge refused"          [ "$CODE" -ne 0 ]
+check "composite names the defect"      grep -q '^BLOCK \[implementation-on-draft\].*SBX-D' <<<"$OUT"
+check "hook names the refusal"          grep -q 'local update of refs/heads/main refused' <<<"$OUT"
+check "main did not move"               [ "$(git rev-parse refs/heads/main)" = "$BEFORE2" ]
+git reset -q --hard HEAD   # a refused ff may leave the worktree updated
+
+echo "== ref-update: APT_SKIP_GATE hatch works; reset back to green flows"
+run env APT_SKIP_GATE=1 git merge wip
+check "hatch lets the merge through"    [ "$CODE" -eq 0 ]
+run git reset --hard "$BEFORE2"
+check "reset to a green state allowed"  [ "$CODE" -eq 0 ]
+check "main back at green"              [ "$(git rev-parse refs/heads/main)" = "$BEFORE2" ]
+
+echo "== ref-update: clean branch ff-merges through the local gate"
+git checkout -qb wip2 "$BEFORE2"
+append_ev   0016 entity.extended SBX-C "clean continuation on a branch"
+append_seal 0017 "sandbox2: clean step"
+git add -A && git commit -qm "sandbox2: clean step"
+git checkout -q main
+run git merge wip2
+check "clean ff merge exits 0"          [ "$CODE" -eq 0 ]
+check "main at wip2 tip"                [ "$(git rev-parse refs/heads/main)" = "$(git rev-parse wip2)" ]
 
 echo
 if [ "$FAIL" -eq 0 ]; then
