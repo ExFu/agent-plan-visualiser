@@ -163,6 +163,8 @@ Naming TBD — `apt` was rejected due to namespace collision with Debian/Ubuntu'
 - `T3-cowork-compat-verify` — confirm plugin loads in Cowork; document any differences.
 - `T3-target-project-init-flow` — slash command + scripts for initialising a fresh project (`.agent-plan-tracker/` setup, hook installation, initial scaffold).
 
+> **Superseded 2026-06-10 by [[M4-fresh-install]] §5.** The candidates consolidate into four authored T3s: `T3-toolchain-portability` (paths via the toolchain home + the APV rename), `T3-project-init-flow` (absorbs cli-install-command + target-project-init-flow), `T3-session-orientation` (the third knowledge channel — hooks.json + the formal orientation skill of §3.4), `T3-distribution` (absorbs npm-package-config + cowork-compat-verify; hosts M3's deferred CI adapter template).
+
 ## 6. Dependencies
 
 - M1 scaffold has no prior dependencies; it's foundational.
@@ -172,6 +174,7 @@ Naming TBD — `apt` was rejected due to namespace collision with Debian/Ubuntu'
 ## 7. Open questions
 
 1. **Final plugin name.** Working name `agent-plan-tracker` works; decide before M4 publish whether to keep or shorten.
+   **RESOLVED 2026-06-10 (operator ruling): `agent-plan-visualiser` (APV).** The `apt` collision (§4) is cleared by `apv`. Execution deferred to [[T3-toolchain-portability]] — every live reference is touched there anyway, so the rename rides at near-zero cost; renaming earlier would touch everything twice. Hard constraints: the event log is never rewritten (append-only — historical names stay as true record), closed plans are archaeology, git history is immutable; the dogfood data dir stays `.agent-plan-tracker/` pinned via `[storage] data_dir`.
 2. **Hook installation mechanism.** Git hooks land in target `.git/hooks/`. Via CLI command (run after install), npm postinstall (automated), or slash command in Claude Code (user-triggered)? Probably the slash command for control + idempotency.
 3. **Cowork install flow differences.** Probably none if Cowork uses the same plugin config dir as Claude Code; verify in M4.
 4. **Versioning convention.** Semver from `0.1.0` once M1 lands. Major version bump policy: when ontology breaks backward compatibility? Defer until first such break is contemplated.
