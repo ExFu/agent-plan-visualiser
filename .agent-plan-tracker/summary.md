@@ -1,13 +1,13 @@
-# Project state — generated 2026-06-10T12:32:33Z
+# Project state — generated 2026-06-10T12:42:51Z
 
-**Total events:** 331  ·  **Draft:** 11  ·  **Live:** 8  ·  **Dormant:** 0  ·  **Closed:** 38  ·  **Orphaned:** 0
+**Total events:** 335  ·  **Draft:** 11  ·  **Live:** 7  ·  **Dormant:** 0  ·  **Closed:** 39  ·  **Orphaned:** 0
 
 ## Live work
 
 ### By thematic parent
 
 - **(T1 itself)**
-  - `T1-top-level` (35 events): entity.extended → entity.accepted → entity.extended
+  - `T1-top-level` (36 events): entity.accepted → entity.extended → entity.extended
 
 - **(T2 itself)**
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
@@ -16,14 +16,6 @@
   - `T2-packaging` (6 events): entity.progressed → entity.extended → entity.progressed
   - `T2-projection` (14 events): analysis.invalidated → entity.progressed → entity.extended
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
-
-- **(milestone)**
-  - `M3-clean-gate` (6 events): entity.extended → entity.progressed → verification.tested
-
-### By milestone
-
-- **(self: M3-clean-gate)**
-  - `M3-clean-gate`
 
 ## Draft
 
@@ -59,8 +51,8 @@ _No orphaned entities._
 - `M1.1-analyser` (plan)
 - `M1.2-relationship-ssot` (plan)
 - `M2-auto-extract` (plan)
+- `M3-clean-gate` (plan)
 - `T3-analyser-live-model-catalog` (plan)
-- `T3-analyser-phase-a-ephemeral` (plan)
 
 ## Notable patterns
 

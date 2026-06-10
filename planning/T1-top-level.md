@@ -8,7 +8,7 @@ status: active-authoring
 # T1-top-level — agent-plan-tracker — Top-level plan
 
 **Status**: Active authoring (design SSOT). Still edited as the design evolves; rarely superseded.
-**Phase**: implementation underway. **M1 (hand-rollable end-to-end) is complete**, plus M6-analyser (all phases) and M1.2-relationship-ssot. **M2 (skill-driven per-commit capture) is complete** — `/apt-capture` is the canonical producer, the capture-guard hook is live, and the draft→accepted lifecycle (schema `0.3.0`) gates implementation work. The tracker runs green against this project via `repack-validate.sh`. Next frontier: M3 (cleanliness gate). Several §5 questions are now closed (notably Q9 — milestone membership is event-sourced); the rest resolve through M3+ dogfooding.
+**Phase**: implementation underway. **M1 (hand-rollable end-to-end) is complete**, plus M6-analyser (all phases) and M1.2-relationship-ssot. **M2 (skill-driven per-commit capture) is complete** — `/apt-capture` is the canonical producer, the capture-guard hook is live, and the draft→accepted lifecycle (schema `0.3.0`) gates implementation work. **M3 (clean gate) is complete** (2026-06-10) — `gate-check` (integrity composite + seal↔commit correspondence, policy in `.apt-config.toml`) fires through three adapters (`/apt-merge` procedural, pre-push, reference-transaction local), and the milestone's own delivery landed on main via its doctrine, gate green. The tracker runs green against this project via `repack-validate.sh`. Next frontier: M4 (fresh-install packaging). Several §5 questions are now closed (notably Q9 — milestone membership is event-sourced); the rest resolve through M4+ dogfooding.
 
 ---
 
