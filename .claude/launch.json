@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "apt-view",
+      "name": "apv-view",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["agent-plan-tracker/scripts/serve.py", "--port", "8772"],
+      "runtimeArgs": ["agent-plan-visualiser/scripts/serve.py", "--port", "8772"],
       "port": 8772
     }
   ]

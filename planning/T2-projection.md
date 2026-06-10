@@ -118,7 +118,7 @@ Default-warn smells (visible but not blocking):
 
 Override path: explicit `decision` event listing the smell's offending event_ids with a `reason` attribute explaining the deferral.
 
-> **Correction (2026-06-09, M3 design — supersedes the lists above).** Reframed from tidiness to **record integrity** (protect the cold read): blocking = schema violations, dangling references, unsealed trailing runs, implementation-on-draft, resurrection-without-reopen, fulcrum-without-decision. Orphans, unresolved-HITL-on-completed, and reopened-without-follow-up demote to **warn/dashboard** — visible true state merges freely; surfacing it is the tracker succeeding. The override path is dropped (integrity defects are repaired, not overridden). Blocking/warn lists live in committed `.apt-config.toml`. Spec: [[M3-clean-gate]] §2; build: [[T3-integrity-composite]].
+> **Correction (2026-06-09, M3 design — supersedes the lists above).** Reframed from tidiness to **record integrity** (protect the cold read): blocking = schema violations, dangling references, unsealed trailing runs, implementation-on-draft, resurrection-without-reopen, fulcrum-without-decision. Orphans, unresolved-HITL-on-completed, and reopened-without-follow-up demote to **warn/dashboard** — visible true state merges freely; surfacing it is the tracker succeeding. The override path is dropped (integrity defects are repaired, not overridden). Blocking/warn lists live in committed `.apv-config.toml`. Spec: [[M3-clean-gate]] §2; build: [[T3-integrity-composite]].
 
 ## 4. Swap-out points
 

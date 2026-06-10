@@ -62,3 +62,15 @@ Never touched: **the event log** (append-only — historical names are true reco
 1. Does the dogfood repo's *plugin dir* rename happen in the same commit as the skill/env renames, or staged? Lean: one commit — half-renamed states are worse than a big diff.
 2. Legacy env-var fallback (`APT_*` read with notice) or clean break? Lean: clean break — the only install is this repo; migration cost is one reinstall.
 3. Does the repo folder itself (`~/Studio/projects/agent-plan-tracker`) rename? Out of plugin scope (operator's filesystem); note `git worktree repair` if done.
+
+## 7. Build notes (2026-06-10)
+
+One commit, as ratified (§6 Q1): five `git mv`s (plugin dir, both skills, `apvlib`, the config file) + 245 mechanical replacements across the toolchain and the 14 non-closed plans + the structural changes below. Clean break on `APT_*` (§6 Q2) — no fallbacks anywhere; one hook reinstall was the whole migration cost. `tests/audit-rename.sh` enforces §4.3 with the allowlist explicit: the data dir, frozen schemas, closed plans, this mapping doc, and two deliberate phrases.
+
+- **Baking is conditional on `--home=`** (the build's main design ruling): an unconditional bake would weld the shared dogfood hooks — one copy serving every worktree — to a single worktree's path. Plugin installs pass `${CLAUDE_PLUGIN_ROOT}`; vendored installs ship the source verbatim and the chain (env → baked → repo-relative → PATH) decides at run time. Installer idempotency compares the **rendered** copy, so same-home re-runs no-op and a different home refuses loudly. `install-hook.sh` needs no `--home` — the guard is toolchain-free.
+- **capture-guard mirrors apvlib POSIX-ly**: `APV_DATA_DIR` → one-key `sed` of `.apv-config.toml` → `.apv` default. apvlib's default moved to `.apv` (M4 §7 Q3); the dogfood repo pins `.agent-plan-tracker` via config — the rename was a non-event for the record.
+- **gate-check's repo-root default** → `git rev-parse --show-toplevel`: the toolchain may live in the plugin cache, far from any tracked repo; the old `SCRIPT_DIR/../..` default assumed the vendored layout.
+- **Schemas stayed byte-frozen** — 0.3.0 even patterns the data dir's real name structurally; epoch artefacts validate historical events and must not move. Manifest bumped 0.2.0 → 0.4.0.
+- Portability sandbox (`tests/gate/run-portability-sandbox.sh`, §4.2): no vendored toolchain, no env overrides, no config file — installer bake asserted in the copies, guard finds `.apv` by default, gate-check passes on both explicit and toplevel-default repo-root, ref-update and pre-push refuse a corrupt state via the baked home and pass clean work, `APV_SKIP_GATE` hatch + reset-to-green exercised.
+- Live cutover: the three installed hooks refreshed by rm + reinstall (differs-refuse made the staleness loud); this T3's own landing transited the renamed gate end-to-end.
+- Surfaced for later: the HTML view hardcodes `../../.agent-plan-tracker/` paths — fine for dogfood, wrong for `.apv` adopters (inbox item filed). The two legacy sandboxes' fixture repos moved to `.apv` with the new default.

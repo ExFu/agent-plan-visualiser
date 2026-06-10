@@ -1,9 +1,0 @@
-{
-  "name": "agent-plan-tracker",
-  "version": "0.2.0",
-  "description": "Event-sourced planning methodology with git-history extraction and projection. Walks a project's git history, extracts structured events against a defined ontology, and provides projections (audits, diagrams, status reports) over the resulting event log.",
-  "author": {
-    "name": "Alastair Brayne"
-  },
-  "keywords": ["planning", "event-sourcing", "git", "audit", "methodology", "claude-code"]
-}

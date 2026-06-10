@@ -401,7 +401,7 @@ Acceptance: global run on the project's ~20 live entities completes in <5 min, s
 
 ## 7. Open questions
 
-1. **Server wrapper deployment.** Does the wrapper replace `python3 -m http.server` outright, or is it offered as `python3 agent-plan-tracker/scripts/serve.py` alongside? Lean replacement to keep one path; document the override for hook-averse setups.
+1. **Server wrapper deployment.** Does the wrapper replace `python3 -m http.server` outright, or is it offered as `python3 agent-plan-visualiser/scripts/serve.py` alongside? Lean replacement to keep one path; document the override for hook-averse setups.
 2. **What counts as "related entities" in per-entity context?** Direct children (T3s of a T2), open blockers/HITL referencing the entity, inbox items mentioning it by id. Anything else? Lean conservative; expand based on Phase A real-failure observations.
 3. **Cost ceiling per call.** Should the analyser refuse to fire if estimated input tokens exceed a threshold? Or just warn and let the user proceed? Lean warn-and-proceed for v1; protective ceilings invite frustration.
 4. **Summary regeneration without invalidation.** Is "regenerate" semantically equivalent to "invalidate current + create new"? Yes. The Regenerate button is sugar over Invalidate-then-Save; UI surfaces it as one action.

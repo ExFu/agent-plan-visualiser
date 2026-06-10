@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-10T21:02:49Z
+# Project state — generated 2026-06-10T21:34:17Z
 
-**Total events:** 363  ·  **Draft:** 12  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 39  ·  **Orphaned:** 0
+**Total events:** 369  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 40  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -24,7 +24,6 @@
   - `T3-distribution` (4 events): relationship.spawns → entity.extended → entity.accepted
   - `T3-project-init-flow` (4 events): relationship.spawns → entity.accepted → entity.extended
   - `T3-session-orientation` (3 events): entity.created → relationship.spawns → entity.accepted
-  - `T3-toolchain-portability` (3 events): entity.created → relationship.spawns → entity.accepted
 
 ### By milestone
 
@@ -35,7 +34,6 @@
   - `T3-distribution`
   - `T3-project-init-flow`
   - `T3-session-orientation`
-  - `T3-toolchain-portability`
 
 ## Draft
 
@@ -50,6 +48,7 @@
   - `2026-05-23.side-quest-formalisation`
   - `2026-05-23.snapshot-trigger-config`
   - `2026-05-23.verification-overhaul-candidate-model`
+  - `2026-06-10.view-hardcodes-dogfood-data-dir`
 - **plan**
   - `T2-ingest`
   - `T3-autonomous-extractor`
@@ -86,7 +85,7 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 0/5 T3 complete (0%); 4 live
+- **M4-fresh-install**: 1/5 T3 complete (20%); 3 live
 
 ---
-_63 entities · 86 relationships · 20 decisions._
+_64 entities · 86 relationships · 21 decisions._

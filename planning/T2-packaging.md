@@ -20,7 +20,7 @@ Packaging is not an end-of-project concern. It's continuous. Every milestone del
 
 ## 2. What lives in this theme
 
-- **Plugin root directory** — `agent-plan-tracker/` at the repo root. The canonical location everything ships from.
+- **Plugin root directory** — `agent-plan-visualiser/` at the repo root. The canonical location everything ships from.
 - **Plugin manifest** — `.claude-plugin/plugin.json`. Required by Claude Code's plugin spec.
 - **Subdirectory layout** — both Claude-spec-conforming dirs (`commands/`, `agents/`, `skills/`, `hooks/`) and project-custom dirs (`scripts/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`).
 - **Repack-and-test loop** — local script that validates plugin installability.
@@ -44,16 +44,16 @@ Investigated via `plugin-dev:plugin-structure` skill during M1's `T3-plugin-scaf
 ### 3.2 Plugin directory layout
 
 ```
-agent-plan-tracker/                          # plugin root (at repo root)
+agent-plan-visualiser/                          # plugin root (at repo root)
   .claude-plugin/
     plugin.json                              # manifest — required location, kebab-case name
   README.md
   commands/
-    <slash command .md files>                # auto-discovered (e.g. /apt-extract, /apt-audit)
+    <slash command .md files>                # auto-discovered (e.g. /apv-init, /apv-audit)
   agents/
     <subagent .md files>                     # auto-discovered (e.g. M2 extraction agent)
   skills/
-    using-agent-plan-tracker/
+    using-agent-plan-visualiser/
       SKILL.md                               # formal spec, full ontology
   hooks/
     hooks.json                               # event-handler configuration
@@ -92,25 +92,25 @@ agent-plan-tracker/                          # plugin root (at repo root)
 
 ### 3.3 Manifest contents (`.claude-plugin/plugin.json`)
 
-Current (v0.1.0-pre-m1):
+Current (v0.4.0, post-rename 2026-06-10):
 
 ```json
 {
-  "name": "agent-plan-tracker",
-  "version": "0.1.0-pre-m1",
-  "description": "Event-sourced planning methodology with git-history extraction and projection.",
+  "name": "agent-plan-visualiser",
+  "version": "0.4.0",
+  "description": "Event-sourced planning methodology with git-history extraction and projection. Walks a project's git history, extracts structured events against a defined ontology, and provides projections (audits, diagrams, status reports) over the resulting event log.",
   "author": { "name": "Alastair Brayne" },
   "keywords": ["planning", "event-sourcing", "git", "audit", "methodology", "claude-code"]
 }
 ```
 
-Version bumps to `0.1.0` when M1 lands fully; semver from there.
+Semver tracks the milestone era (0.&lt;milestone&gt;.x); the first test-channel cut is T3-distribution's call.
 
 ### 3.4 Plugin instruction shape (the skill tells downstream agents)
 
 - Prefer existing `scripts/<script>` over generating SQL from scratch — major token saving.
 - If you find yourself generating a useful query repeatedly, save it to `scripts/local/<descriptive-name>.sql` for future agents and humans. Lookup order: `scripts/` → `scripts/local/` → generate-from-scratch-and-save.
-- For ontology/schema questions, go to `skills/using-agent-plan-tracker/SKILL.md` (the formal spec). For common operations, `cheatsheet/cheatsheet.md`. For worked scenarios, `cheatsheet/worked-examples/`. The formal spec is the floor, not the everyday surface.
+- For ontology/schema questions, go to `skills/using-agent-plan-visualiser/SKILL.md` (the formal spec). For common operations, `cheatsheet/cheatsheet.md`. For worked scenarios, `cheatsheet/worked-examples/`. The formal spec is the floor, not the everyday surface.
 - The `philosophies/` content grounds judgement calls when instructions don't anticipate something.
 
 ### 3.5 Repack-and-test loop
@@ -126,15 +126,15 @@ Plugin-structure smoke validations (M2-scoped — vacuously true until skills/ho
 
 ### 3.6 Repository layout (where the plugin sits relative to dogfood)
 
-The `agent-plan-tracker/` directory IS the plugin. The repo also contains:
+The `agent-plan-visualiser/` directory IS the plugin. The repo also contains:
 
-- `agent-plan-tracker/` — the plugin.
+- `agent-plan-visualiser/` — the plugin.
 - `planning/` — this project's own plans (dogfood).
 - `.agent-plan-tracker/` — this project's own event log (dogfood).
 - `CLAUDE.md` — this project's session-start orientation.
 - `.gitignore`, `README.md` (eventual) at repo root.
 
-The dual presence (`agent-plan-tracker/` AS plugin + `.agent-plan-tracker/` AS dogfood event log) is by design: the plugin lives at one path; the data it works against lives at another path with a similar but distinct name. Future agents reading the repo can distinguish *the tool* from *the tool used on itself*.
+The dual presence (`agent-plan-visualiser/` AS plugin + `.agent-plan-tracker/` AS dogfood event log) is by design: the plugin lives at one path; the data it works against lives at another path with a similar but distinct name. Future agents reading the repo can distinguish *the tool* from *the tool used on itself*.
 
 ## 4. Artefact strategy
 
@@ -149,7 +149,7 @@ The distribution strategy (T2 lock-in deferred to M4):
 - The Claude plugin works in both Claude Code and Claude Cowork automatically.
 - The plugin's project-init slash command writes git hooks into the target project's `.git/hooks/`.
 
-Naming TBD — `apt` was rejected due to namespace collision with Debian/Ubuntu's package manager. Alternatives in play: `agent-plan-tracker` (current working name, verbose), `plan-spine`, `git-plan`, `apgt`, `aplan`, `apath`. Decide before M4 publish.
+Naming TBD — `apt` was rejected due to namespace collision with Debian/Ubuntu's package manager. Alternatives in play: `agent-plan-visualiser` (current working name, verbose), `plan-spine`, `git-plan`, `apgt`, `aplan`, `apath`. Decide before M4 publish.
 
 ## 5. T3 candidates
 

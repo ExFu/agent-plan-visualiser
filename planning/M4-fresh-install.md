@@ -18,7 +18,7 @@ M1–M3 built the methodology and proved it on this repo — where the toolchain
 
 The consumer question M4 answers: **how does a downstream agent know how to install and use this?** The design stance: knowledge is delivered just-in-time through three channels, never front-loaded —
 
-1. **Skill descriptions** (when to act): `/apt-capture` and `/apt-merge` trigger off the repo fingerprint at the moments that matter. Ships free with the plugin spec — already built.
+1. **Skill descriptions** (when to act): `/apv-capture` and `/apv-merge` trigger off the repo fingerprint at the moments that matter. Ships free with the plugin spec — already built.
 2. **Enforcement refusals** (when discipline slips): the guard and gate hooks name the missing skill and the repair path in their refusal messages. Already built.
 3. **Bootstrap + orientation** (once per repo, once per session): nothing today initialises a repo, installs the hooks, or tells a session "this project is tracked". **This is M4's build.**
 
@@ -26,7 +26,7 @@ The consumer question M4 answers: **how does a downstream agent know how to inst
 
 ### 2.1 Code/data split is absolute
 
-An attached repo carries **data**: the log, `.apt-config.toml`, and installed git-hook copies. It never carries toolchain. The toolchain home is the plugin install (`${CLAUDE_PLUGIN_ROOT}`); the dogfood repo's vendored copy remains a supported home (it is simply "the toolchain happens to live in the repo"). M3 already made this executable for schemas; M4 finishes it for every script, skill and hook reference. Installed hook copies bake the toolchain path at install time — the resolution chain (env → repo-vendored → plugin root → PATH) decides once, at init.
+An attached repo carries **data**: the log, `.apv-config.toml`, and installed git-hook copies. It never carries toolchain. The toolchain home is the plugin install (`${CLAUDE_PLUGIN_ROOT}`); the dogfood repo's vendored copy remains a supported home (it is simply "the toolchain happens to live in the repo"). M3 already made this executable for schemas; M4 finishes it for every script, skill and hook reference. Installed hook copies bake the toolchain path at install time — the resolution chain (env → repo-vendored → plugin root → PATH) decides once, at init.
 
 ### 2.2 Init is a user-triggered, idempotent command
 
@@ -48,7 +48,7 @@ Attaching to an existing repo = init-from-now: empty log, hooks live, the next c
 
 ## 4. How a cold agent experiences the result (definition of the job)
 
-Install plugin → open any repo → session orientation says nothing (untracked) or one line (tracked). Run the init command on a project → data dir, config, three hooks, orientation block. Work normally → the capture skill triggers before commits; the guard catches misses; the gate guards main; `/apt-merge` lands branches. At no point does the user read a manual; at no point does the agent need this repo's CLAUDE.md.
+Install plugin → open any repo → session orientation says nothing (untracked) or one line (tracked). Run the init command on a project → data dir, config, three hooks, orientation block. Work normally → the capture skill triggers before commits; the guard catches misses; the gate guards main; `/apv-merge` lands branches. At no point does the user read a manual; at no point does the agent need this repo's CLAUDE.md.
 
 ## 5. How M4 delivers — T3 tasks
 

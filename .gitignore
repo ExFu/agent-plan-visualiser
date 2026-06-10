@@ -13,11 +13,14 @@ _scratch/
 # Background-agent worktrees (Claude agent SDK creates these for isolation)
 .claude/worktrees/
 
-# agent-plan-tracker local-only data: shadow data dir for M2 shadow-dev
-# (APT_DATA_DIR target), and the local capture timestamp consumed by the
+# agent-plan-visualiser local-only data: shadow data dir for M2 shadow-dev
+# (APV_DATA_DIR target), and the local capture timestamp consumed by the
 # capture-guard hook.
 .agent-plan-tracker-auto/
 .agent-plan-tracker/.last-capture
 
-# Python bytecode cache (scripts/ now imports aptlib, which generates this)
+# Python bytecode cache (scripts/ now imports apvlib, which generates this)
 __pycache__/
+
+# Editor/agent-plugin local state — never plugin content.
+.omc/
