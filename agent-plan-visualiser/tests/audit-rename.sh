@@ -47,6 +47,8 @@ PATTERNS = re.compile(
 )
 
 def allowed_file(p: str) -> bool:
+    if p == "agent-plan-visualiser/tests/audit-rename.sh":
+        return True  # the audit necessarily contains the patterns it hunts
     if p.startswith(".agent-plan-tracker/"):
         return True
     if p.startswith("agent-plan-visualiser/schemas/"):

@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-10T21:34:17Z
+# Project state — generated 2026-06-10T21:36:10Z
 
-**Total events:** 369  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 40  ·  **Orphaned:** 0
+**Total events:** 371  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 40  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -18,7 +18,7 @@
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
 
 - **(milestone)**
-  - `M4-fresh-install` (5 events): entity.extended → entity.accepted → entity.extended
+  - `M4-fresh-install` (6 events): entity.accepted → entity.extended → entity.progressed
 
 - **T2-packaging**
   - `T3-distribution` (4 events): relationship.spawns → entity.extended → entity.accepted
