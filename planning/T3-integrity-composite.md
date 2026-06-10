@@ -80,3 +80,12 @@ data_dir = ".agent-plan-tracker"
 
 1. **Seal↔commit correspondence** (each seal's `message_first_line` matches a real commit) needs git access. In the composite, in `gate-check`, or deferred? Lean: `gate-check` — boundary context owns git; the composite stays log-only.
 2. **Plumbing share with `repack-validate.sh`** — separate entry points, but may invoke the same validator module. Confirm during build.
+
+## 7. Build notes (2026-06-10)
+
+Shipped: `scripts/gate-composite.py` (stdlib-only), `.apt-config.toml` at repo root, fixtures + runner under `tests/gate/`. All four §4 verification items pass (`run-gate-tests.sh`: 21 assertions, five cases; real log exits 0 with 7 honest stalled warnings). Decisions settled during the build:
+
+- **Epoch rule.** Replay-semantics checks enforce the 0.3.0 capture discipline only from the regime that introduced it (`EPOCH = (0,3,0)`, hardcoded — an ontology fact, not a project preference, so deliberately not config). Keying differs by check: **implementation-on-draft keys on the entity's birth regime** (its `entity.created` schema_version) — draft is a creation-time property, and cache-build's retroactive created→draft is a replay convenience, not a historical claim. The record validates this: the first acceptance ceremony (log lines 259–265) accepted exactly the 7 plans born into 0.3.0, while T3-entity-accepted, born 0.2.0, needed none. **Lifecycle-without-created** and **resurrection-without-reopen** key on the offending event's schema_version. **Structural checks** (schema routing, dangling decision refs, relationship existence, sealed-tail, fulcrum-without-decision) apply to all epochs — never legitimate in any regime.
+- **Implicit-work carve-out is strict**: `entity_type == "implicit-work"` AND created's seal block == offending event's seal block. Plans get no same-block grace.
+- **Blocking replays raw `events.jsonl`; warn reads `cache.sqlite`** (lazily rebuilt via subprocess when event count mismatches the log). Blocking never trusts the cache — cache-build tolerates and repairs the very defects the gate exists to catch. A blocking-check exception fails closed (synthesized BLOCK); a warn-check exception degrades to a stderr notice.
+- **§6 Q2 resolved**: separate entry points, shared validator — the composite subprocesses `validate-events.sh` per schema-version group and maps line numbers back. §6 Q1 unchanged — seal↔commit stays with `gate-check` (T3-gate-core).

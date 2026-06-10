@@ -1,0 +1,4 @@
+# Mirror of the repo-root .apt-config.toml [gate] defaults — fixture baseline.
+[gate]
+blocking = ["schema", "referential", "sealed-tail", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision"]
+warn = ["drift", "orphans", "stalled", "long-blockers"]

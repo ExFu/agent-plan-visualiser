@@ -1,0 +1,6 @@
+# Config-flip fixture (T3-integrity-composite §4.4, warn->blocking direction):
+# drift promoted to blocking. Against fixture-drift the gate must exit 1
+# with a BLOCK [drift] line.
+[gate]
+blocking = ["schema", "referential", "sealed-tail", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision", "drift"]
+warn = ["orphans", "stalled", "long-blockers"]

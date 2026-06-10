@@ -1,0 +1,6 @@
+# Config-flip fixture (T3-integrity-composite §4.4, blocking->warn direction):
+# sealed-tail demoted to warn. Against fixture-corrupt the gate must still
+# exit 1 (three blockers remain) but report sealed-tail as WARN, not BLOCK.
+[gate]
+blocking = ["schema", "referential", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision"]
+warn = ["sealed-tail", "drift", "orphans", "stalled", "long-blockers"]

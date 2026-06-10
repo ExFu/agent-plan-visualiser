@@ -1,0 +1,2 @@
+# Fixture caches are derived artifacts (rebuilt by run-gate-tests.sh).
+fixture-*/cache.sqlite
