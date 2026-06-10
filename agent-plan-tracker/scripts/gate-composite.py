@@ -364,28 +364,39 @@ def check_impl_on_draft(ctx):
 def check_resurrection(ctx):
     """State-bearing events on a closed entity without an intervening
     entity.reopened. Branch-agnostic — also catches cross-branch
-    contradictions after a merge. Epoch-keyed on the offending event."""
-    instances = []
+    contradictions after a merge. Epoch-keyed on the offending event.
+
+    A LATER entity.reopened for the same entity heals the violations
+    before it: every blocking check must be append-only-repairable, and
+    the /apt-merge reconciliation repairs a merged contradiction by
+    appending the operator's ruling (reopened + paired decision — the
+    fulcrum check guarantees the decision). What blocks at the boundary
+    is the UNRESOLVED contradiction; a resolved one reads coherently:
+    the ruling is in the log. A reopen heals only what precedes it —
+    violations after it accumulate afresh."""
+    pending = {}  # (et, eid) -> [(line_no, instance)] awaiting a healing reopen
     state = {}
     for ev in ctx.events:
         et, eid = ev.get("entity_type"), ctx.rid(ev.get("entity_id"))
         if not (et and eid):
             continue
         key, t = (et, eid), ev["type"]
-        if (
+        if t == "entity.reopened":
+            pending.pop(key, None)  # ruling recorded — earlier contradiction resolved
+        elif (
             state.get(key) == "closed"
             and t in STATE_FROM_EVENT
-            and t != "entity.reopened"
             and parse_version(ev.get("schema_version")) >= EPOCH
         ):
-            instances.append(
+            pending.setdefault(key, []).append((
+                ev["_line_no"],
                 f"{t} {ev['event_id']} (line {ev['_line_no']}): {et} '{eid}' is "
-                f"closed — resurrection requires entity.reopened (+ paired decision)"
-            )
+                f"closed — resurrection requires entity.reopened (+ paired decision)",
+            ))
         new_state = STATE_FROM_EVENT.get(t)
         if new_state and not (t in DRAFT_PRESERVING and state.get(key) == "draft"):
             state[key] = new_state
-    return instances
+    return [msg for _, msg in sorted(p for lst in pending.values() for p in lst)]
 
 
 def check_fulcrum(ctx):

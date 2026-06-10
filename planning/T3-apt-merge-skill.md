@@ -51,3 +51,13 @@ Bringing a branch's event log to main is the one moment append-only discipline i
 
 1. **Does a clean merge commit need a seal?** Lean no — nothing happened to the log (M3-clean-gate §3.2); positional rollup tolerates sealess commits.
 2. **Sandbox test required or stretch?** (M3-clean-gate §8 Q3 — resolve when the real merge's conflict surface is known.)
+
+## 7. Build notes (2026-06-10)
+
+Shipped: `skills/apt-merge/SKILL.md` (the doctrine — lightest-integration table, the prefix+append recipe, semantic pass, seal-by-merge-commit, gate-then-ff landing, manual degradation §6) and `tests/gate/run-aptmerge-sandbox.sh` (21 assertions, 3 cases). Settled during the build:
+
+- **§6 Q1 resolved: no.** A clean merge bypasses the pre-commit hook by git's own design — nothing happened to the log, so no capture and no seal; sealless merge commits are tolerated (positional rollup skips them, seal↔commit checks log→git only). A *conflicted* merge is the designed opposite: the guard fires correctly, the minimum capture is a seal-only block, and contradictions add reconciliation events before the seal. Both halves sandbox-asserted.
+- **§6 Q2 resolved: required, and built.** The real merge (this branch → main) is a pure fast-forward — main sits at the merge-base — so the self-referential acceptance test exercises no conflict. The sandbox carries the contradiction verification (closes M3-clean-gate §8 Q3 the same way).
+- **`check_resurrection` learns the healed shape** (cross-T3 change, documented like gate-core's schema-home fix): a later `entity.reopened` resolves the violations before it for that entity. Every blocking check must be **append-only-repairable** — the recipe linearises a cross-branch contradiction as closed-then-progressed, and nothing can ever be inserted before the violation. What blocks at the boundary is the *unresolved* contradiction; the ruling's paired decision is guaranteed by the fulcrum check; a reopen heals only what precedes it.
+- **Gate placement (skill §5)**: run `gate-check` *after* concluding the merge commit, from the branch — both parents reachable, every seal resolves (mid-merge, main's seals would look orphaned). "Before main moves" is the invariant, not "before the merge commit exists".
+- **aptlib TOML fallback** (build-surfaced): stock macOS python3 is 3.9.6 — no `tomllib` — and `apt_config` silently returned `{}` with a config *present*: gate policy ignored, and a configured `[storage] data_dir` would silently misroute data. Added `_parse_toml_minimal` (strict subset: tables, strings, booleans, integers, single-line string arrays); anything outside the subset fails loud per M3 §3.3's own doctrine. The fixture suite's config-flip cases now exercise whichever parser path the host python provides.

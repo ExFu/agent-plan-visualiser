@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-10T01:30:33Z
+# Project state — generated 2026-06-10T12:21:18Z
 
-**Total events:** 321  ·  **Draft:** 11  ·  **Live:** 9  ·  **Dormant:** 0  ·  **Closed:** 37  ·  **Orphaned:** 0
+**Total events:** 326  ·  **Draft:** 11  ·  **Live:** 8  ·  **Dormant:** 0  ·  **Closed:** 38  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,16 +20,10 @@
 - **(milestone)**
   - `M3-clean-gate` (3 events): entity.created → relationship.spawns → entity.accepted
 
-- **T2-extraction**
-  - `T3-apt-merge-skill` (3 events): entity.created → relationship.spawns → entity.accepted
-
 ### By milestone
 
 - **(self: M3-clean-gate)**
   - `M3-clean-gate`
-
-- **M3-clean-gate**
-  - `T3-apt-merge-skill`
 
 ## Draft
 
@@ -78,7 +72,7 @@ _No flapping closures._
 - **M1.1-analyser**: 6/6 T3 complete (100%); 0 live
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
-- **M3-clean-gate**: 2/3 T3 complete (66%); 1 live
+- **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
 
 ---
-_57 entities · 75 relationships · 15 decisions._
+_57 entities · 75 relationships · 16 decisions._
