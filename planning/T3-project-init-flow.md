@@ -23,9 +23,9 @@ Plugin install is per-user; tracking is per-repo. Nothing today bridges them —
 Single command (final name post-rename, e.g. `/apv-init`), runnable in any git repo:
 
 1. **Preconditions**: a git repo; refuses bare repos; detects an already-attached repo and switches to report-and-repair mode.
-2. **Seed**: create the data dir (name per M4 §7 Q3), empty `events.jsonl` (created explicitly *here* — the one sanctioned creation site), write `.apv-config.toml` with `[storage] data_dir` + default `[gate]` lists.
+2. **Seed**: create the data dir — **`.apv/`** (M4 §7 Q3, ruled 2026-06-10) — with an empty `events.jsonl` (created explicitly *here* — the one sanctioned creation site), and write `.apv-config.toml` with `[storage] data_dir = ".apv"` + default `[gate]` lists.
 3. **Hooks**: run the three existing installers (capture-guard pre-commit; gate pre-push; gate ref-update) with the toolchain path baked (T3-toolchain-portability). Their fresh/identical/differs contract is the idempotency story — a foreign hook refuses loudly, never clobbers.
-4. **Orient**: offer (never write unasked — M4 §7 Q4) a CLAUDE.md block: one paragraph naming the discipline and the skills.
+4. **Orient**: offer to write a CLAUDE.md block — one paragraph naming the discipline and the skills. Ruled (M4 §7 Q4, 2026-06-10): the offer makes clear **init is its only trigger** (no other code path writes or re-offers; re-run init to be offered again), and writing requires **explicit user acceptance** — never unasked.
 5. **Hand off**: print next steps — "work normally; capture before commits; the guard will catch you if you forget".
 
 Re-run = audit mode: report each component's state (present/missing/differs), fix the missing, touch nothing else.

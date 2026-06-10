@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-10T20:34:19Z
+# Project state — generated 2026-06-10T21:02:49Z
 
-**Total events:** 352  ·  **Draft:** 16  ·  **Live:** 7  ·  **Dormant:** 0  ·  **Closed:** 39  ·  **Orphaned:** 0
+**Total events:** 363  ·  **Draft:** 12  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 39  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -17,6 +17,26 @@
   - `T2-projection` (14 events): analysis.invalidated → entity.progressed → entity.extended
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
 
+- **(milestone)**
+  - `M4-fresh-install` (5 events): entity.extended → entity.accepted → entity.extended
+
+- **T2-packaging**
+  - `T3-distribution` (4 events): relationship.spawns → entity.extended → entity.accepted
+  - `T3-project-init-flow` (4 events): relationship.spawns → entity.accepted → entity.extended
+  - `T3-session-orientation` (3 events): entity.created → relationship.spawns → entity.accepted
+  - `T3-toolchain-portability` (3 events): entity.created → relationship.spawns → entity.accepted
+
+### By milestone
+
+- **(self: M4-fresh-install)**
+  - `M4-fresh-install`
+
+- **M4-fresh-install**
+  - `T3-distribution`
+  - `T3-project-init-flow`
+  - `T3-session-orientation`
+  - `T3-toolchain-portability`
+
 ## Draft
 
 - **inbox-item**
@@ -31,12 +51,8 @@
   - `2026-05-23.snapshot-trigger-config`
   - `2026-05-23.verification-overhaul-candidate-model`
 - **plan**
-  - `M4-fresh-install`
   - `T2-ingest`
-  - `T3-distribution`
-  - `T3-project-init-flow`
-  - `T3-session-orientation`
-  - `T3-toolchain-portability`
+  - `T3-autonomous-extractor`
 
 ## Blocked
 
@@ -70,7 +86,7 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 0/4 T3 complete (0%); 0 live
+- **M4-fresh-install**: 0/5 T3 complete (0%); 4 live
 
 ---
-_62 entities · 84 relationships · 19 decisions._
+_63 entities · 86 relationships · 20 decisions._
