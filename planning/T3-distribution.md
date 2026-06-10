@@ -16,12 +16,12 @@ status: draft
 
 ## 1. Why
 
-Everything before this T3 makes the plugin *work* anywhere; this T3 makes it *arrive* anywhere. Distribution mechanism is the last unresolved packaging stance (T2-packaging §4 sketched npm before Claude plugin marketplaces matured) — decide it with a decision event, then build the artefact.
+Everything before this T3 makes the plugin *work* anywhere; this T3 makes it *arrive* anywhere. For the test phase the mechanism is ruled (§2.1); the public-distribution stance (T2-packaging §4's npm sketch vs the matured plugin marketplaces) stays open deliberately until test-client feedback warrants deciding it.
 
 ## 2. What
 
-1. **Mechanism decision** (M4 §7 Q2): Claude Code plugin marketplace vs npm vs both. Evaluate against: install UX (one command?), version/update story, Cowork reachability, private-repo friction. Record as a `decision` event + plan note.
-2. **The artefact**: package the plugin tree (manifest, skills, hooks + hooks.json, scripts, schemas, view, cheatsheet, philosophies) per the chosen mechanism; version from the manifest (semver — first public cut).
+1. **Mechanism — ruled for the test phase** (operator, 2026-06-10, resolves M4 §7 Q2 for now): **bundle the plugin**; deploy the bundle to exfu.ai as a private test channel (placement and upload flow: operator walkthrough pending) so test clients can install it and feed back. Public distribution is **deferred, not decided** — revisit on feedback. The exfu-solo plugin already distributes as a bundle via exfu.ai, so the channel pattern exists.
+2. **The artefact**: package the plugin tree (manifest, skills, hooks + hooks.json, scripts, schemas, view, cheatsheet, philosophies) as an installable bundle; version from the manifest (semver — first test cut).
 3. **Cowork verification** (T2-packaging §7 Q3): install + load in Cowork; document deltas (or confirm none).
 4. **CI gate adapter template**: the thin caller M3 scoped out — a GitHub Actions example invoking `gate-check --ref` on PRs to main, shipped as documentation/template, no Actions dependency in the plugin itself.
 5. **README quickstart**: install → init → first captured commit, in ten lines.
@@ -48,5 +48,5 @@ Everything before this T3 makes the plugin *work* anywhere; this T3 makes it *ar
 
 ## 6. Open questions
 
-1. Distribution mechanism (the §2.1 decision itself).
+1. ~~Distribution mechanism~~ — ruled for the test phase (§2.1). Remaining: where on exfu.ai and the upload/update flow (operator walkthrough pending); and the public-distribution question, deferred until test feedback.
 2. Does the dogfood repo consume the plugin from the artefact thereafter (eat the shipped build), or keep the vendored tree as the development home with the artefact derived? Lean: vendored stays the dev home; artefact is derived output.

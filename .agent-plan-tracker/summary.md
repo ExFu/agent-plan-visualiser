@@ -1,6 +1,6 @@
-# Project state — generated 2026-06-10T13:37:55Z
+# Project state — generated 2026-06-10T20:34:19Z
 
-**Total events:** 348  ·  **Draft:** 16  ·  **Live:** 7  ·  **Dormant:** 0  ·  **Closed:** 39  ·  **Orphaned:** 0
+**Total events:** 352  ·  **Draft:** 16  ·  **Live:** 7  ·  **Dormant:** 0  ·  **Closed:** 39  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -73,4 +73,4 @@ _No flapping closures._
 - **M4-fresh-install**: 0/4 T3 complete (0%); 0 live
 
 ---
-_62 entities · 84 relationships · 18 decisions._
+_62 entities · 84 relationships · 19 decisions._

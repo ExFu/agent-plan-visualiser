@@ -72,7 +72,7 @@ All under T2-packaging. Consolidates that plan's §5 M4-scheduled candidates (`T
 ## 7. Open questions
 
 1. **Extractor placement** — later-wave M4 (current lean) or its own milestone? Operator call at acceptance.
-2. **Distribution mechanism** — npm package vs Claude Code plugin marketplace vs both (T2-packaging §4 sketched npm-bundles-both before marketplaces matured). Resolve in T3-distribution with a decision event.
+2. **Distribution mechanism** — npm package vs Claude Code plugin marketplace vs both (T2-packaging §4 sketched npm-bundles-both before marketplaces matured). **Ruled for the test phase (operator, 2026-06-10): bundle the plugin and deploy to exfu.ai as a private test channel for test-client feedback; public distribution deferred, not decided.** T3-distribution carries the bundle; the public question reopens on test feedback.
 3. **Fresh-install data dir name** — `.agent-plan-visualiser/` (consistent) vs `.apv/` (short). Decide in T3-project-init-flow; dogfood stays grandfathered either way.
 4. **CLAUDE.md block** — does init write it by default or offer it? Lean: offer, never write unasked.
 5. **Cowork deltas** — unknown until T3-distribution verifies (T2-packaging §7 Q3).
