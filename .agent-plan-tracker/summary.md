@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-03T17:56:28Z
+# Project state — generated 2026-07-03T18:20:48Z
 
-**Total events:** 445  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 48  ·  **Orphaned:** 0
+**Total events:** 449  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 48  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -19,7 +19,7 @@
 
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
-  - `M5-backfill` (5 events): entity.accepted → entity.extended → entity.progressed
+  - `M5-backfill` (7 events): entity.progressed → entity.extended → entity.progressed
 
 - **T2-packaging**
   - `T3-distribution` (8 events): entity.progressed → verification.tested → verification.skipped
@@ -89,4 +89,4 @@ _No flapping closures._
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 
 ---
-_71 entities · 97 relationships · 23 decisions._
+_71 entities · 97 relationships · 24 decisions._

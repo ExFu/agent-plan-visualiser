@@ -58,6 +58,12 @@ import apvlib  # noqa: E402
 
 DEFAULT_PROMPT = Path(__file__).resolve().parent / "extract-commit-prompt.md"
 SCHEMA_PATH = SCRIPTS.parent / "schemas/0.4.0/events.schema.json"
+# Oversize diffs are TRUNCATED with an explicit marker, not halted: unlike
+# live capture (which can ask the committer to split), history cannot be
+# re-cut, and the complete name-status listing + message keep classification
+# viable. Surfaced by the exfu rehearsal staging: release commits with
+# bundled artefacts produce ~300k-char diffs.
+DIFF_CAP = 120_000
 FORBIDDEN_TYPES = {"entity.accepted", "analysis.live-summary", "analysis.invalidated"}
 UUID4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
@@ -149,6 +155,12 @@ def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
     meta = commit_meta(project_path, commit_ref)
     body = git(["show", "-s", "--format=%b", commit_ref], project_path)
     diff = git(["show", "--format=", commit_ref], project_path)
+    if len(diff) > DIFF_CAP:
+        diff = (diff[:DIFF_CAP]
+                + f"\n\n[... diff truncated at {DIFF_CAP} chars of "
+                f"{len(diff)} — too large for single-shot extraction; the "
+                f"files-touched listing below is COMPLETE; classify from it "
+                f"+ the message where the diff is missing ...]")
     name_status = git(["show", "--name-status", "--format=", commit_ref], project_path).strip()
 
     planning_files = []

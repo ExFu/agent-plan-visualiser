@@ -75,3 +75,10 @@ The design ground is already ratified (2026-07-03):
 ## 8. After M5
 
 The plugin is whole: adopt forward from today (M4), recover backward when wanted (M5). What remains beyond is distribution maturity (public channel, T2-packaging §8) and ontology reviews (verification overhaul, T2-ontology §7 Q1).
+
+## 9. Amendments at wave 3 (operator rulings, 2026-07-03)
+
+1. **The §4 self-referential test is vacuous — discovered at rehearsal staging.** This repo's log begins at its *first commit* (the bootstrap seal corresponds to `ce330f02`); there is no pre-adoption history to mine, and the boundary detector correctly reports nothing. **Ruled: exfu_website is the rehearsal AND the reference** — one target proves the machinery and the non-native story together. §4's native-proof bullet is superseded by: the exfu rehearsal (disposable clone) runs backfill live, gate green, projections unfurl, triage exercised, repudiation demonstrated on its real data.
+2. **Extraction runs on latest Sonnet, never Fable** (`APV_EXTRACT_MODEL=sonnet`) — bulk per-commit extraction is too expensive for the top-tier model and gains nothing from it. Standing preference, recorded in session memory too.
+3. **Nested-auth constraint**: `claude -p` cannot authenticate from inside a Claude Code session (no credentials file; OAuth lives with the host app) — live runs are operator-run from a normal terminal. The rehearsal is staged accordingly: disposable clone at `~/Studio/projects/exfu_website-backfill-rehearsal/` (attached via /apv-init, agent-drafted mapping note placed, dry-run verified) with `run-rehearsal.sh` as the one-command entry (sample 10 commits; `--full` = all 61).
+4. **Oversize-diff handling ruled by rehearsal evidence**: exfu release commits produce ~300k-char diffs; backfill now truncates at 120k with an explicit in-bundle marker (the complete files-touched listing is preserved) rather than halting — history cannot be re-cut, unlike live capture.
