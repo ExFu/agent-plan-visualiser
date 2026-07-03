@@ -64,9 +64,13 @@ The design ground is already ratified (2026-07-03):
 ## 7. Open questions (for the acceptance ceremony)
 
 1. **Self-referential native test** — confirm the dogfood repo's own pre-adoption history as the wave's first backfill target (lean: yes — M3 and M4 both proved themselves on themselves).
-2. **Non-native reference project** — which real project is the canonical first non-native target (T2-ingest §4 suggested one of the operator's client projects)? Operator call; can land after the native test without blocking the milestone.
-3. **Extractor consolidation** — `T3-autonomous-extractor` (M4, unaccepted draft) and `T3-backfill-workflow` share the per-commit `claude -p` machinery. Accept the extractor into this wave, keep it M4, or fold it into #3? Operator call at ceremony.
-4. **0.4.0 timing** — bump at wave 1 (schema exists before any backfilled event) or lazily at first emission? Lean: wave 1 — the UI and gate work need the schema to test against.
+   **RESOLVED at acceptance (operator, 2026-07-03): yes — rehearsed in a disposable copy.** The proof run executes against a sandbox copy of this repo ("a test folder", operator's phrasing); appending the segment to the *real* dogfood log is a separate, explicitly operator-triggered step once the rehearsal is green.
+2. **Non-native reference project** — which real project is the canonical first non-native target?
+   **RESOLVED at acceptance (operator, 2026-07-03): `/Users/al/Studio/projects/exfu_website`, particularly its `plugin/` subdir.** Read-only until the mapping note is authored and the operator triggers the run.
+3. **Extractor consolidation** — `T3-autonomous-extractor` (M4, unaccepted draft) shares the per-commit `claude -p` machinery with `T3-backfill-workflow`.
+   **RESOLVED at acceptance (operator, 2026-07-03): accepted and built now.** The operator had believed it already built — surfacing a methodology gap (nothing *prompts* a pending ceremony; see the inbox item filed with this ruling). It keeps its M4 identity (already ruled in-wave there); `T3-backfill-workflow` consumes its machinery.
+4. **0.4.0 timing** — bump at wave 1 or lazily at first emission?
+   **RESOLVED at acceptance (operator, 2026-07-03): wave 1, as recommended** — the schema exists before any backfilled event; UI and gate work test against it.
 
 ## 8. After M5
 
