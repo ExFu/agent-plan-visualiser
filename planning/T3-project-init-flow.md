@@ -55,3 +55,15 @@ Re-run = audit mode: report each component's state (present/missing/differs), fi
 
 1. Command shape: plugin slash-command invoking a script, vs script-only with the skill documenting it? Lean: slash command (discoverable) wrapping one idempotent script (testable).
 2. Should init offer `--at=manual` (no hooks, gate-on-demand) for hook-averse teams? Lean: yes, flag-through to the installers.
+
+## 7. Build notes (2026-07-03)
+
+Both §6 leans ratified in the build:
+
+- **Q1 — slash command wrapping one idempotent script.** `scripts/apv-init.sh` owns every filesystem action; `commands/apv-init.md` owns the conversation (relay the per-component report; ask the CLAUDE.md question explicitly; re-run with `--accept-claude-md` only on the user's yes).
+- **Q2 — `--at=manual` flags through**: no git hooks installed, the on-demand gate contract printed instead. `--at=pre-push`/`--at=ref-update` install a single gate adapter; the default installs all three hooks.
+- **Vendored-vs-external detection**: the toolchain home is the script's own parent; when it sits inside the repo being attached the gate installers run bare (one shared hook copy must serve every worktree — the dogfood story), otherwise `--home=` bakes the plugin home (T3-toolchain-portability's contract, consumed as designed).
+- **CLAUDE.md offer is marker-guarded** (`<!-- apv:orientation -->`): accepted runs are idempotent, the offer repeats only on re-init, nothing is ever written unasked (M4 §7 Q4 honoured).
+- **Foreign-hook refusal aggregates**: init continues past a refused slot, surfaces the installer's own refusal text, exits 1 (§4.2's loud-but-partial shape).
+- **Gate green on an empty log confirmed** — adopting repos start at zero events and pass; `schema-version.txt` seeded as a human-readable epoch marker (no toolchain consumer).
+- Sandbox: `tests/init/run-init-sandbox.sh` covers §4.1–4.3 plus `--at=manual` and acceptance idempotency.
