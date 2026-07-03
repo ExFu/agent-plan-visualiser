@@ -86,6 +86,18 @@ RELATIONSHIP_FROM_TYPES = {
 # not project preference — hence code, not config.
 EPOCH = (0, 3, 0)
 
+
+def is_backfilled(ev):
+    """Origin-aware enforcement (T2-ontology §3.12, the 0.4.0 provenance
+    epoch): discipline checks do not JUDGE backfilled events — they record
+    what happened, not what should have; the methodology cannot be demanded
+    retroactively of commits that predate adoption. Backfilled events still
+    FOLD into state (the replay must see them) and schema validity applies
+    in full regardless of origin. This generalises the schema_version epoch
+    keying above: epochs key on when discipline existed; provenance keys on
+    whether anyone was there to practise it."""
+    return ev.get("origin") == "backfilled"
+
 # Built-in defaults — identical to the committed .apv-config.toml [gate]
 # lists; used when no config file exists (the gate must run pre-adoption).
 DEFAULT_BLOCKING = [
@@ -341,7 +353,8 @@ def check_impl_on_draft(ctx):
         if not (et and eid):
             continue
         key, t = (et, eid), ev["type"]
-        if t in ("entity.progressed", "entity.completed") and state.get(key) == "draft":
+        if (t in ("entity.progressed", "entity.completed")
+                and state.get(key) == "draft" and not is_backfilled(ev)):
             birth = ctx.created_sv.get(key)
             if birth is not None and birth >= EPOCH:
                 same_block_implicit = (
@@ -387,6 +400,7 @@ def check_resurrection(ctx):
             state.get(key) == "closed"
             and t in STATE_FROM_EVENT
             and parse_version(ev.get("schema_version")) >= EPOCH
+            and not is_backfilled(ev)
         ):
             pending.setdefault(key, []).append((
                 ev["_line_no"],
@@ -402,17 +416,27 @@ def check_resurrection(ctx):
 def check_fulcrum(ctx):
     """Fulcrum events not paired with a same-commit decision referencing
     them — mirror of audit-fulcrum-without-decision.sql on the raw log
-    (same seal + attributes-contains-event_id pairing)."""
+    (same seal + attributes-contains-event_id pairing).
+
+    Backfilled fulcrums (T2-ontology §3.12 three-tier Why): a recovered or
+    recollected decision pairs as usual; where only tier 3 exists, a
+    same-block hitl-question carrying the fulcrum's event_id (the candidate
+    hypotheses) stands in — an honest open question, never a fabricated
+    rationale. Captured fulcrums cannot use the stand-in."""
     instances = []
     decisions_by_seal = {}
+    hitl_by_seal = {}
     for ev in ctx.events:
-        if ev["type"] != "decision":
-            continue
         seal = ctx.seal_for(ev["_line_no"])
         sid = seal[1] if seal else None
-        decisions_by_seal.setdefault(sid, []).append(
-            json.dumps(ev.get("attributes", {}))
-        )
+        if ev["type"] == "decision":
+            decisions_by_seal.setdefault(sid, []).append(
+                json.dumps(ev.get("attributes", {}))
+            )
+        elif ev["type"] == "entity.created" and ev.get("entity_type") == "hitl-question":
+            hitl_by_seal.setdefault(sid, []).append(
+                json.dumps(ev.get("attributes", {}))
+            )
     for ev in ctx.events:
         if ev["type"] not in FULCRUM_TYPES:
             continue
@@ -421,6 +445,10 @@ def check_fulcrum(ctx):
         paired = sid is not None and any(
             ev["event_id"] in blob for blob in decisions_by_seal.get(sid, [])
         )
+        if not paired and is_backfilled(ev) and sid is not None:
+            paired = any(
+                ev["event_id"] in blob for blob in hitl_by_seal.get(sid, [])
+            )
         if not paired:
             instances.append(
                 f"{ev['type']} {ev['event_id']} (line {ev['_line_no']}): "

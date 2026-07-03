@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 EVENTS = DATA_DIR / "events.jsonl"
 CACHE = DATA_DIR / "cache.sqlite"
-SCHEMA_DDL = REPO_ROOT / "agent-plan-visualiser/schemas/0.3.0/cache.schema.sql"
+SCHEMA_DDL = REPO_ROOT / "agent-plan-visualiser/schemas/0.4.0/cache.schema.sql"
 
 STATE_FROM_EVENT = {
     "entity.created": "draft",
@@ -171,6 +171,26 @@ def main():
                         b_attrs.get("message_first_line"))
         return (None, None, None, None)
 
+    def event_time_of(ev):
+        """The block's event-time anchor: its seal's date, day granularity.
+        None for the unsealed tail."""
+        _, _, d, _ = find_commit_for(ev["_line_no"])
+        return str(d)[:10] if d else None
+
+    # Event-time ordering (T2-ontology §3.12, the 0.4.0 bitemporal epoch):
+    # derived STATE replays in the order work HAPPENED (block anchor day) —
+    # a backfilled 2025 block appended at the record tail folds before the
+    # 2026 captured blocks it chronologically precedes. Record order
+    # (line_no) is the tiebreak within a day; the unsealed tail sorts last.
+    # For a captured-only log (seal days nondecreasing by construction) this
+    # is IDENTICAL to record order — the pre-0.4.0 behaviour is preserved.
+    # Rename/reattach pre-scans deliberately stay in RECORD order:
+    # identity and edge folds are latest-KNOWLEDGE-wins, not latest-event-
+    # time-wins — a later-recorded correction outranks an older anchor.
+    events_et = sorted(
+        events, key=lambda ev: (event_time_of(ev) or "9999-99-99", ev["_line_no"])
+    )
+
     for ev in events:
         line_no = ev["_line_no"]
         cref = blame.get(line_no, (None,))[0]  # commit_ref only — blame is unreliable post-rewrite for commit_meta
@@ -178,19 +198,25 @@ def main():
         conn.execute(
             """INSERT INTO events (event_id, type, entity_type, entity_id, actor, confidence,
                 schema_version, attributes, line_no, commit_ref, commit_author, commit_date,
-                commit_message_first_line, commit_recorded_event_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                commit_message_first_line, commit_recorded_event_id, origin, backfill_run,
+                event_time)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 ev["event_id"], ev["type"], ev.get("entity_type"), rid(ev.get("entity_id")),
                 ev["actor"], ev["confidence"], ev["schema_version"],
                 json.dumps(ev.get("attributes", {}), separators=(",", ":")),
                 line_no, cref, cauthor, cdate, csum, cre_id,
+                ev.get("origin"),
+                (ev.get("attributes") or {}).get("backfill_run"),
+                event_time_of(ev),
             ),
         )
 
-    # Materialise entities
+    # Materialise entities — replayed in EVENT-TIME order (events_et), so a
+    # backfilled segment unfurls into its historical position in each
+    # entity's lifecycle instead of appearing to happen at append time.
     entities = {}
-    for ev in events:
+    for ev in events_et:
         et = ev.get("entity_type")
         eid = rid(ev.get("entity_id"))
         if not et or not eid:
@@ -201,9 +227,11 @@ def main():
             "attrs": {},
             "last_event_id": "",
             "sequence": [],
+            "origins": set(),
         })
         e["sequence"].append(ev["type"])
         e["last_event_id"] = ev["event_id"]
+        e["origins"].add(ev.get("origin") or "captured")
         new_state = STATE_FROM_EVENT.get(ev["type"])
         # Draft-preserving exception: entity.extended on a draft entity keeps
         # it draft (authoring continues; acceptance is a separate gate).
@@ -246,14 +274,17 @@ def main():
         pass
 
     for (et, eid), e in entities.items():
+        origins = e.get("origins") or {"captured"}
+        origin = "mixed" if len(origins) > 1 else next(iter(origins))
         conn.execute(
             """INSERT INTO entities (entity_type, entity_id, derived_state, attributes,
-                last_event_id, event_type_sequence) VALUES (?,?,?,?,?,?)""",
+                last_event_id, event_type_sequence, origin) VALUES (?,?,?,?,?,?,?)""",
             (
                 et, eid, e["state"],
                 json.dumps(e["attrs"], separators=(",", ":")),
                 e["last_event_id"],
                 json.dumps(e["sequence"], separators=(",", ":")),
+                origin,
             ),
         )
 
@@ -382,8 +413,9 @@ def main():
             conn.execute(
                 """INSERT OR REPLACE INTO commits (commit_recorded_event_id, commit_ref,
                     author, date, message_first_line,
-                    first_event_line_no, last_event_line_no)
-                    VALUES (?,?,?,?,?,?,?)""",
+                    first_event_line_no, last_event_line_no,
+                    origin, anchor_commit_ref, event_time)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)""",
                 (
                     ev["event_id"], cref,
                     attrs.get("author", ""),
@@ -391,6 +423,9 @@ def main():
                     attrs.get("message_first_line", ""),
                     last_boundary + 1,
                     ev["_line_no"],
+                    ev.get("origin"),
+                    attrs.get("commit_ref"),
+                    str(attrs.get("date", ""))[:10] or None,
                 ),
             )
             last_boundary = ev["_line_no"]

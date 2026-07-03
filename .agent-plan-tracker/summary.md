@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-03T16:46:46Z
+# Project state — generated 2026-07-03T16:56:36Z
 
-**Total events:** 422  ·  **Draft:** 13  ·  **Live:** 15  ·  **Dormant:** 0  ·  **Closed:** 43  ·  **Orphaned:** 0
+**Total events:** 427  ·  **Draft:** 13  ·  **Live:** 14  ·  **Dormant:** 0  ·  **Closed:** 44  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -26,9 +26,6 @@
   - `T3-retrospective-mapping-template` (3 events): entity.created → relationship.spawns → entity.accepted
   - `T3-why-triage-pass` (3 events): entity.created → relationship.spawns → entity.accepted
 
-- **T2-ontology**
-  - `T3-origin-provenance-schema` (3 events): entity.created → relationship.spawns → entity.accepted
-
 - **T2-packaging**
   - `T3-distribution` (8 events): entity.progressed → verification.tested → verification.skipped
 
@@ -49,7 +46,6 @@
 - **M5-backfill**
   - `T3-backfill-workflow`
   - `T3-historical-projection-ui`
-  - `T3-origin-provenance-schema`
   - `T3-retrospective-mapping-template`
   - `T3-why-triage-pass`
 
@@ -104,7 +100,7 @@ _No flapping closures._
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
 - **M4-fresh-install**: 4/5 T3 complete (80%); 1 live
-- **M5-backfill**: 0/5 T3 complete (0%); 5 live
+- **M5-backfill**: 1/5 T3 complete (20%); 4 live
 
 ---
 _71 entities · 97 relationships · 23 decisions._

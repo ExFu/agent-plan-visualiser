@@ -16,8 +16,8 @@ DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 CACHE = DATA_DIR / "cache.sqlite"
 OUT = DATA_DIR / "projection.json"
 
-SCHEMA_VERSION = "0.3.0"
-ONTOLOGY_VERSION = "0.3.0"
+SCHEMA_VERSION = "0.4.0"
+ONTOLOGY_VERSION = "0.4.0"
 
 
 def compute_milestone_progress(entities, relationships):
@@ -78,6 +78,9 @@ def main():
             "derived_state": row["derived_state"],
             "event_type_sequence": json.loads(row["event_type_sequence"]),
             "attributes": json.loads(row["attributes"] or "{}"),
+            # Provenance (0.4.0): 'captured' | 'backfilled' | 'mixed' — the
+            # historical-projection UI keys its rendering on this.
+            "origin": row["origin"],
         }
 
     relationships = []
