@@ -2,8 +2,34 @@
 // Three views: Entity state board, Plan hierarchy tree, Workstreams flow.
 // Pure SVG + vanilla JS. No external dependencies. No build step.
 
-const PROJECTION_PATH = "../../.agent-plan-tracker/projection.json";
-const EVENTS_PATH = "../../.agent-plan-tracker/events.jsonl";
+// Data resolution (T3-historical-projection-ui): serve.py exposes the
+// apvlib-resolved data dir at /data/ and the plans at /planning/, so the
+// view works in ANY tracked repo (.apv adopters included). The legacy
+// dogfood-relative paths remain as fallbacks for plain `python3 -m
+// http.server` browsing from this repo's root.
+const DATA_PATHS = {
+  projection: ["/data/projection.json", "../../.agent-plan-tracker/projection.json"],
+  events: ["/data/events.jsonl", "../../.agent-plan-tracker/events.jsonl"],
+};
+function planPaths(entityId) {
+  return [`/planning/${entityId}.md`, `../../planning/${entityId}.md`];
+}
+function inboxPaths(entityId) {
+  // Inbox filenames use dashes throughout; entity_id has a dot between date and slug.
+  const filename = entityId.replace(/\./g, "-");
+  return [`/data/inbox/${filename}.md`, `../../.agent-plan-tracker/inbox/${filename}.md`];
+}
+async function fetchFirst(paths) {
+  let lastErr;
+  for (const p of paths) {
+    try {
+      const res = await fetch(p);
+      if (res.ok) return res;
+      lastErr = new Error(`${p}: HTTP ${res.status}`);
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error("no candidate paths");
+}
 
 const state = {
   projection: null,
@@ -25,6 +51,7 @@ const state = {
     collapsedSwimlanes: new Set(), // swimlane keys collapsed to a placeholder node
     isolateRoot: null,             // { kind: "entity"|"swimlane", key } or null
     lifecycle: "all",              // "all" | "open" | "closed"
+    provenance: "all",             // "all" | "captured" | "backfilled" (0.4.0 origin)
   },
 };
 
@@ -36,14 +63,35 @@ async function main() {
   initAnalyser();
   try {
     const [pRes, eRes] = await Promise.all([
-      fetch(PROJECTION_PATH),
-      fetch(EVENTS_PATH),
+      fetchFirst(DATA_PATHS.projection),
+      fetchFirst(DATA_PATHS.events),
     ]);
-    if (!pRes.ok) throw new Error(`projection.json: HTTP ${pRes.status}`);
-    if (!eRes.ok) throw new Error(`events.jsonl: HTTP ${eRes.status}`);
     state.projection = await pRes.json();
     const eText = await eRes.text();
-    const rawEvents = eText.trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+    let rawEvents = eText.trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+
+    // Event-time unfurl (T2-ontology §3.12, the 0.4.0 bitemporal epoch):
+    // every view sequences by when work HAPPENED, not when it entered the
+    // record. Each event's anchor is its block seal's day (forward rollup);
+    // a stable sort by (anchor day, record order) moves backfilled segments
+    // appended at the record tail into their historical position — and is
+    // the identity for captured-only logs (seal days nondecreasing). The
+    // unsealed tail anchors to "now" (sorts last). Anchor kept on the event
+    // as _event_time for tooltips/detail ("happened" vs "recorded").
+    {
+      const et = new Array(rawEvents.length).fill("9999-99-99");
+      let cur = "9999-99-99";
+      for (let i = rawEvents.length - 1; i >= 0; i--) {
+        if (rawEvents[i].type === "commit.recorded") {
+          cur = String(rawEvents[i].attributes?.date || "").slice(0, 10) || "9999-99-99";
+        }
+        et[i] = cur;
+      }
+      rawEvents.forEach((ev, i) => { ev._event_time = et[i] === "9999-99-99" ? null : et[i]; });
+      rawEvents = rawEvents.map((_, i) => i)
+        .sort((a, b) => (et[a] < et[b] ? -1 : et[a] > et[b] ? 1 : a - b))
+        .map(i => rawEvents[i]);
+    }
     // Apply the rename identity-migration to raw events so the view's identity
     // model matches the cache/projection. events.jsonl is the append-only
     // canonical log: an `entity.renamed` event does NOT rewrite the old events'
@@ -157,12 +205,22 @@ function renderBoard(p, content) {
 
 function card(e) {
   const div = document.createElement("div");
-  div.className = "entity-card";
+  div.className = "entity-card"
+    + (e.origin && e.origin !== "captured" ? ` origin-${e.origin}` : "")
+    + (e.entity_type === "hitl-question" ? " open-question" : "");
   const tierTag = renderTierTag(e);
   div.innerHTML = `
     <div class="entity-id">${escapeHtml(e.entity_id)}</div>
     <div class="entity-meta">
-      <span class="badge ${e.derived_state}">${e.derived_state}</span>
+      <span class="badge ${e.derived_state}">${e.derived_state}</span>${
+        e.origin && e.origin !== "captured"
+          ? ` <span class="badge origin-badge" title="Provenance: ${e.origin === "mixed" ? "captured + backfilled events" : "retrospectively mined — inference, not contemporaneous record"}">${e.origin}</span>`
+          : ""
+      }${
+        e.entity_type === "hitl-question" && e.derived_state !== "closed"
+          ? ` <span class="badge question-badge" title="Open question — candidate hypotheses, not settled rationale">open question</span>`
+          : ""
+      }
       <span>${e.entity_type}</span>
       ${tierTag}
     </div>
@@ -211,7 +269,8 @@ function renderTree(p, content) {
 
 function treeNode(entity, p, children) {
   const div = document.createElement("div");
-  div.className = "tree-node";
+  div.className = "tree-node"
+    + (entity.origin && entity.origin !== "captured" ? ` origin-${entity.origin}` : "");
   const tierTag = renderTierTag(entity);
   div.innerHTML = `<span class="badge ${entity.derived_state}">${entity.derived_state}</span> <strong>${escapeHtml(entity.entity_id)}</strong> ${tierTag}`;
   const key = `plan:${entity.entity_id}`;
@@ -294,6 +353,24 @@ function renderFlow(projection, events, content) {
     lcWrap.appendChild(b);
   }
   sub.appendChild(lcWrap);
+
+  // Provenance filter (T3-historical-projection-ui, 0.4.0 origin): All /
+  // Captured / Backfilled. Same component pattern as the lifecycle filter —
+  // one shared button system, no location-specific styling. "Captured"
+  // hides backfilled-only entities (mixed stays — it has captured events);
+  // "Backfilled" isolates the mined history (backfilled + mixed).
+  const provWrap = document.createElement("span");
+  provWrap.className = "lifecycle-filter provenance-filter";
+  provWrap.appendChild(Object.assign(document.createElement("span"),
+    { className: "lifecycle-label", textContent: "Provenance:" }));
+  for (const [val, label] of [["all", "All"], ["captured", "Captured"], ["backfilled", "Backfilled"]]) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    if (F.provenance === val) b.classList.add("active");
+    b.addEventListener("click", () => { F.provenance = val; rerenderFlow(); });
+    provWrap.appendChild(b);
+  }
+  sub.appendChild(provWrap);
 
   // Isolation banner + unisolate (T3-flow-view-filtering D2).
   if (F.isolateRoot) {
@@ -449,6 +526,14 @@ function computeFlowVisibility(projection, filters, aggregate, show) {
     candidate = new Set([...candidate].filter(k => entities[k].derived_state !== "closed"));
   } else if (filters.lifecycle === "closed") {
     candidate = new Set([...candidate].filter(k => entities[k].derived_state === "closed"));
+  }
+
+  // 2.6. Provenance filter (0.4.0 origin) — removes rows entirely, like
+  // lifecycle. Absent origin (pre-0.4.0 projections) reads as captured.
+  if (filters.provenance === "captured") {
+    candidate = new Set([...candidate].filter(k => (entities[k].origin || "captured") !== "backfilled"));
+  } else if (filters.provenance === "backfilled") {
+    candidate = new Set([...candidate].filter(k => ["backfilled", "mixed"].includes(entities[k].origin)));
   }
 
   // 2.5 parent-band visibility — hide a whole parent tier (its rows + arcs)
@@ -983,12 +1068,14 @@ function renderFlowSVG(layout) {
   // Edges
   const edgeG = createNS("g", { class: "edges" });
 
-  // Entity spines (solid, one path per entity connecting its nodes)
+  // Entity spines (solid, one path per entity connecting its nodes).
+  // Fully-backfilled entities get the ghost treatment on their whole spine.
   for (const ek of Object.keys(layout.entityNodes)) {
     const ns = layout.entityNodes[ek];
     if (ns.length < 2) continue;
+    const spineGhost = state.projection.entities[ek]?.origin === "backfilled";
     edgeG.appendChild(createNS("path", {
-      class: "entity-spine",
+      class: "entity-spine" + (spineGhost ? " ghost" : ""),
       d: "M " + ns.map(n => `${n.x} ${n.y}`).join(" L "),
     }));
   }
@@ -1017,8 +1104,11 @@ function renderFlowSVG(layout) {
   const nodeG = createNS("g", { class: "nodes" });
   for (const n of layout.nodes) {
     const r = Math.min(11, layout.NODE_RADIUS + Math.log2(n.eventCount + 1) * 1.6);
+    // Ghost treatment (0.4.0 provenance): a composite node whose events are
+    // all backfilled renders ghosted — inference, visibly not record.
+    const allBackfilled = n.events.length > 0 && n.events.every(ev => ev.origin === "backfilled");
     const circle = createNS("circle", {
-      class: "node",
+      class: "node" + (allBackfilled ? " ghost" : ""),
       cx: n.x, cy: n.y, r,
       fill: n.color,
     });
@@ -1224,8 +1314,9 @@ function renderFlowGutter(layout, gutter) {
       const entity = state.projection.entities[ek];
       if (!entity) continue;
       const suppressed = layout.suppressed && layout.suppressed.has(ek);
+      const rowOrigin = entity.origin && entity.origin !== "captured" ? ` origin-${entity.origin}` : "";
       const row = document.createElement("div");
-      row.className = "flow-gutter-row" + (suppressed ? " is-suppressed" : "");
+      row.className = "flow-gutter-row" + (suppressed ? " is-suppressed" : "") + rowOrigin;
       row.style.top = (yMid - 9) + "px";  // center on the lifeline (height=18)
 
       const isIsolatedRoot = F.isolateRoot && F.isolateRoot.kind === "entity" && F.isolateRoot.key === ek;
@@ -1563,21 +1654,18 @@ async function showPlanMarkdown(entity) {
   if (!panel) return;
   panel.innerHTML = `<p>Loading <code>${escapeHtml(entity.entity_id)}</code>…</p>`;
 
-  let path;
+  let paths;
   if (entity.entity_type === "plan") {
-    path = `../../planning/${entity.entity_id}.md`;
+    paths = planPaths(entity.entity_id);
   } else if (entity.entity_type === "inbox-item") {
-    // Inbox filenames use dashes throughout; entity_id has a dot between date and slug.
-    const filename = entity.entity_id.replace(/\./g, "-");
-    path = `../../.agent-plan-tracker/inbox/${filename}.md`;
+    paths = inboxPaths(entity.entity_id);
   } else {
     panel.innerHTML = `<p>No file mapping for entity_type <code>${escapeHtml(entity.entity_type)}</code>.</p>`;
     return;
   }
 
   try {
-    const res = await fetch(path);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await fetchFirst(paths);
     const md = await res.text();
     const body = stripFrontmatter(md);
     const rendered = (window.marked && window.marked.parse)
@@ -2054,17 +2142,15 @@ const ContextBuilder = {
   },
 
   async _fetchEntityMarkdown(entity) {
-    let path;
+    let paths;
     if (entity.entity_type === "plan") {
-      path = `../../planning/${entity.entity_id}.md`;
+      paths = planPaths(entity.entity_id);
     } else if (entity.entity_type === "inbox-item") {
-      const filename = entity.entity_id.replace(/\./g, "-");
-      path = `../../.agent-plan-tracker/inbox/${filename}.md`;
+      paths = inboxPaths(entity.entity_id);
     } else {
       return "";
     }
-    const res = await fetch(path);
-    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${path}`);
+    const res = await fetchFirst(paths);
     const raw = await res.text();
     return stripFrontmatter(raw).trim();
   },
@@ -3016,8 +3102,8 @@ const GlobalContextBuilder = {
     //    most-cacheable input).
     let t1md = "";
     try {
-      const res = await fetch("../../planning/T1-top-level.md");
-      if (res.ok) t1md = stripFrontmatter(await res.text()).trim();
+      const res = await fetchFirst(planPaths("T1-top-level"));
+      t1md = stripFrontmatter(await res.text()).trim();
     } catch { /* tolerate */ }
 
     // 2. Live entities index.

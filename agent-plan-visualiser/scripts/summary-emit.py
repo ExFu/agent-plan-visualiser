@@ -9,7 +9,7 @@ from pathlib import Path
 
 import apvlib
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = apvlib.repo_root()
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 PROJECTION = DATA_DIR / "projection.json"
 OUT = DATA_DIR / "summary.md"

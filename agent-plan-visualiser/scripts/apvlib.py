@@ -80,6 +80,27 @@ def apv_config(repo_root: Path, config_path=None) -> dict:
     return _parse_toml_minimal(path.read_text(encoding="utf-8"), str(path))
 
 
+def repo_root() -> Path:
+    """The repo being OPERATED ON: the enclosing repo of the cwd, falling
+    back to the toolchain's own repo (the vendored/dogfood case). The
+    toolchain may live in the plugin cache, far from any tracked repo —
+    a `parents[2]` default there points data resolution at the wrong tree
+    (the same trap gate-check's repo-root default fixed in M4). Toolchain
+    CONTENT (schemas, view) is never resolved through this — that stays
+    relative to the script's own location."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return Path(out.stdout.strip())
+    except OSError:
+        pass
+    return Path(__file__).resolve().parents[2]
+
+
 def apv_data_dir(repo_root: Path, config_path=None) -> Path:
     """Resolve the tracking data directory (events.jsonl, cache, projection...).
 

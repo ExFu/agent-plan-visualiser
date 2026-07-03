@@ -11,7 +11,7 @@ from pathlib import Path
 
 import apvlib
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = apvlib.repo_root()
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 CACHE = DATA_DIR / "cache.sqlite"
 OUT = DATA_DIR / "projection.json"

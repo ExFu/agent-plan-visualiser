@@ -14,11 +14,13 @@ from pathlib import Path
 
 import apvlib
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = apvlib.repo_root()
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 EVENTS = DATA_DIR / "events.jsonl"
 CACHE = DATA_DIR / "cache.sqlite"
-SCHEMA_DDL = REPO_ROOT / "agent-plan-visualiser/schemas/0.4.0/cache.schema.sql"
+# Toolchain content resolves against THIS script's home, never the target
+# repo — on a plugin install the schemas live in the plugin cache.
+SCHEMA_DDL = Path(__file__).resolve().parents[1] / "schemas/0.4.0/cache.schema.sql"
 
 STATE_FROM_EVENT = {
     "entity.created": "draft",

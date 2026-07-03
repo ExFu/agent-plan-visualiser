@@ -1341,3 +1341,45 @@ button:disabled {
 }
 .btn-isolate:hover { background: var(--isolate-tint-hover); }
 
+
+/* --- Provenance (0.4.0 origin — T3-historical-projection-ui) ---------------
+   Backfilled = retrospectively mined inference; rendered GHOSTED so it is
+   visibly not contemporaneous record. Mixed entities keep full presence
+   (they have captured events) but carry the badge. The provenance filter
+   buttons reuse .lifecycle-filter — one button system, no local styles. */
+
+.badge.origin-badge {
+  background: transparent;
+  color: #8a7a52;
+  border: 1px dashed #b8a878;
+}
+.badge.question-badge {
+  background: transparent;
+  color: #7e57c2;
+  border: 1px solid #b39ddb;
+}
+
+/* Board + tree ghosting: whole-card fade for fully-backfilled entities. */
+.entity-card.origin-backfilled { opacity: 0.55; }
+.entity-card.origin-backfilled:hover { opacity: 0.9; }
+.entity-card.origin-backfilled .entity-id::before,
+.tree-node.origin-backfilled > strong::before {
+  content: "◌ ";
+  color: #b8a878;
+}
+.tree-node.origin-backfilled { opacity: 0.6; }
+.entity-card.open-question { border-style: dashed; }
+
+/* Flow view ghosting: dashed spine + translucent nodes for backfilled. */
+.entity-spine.ghost {
+  stroke-dasharray: 5 4;
+  opacity: 0.5;
+}
+.node.ghost {
+  opacity: 0.5;
+  stroke-dasharray: 2.5 2;
+}
+.node.ghost:hover { opacity: 0.85; }
+.flow-gutter-row.origin-backfilled { opacity: 0.55; font-style: italic; }
+.flow-gutter-row.origin-backfilled:hover { opacity: 0.85; }
+.flow-gutter-row.origin-mixed { font-style: italic; }

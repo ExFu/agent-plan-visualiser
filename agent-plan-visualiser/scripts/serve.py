@@ -29,7 +29,12 @@ from pathlib import Path
 
 import apvlib
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# The repo being served is the CALLER's repo (apvlib.repo_root — cwd's
+# enclosing repo, falling back to the vendored/dogfood layout). Toolchain
+# content (the view itself, schemas) resolves against this script's home.
+REPO_ROOT = apvlib.repo_root()
+TOOLCHAIN = Path(__file__).resolve().parents[1]
+VIEW_DIR = TOOLCHAIN / "view"
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 # Repo-root-relative form, used for freeform_path values recorded in events
 # (consumed as REPO_ROOT / freeform_path). Falls back to the absolute path if
@@ -40,7 +45,7 @@ except ValueError:
     DATA_DIR_PREFIX = str(DATA_DIR)
 EVENTS = DATA_DIR / "events.jsonl"
 SUMMARIES_DIR = DATA_DIR / "summaries"
-SCHEMA_PATH = REPO_ROOT / "agent-plan-visualiser/schemas/0.2.0/events.schema.json"
+SCHEMA_PATH = TOOLCHAIN / "schemas/0.2.0/events.schema.json"
 
 
 # ---------------------------------------------------------------------------
@@ -154,11 +159,50 @@ class APTHandler(SimpleHTTPRequestHandler):
 
     # --- routing ----------------------------------------------------------
 
+    # Stable routes (T3-historical-projection-ui): the view is toolchain
+    # content served from the plugin home; /data/ is the apvlib-resolved
+    # data dir; /planning/ is the target repo's plans. Together these make
+    # the view work in ANY tracked repo — the app no longer assumes the
+    # dogfood layout. Legacy repo-relative URLs still fall through to the
+    # SimpleHTTPRequestHandler static tree rooted at REPO_ROOT.
+
+    def _serve_file(self, base: Path, rel: str):
+        import mimetypes
+        import urllib.parse
+        rel = urllib.parse.unquote(rel.split("?", 1)[0])
+        base = base.resolve()
+        target = (base / rel).resolve()
+        # Path-traversal guard: the resolved target must stay inside base.
+        if base != target and base not in target.parents:
+            return self._send_json(404, {"ok": False, "message": "not found"})
+        if not target.is_file():
+            return self._send_json(404, {"ok": False, "message": f"not found: {rel}"})
+        ctype = mimetypes.guess_type(str(target))[0]
+        if not ctype:
+            ctype = "application/json" if target.suffix in (".json", ".jsonl") else "text/plain"
+        data = target.read_bytes()
+        self.send_response(200)
+        self.send_header("content-type", ctype)
+        self.send_header("content-length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
         if self.path == "/api/clean-check":
             clean, dirty = git_clean_check()
             self._send_json(200, {"clean": clean, "dirty_files": dirty})
             return
+        if self.path in ("/", "/view", "/view/"):
+            self.send_response(302)
+            self.send_header("Location", "/view/index.html")
+            self.end_headers()
+            return
+        if self.path.startswith("/view/"):
+            return self._serve_file(VIEW_DIR, self.path[len("/view/"):])
+        if self.path.startswith("/data/"):
+            return self._serve_file(DATA_DIR, self.path[len("/data/"):])
+        if self.path.startswith("/planning/"):
+            return self._serve_file(REPO_ROOT / "planning", self.path[len("/planning/"):])
         return super().do_GET()
 
     def do_POST(self):
@@ -505,6 +549,8 @@ def run(port=8765, host="127.0.0.1"):
     os.chdir(str(REPO_ROOT))
     server = HTTPServer((host, port), APTHandler)
     print(f"serve.py listening on http://{host}:{port}")
+    print(f"  view:   http://{host}:{port}/view/index.html (from {VIEW_DIR})")
+    print(f"  data:   /data/* -> {DATA_DIR}")
     print(f"  static: serving from {REPO_ROOT}")
     print(f"  endpoints:")
     print(f"    GET  /api/clean-check")
