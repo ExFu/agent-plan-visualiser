@@ -22,5 +22,9 @@ _scratch/
 # Python bytecode cache (scripts/ now imports apvlib, which generates this)
 __pycache__/
 
+# Distribution bundles — derived output of scripts/build-bundle.sh, never
+# committed; the vendored tree stays the dev home (T3-distribution §6 Q2).
+dist/
+
 # Editor/agent-plugin local state — never plugin content.
 .omc/

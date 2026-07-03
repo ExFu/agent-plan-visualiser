@@ -1,24 +1,65 @@
-# agent-plan-visualiser
+# agent-plan-visualiser (APV)
 
-Event-sourced planning methodology + tracking spine, packaged as a Claude Code plugin.
+Event-sourced planning methodology + tracking spine, packaged as a Claude
+Code plugin. Git commit history is the one artefact that cannot lie about
+what happened: APV keeps an append-only event log extracted at commit time
+and derives every view of project state (status, audits, decision traces,
+an HTML flow view) from it. Plans stay rich intent; the log records what
+actually happened; the gap between the two is signal.
 
-## Status
+## Quickstart
 
-**M1 shipped; pre-distribution.** Not yet installable on other projects — that's M4. The hand-rolled end-to-end pipeline is complete and dogfooded against this repo: schema validation → SQLite cache → `projection.json` → `summary.md` → HTML flow view, all green via `scripts/repack-validate.sh`. Two further milestones landed on top: **M6-analyser** (browser-direct outstanding-work analyser; first ontology evolution to schema `0.2.0`) and **M1.2-relationship-ssot** (event-sourced relationship membership). Next frontier: **M2 — automated per-commit extraction** (events are still hand-rolled until then).
+```text
+# 1. Build (or download) the bundle, then install the plugin:
+bash agent-plan-visualiser/scripts/build-bundle.sh        # -> dist/apv-marketplace/
+/plugin marketplace add <path>/apv-marketplace
+/plugin install agent-plan-visualiser@apv
 
-## What it will do
+# 2. Attach a project (fresh or existing repo — attaches from now):
+/apv-init          # seeds .apv/, writes config, installs the git hooks
 
-- Walk a project's git history and extract structured events against a defined ontology.
-- Maintain an append-only event log (`.agent-plan-tracker/events.jsonl`) as canonical project state.
-- Provide projections (audits, decision traces, status reports, HTML view) derived from the log.
-- Enforce a tiered planning methodology (T1/T2/T3 + milestones + lettered workstreams).
+# 3. Work normally; before each commit:
+/apv-capture       # appends the sealed event block; the guard enforces this
+```
 
-## Authoritative references
+Land branches on main via `/apv-merge`; the pre-push and
+reference-transaction hooks keep an untrustworthy log off main either way.
+`git commit --no-verify` is the sanctioned hatch for capture-free trivia.
 
-- `../planning/T1-top-level.md` — full T1 design.
-- `../planning/M1-bootstrap.md` — current milestone (M1).
-- `../.agent-plan-tracker/events.jsonl` — this project's own event log (dogfood).
-- `../CLAUDE.md` — session-start orientation.
+## What's in the box
+
+- **Skills** — `apv-capture` (the extractor: you, before every commit),
+  `apv-merge` (landing doctrine), `using-agent-plan-visualiser` (the
+  formal orientation/spec floor).
+- **Command** — `/apv-init`: idempotent attach/audit/repair of any repo.
+- **Hooks** — a SessionStart one-liner orients any session in a tracked
+  repo (`hooks/hooks.json`); the git hooks (capture-guard, gate adapters)
+  are installed per-repo by `/apv-init`.
+- **Scripts** — the pipeline (`repack-validate.sh`), the boundary gate
+  (`gate-check.sh`), audits, timelines, the view server, the bundle
+  builder.
+- **Schemas** — the versioned event + plan-frontmatter ontology.
+- **Cheatsheet & worked examples** — the operations agents actually run,
+  including a CI gate-adapter template.
+- **Philosophies** — the grounding documents downstream agents use for
+  judgement calls.
+
+## Methodology, in one paragraph
+
+Plans live in `planning/`, tiered by altitude — T1 intent, T2 per-theme
+architecture, T3 executable briefs — with milestone plans (`Mn`) sequencing
+the same work on an orthogonal axis, and lettered workstreams for crosscuts
+and side quests. Plans are append-only: adjust by appending, replace by
+superseding, never delete. Every commit is captured as events against a
+defined ontology (entities, lifecycle, decisions-as-arc-metadata, blockers,
+verification, relationships), sealed by the commit message. The full design
+rationale ships in `philosophies/`.
+
+## Requirements
+
+`bash`, `git`, `python3` (stdlib only for the gate; `jsonschema` — or
+`check-jsonschema` — for full pipeline validation), `sqlite3` for the cache
+and audits.
 
 ## License
 
