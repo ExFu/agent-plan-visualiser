@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-03T16:12:51Z
+# Project state — generated 2026-07-03T16:19:23Z
 
-**Total events:** 392  ·  **Draft:** 13  ·  **Live:** 9  ·  **Dormant:** 0  ·  **Closed:** 42  ·  **Orphaned:** 0
+**Total events:** 405  ·  **Draft:** 19  ·  **Live:** 9  ·  **Dormant:** 0  ·  **Closed:** 42  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -46,8 +46,14 @@
   - `2026-05-23.verification-overhaul-candidate-model`
   - `2026-06-10.view-hardcodes-dogfood-data-dir`
 - **plan**
+  - `M5-backfill`
   - `T2-ingest`
   - `T3-autonomous-extractor`
+  - `T3-backfill-workflow`
+  - `T3-historical-projection-ui`
+  - `T3-origin-provenance-schema`
+  - `T3-retrospective-mapping-template`
+  - `T3-why-triage-pass`
 
 ## Blocked
 
@@ -82,6 +88,7 @@ _No flapping closures._
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
 - **M4-fresh-install**: 3/5 T3 complete (60%); 1 live
+- **M5-backfill**: 0/5 T3 complete (0%); 0 live
 
 ---
-_64 entities · 86 relationships · 22 decisions._
+_70 entities · 97 relationships · 22 decisions._
