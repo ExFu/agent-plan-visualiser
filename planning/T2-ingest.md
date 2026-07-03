@@ -121,10 +121,28 @@ State file `.agent-plan-tracker/backfill-state.json` tracks last-processed commi
 - **Native** (project uses this methodology from start but plugin installed late): straightforward. Mapping note may not be needed.
 - **Non-native** (project uses some other planning convention): mapping note essential. Backfill quality depends on note quality.
 
+### 3.7 Representation: bitemporal anchoring + origin provenance (ratified 2026-07-03)
+
+How backfilled events sit in a log that already has live blocks — the question §3.4's walk deliberately left open. The ontology mechanics are specified in [[T2-ontology]] §3.12 (schema `0.4.0`); this section is the ingest-side doctrine.
+
+**Append at the record tail, anchor to event time.** Backfilled blocks are appended after all existing live blocks — the append-only law is never bent, and the log honestly records "in <now> we learned what happened in <then>." Each historical commit gets its own block, terminated by a seal quoting that commit's message/author/date plus `commit_ref` (the sha exists at extraction time — unlike live capture). Projections *unfurl* the segment by ordering on event time (the anchor), with record time as tiebreak; positional rollup works unchanged inside the segment. The gate's seal↔commit check passes as-is, since historical commits are reachable.
+
+**Chunked backfill commits.** The real commits appending a segment are ordinary captured commits ("backfill: commits a1b2c3..d4e5f6, 40 blocks"), chunked to match §3.5's resumability — each chunk transits the capture guard normally.
+
+**Everything backfilled is marked.** Every backfilled event carries `origin: "backfilled"` + `attributes.backfill_run`; absence of `origin` means contemporaneous capture (no migration of the existing log). The gate is origin-aware: discipline checks don't judge backfilled events (the methodology can't be demanded retroactively); schema validity applies in full. A bad run is auditable — and repudiable — as a cohort via its run id.
+
+**The Why is emitted at exactly one of three strengths, never fabricated** (full spec: T2-ontology §3.12): *recovered* (rationale genuinely present in the historical record → real `decision` citing its source), *recollected* (the human who was there confirms at triage → `decision` with the operator as actor), or *inferred* (no source, no confirmation → **no decision**; candidate rationales become a `hitl-question` on the affected plan — open, non-authoritative, convertible to recollected append-only when the operator later answers). The Why-gap concentrates at fulcrums, which is precisely what the mapping note's "Known pivots" section harvests from the human up front; most historical commits are honestly `implicit-work` with What-only summaries, and that is fine — backfilled history serves navigation and memory, not steering.
+
+**The post-walk triage pass.** The walk (§3.4 step 3) emits hypotheses inline but never stops for them (only genuine ambiguity halts). After the walk, one batch triage session presents every fulcrum-ish moment with its candidate rationales as a checklist; the operator confirms/edits/rejects in one sitting; confirmations land as recollected decisions in the triage commit's block. Same ergonomic shape as the analyser's bulk mode.
+
+**UI co-design constraint.** `origin` + event-time ordering are the contract the historical-projection UI keys on (ghosted rendering, provenance toggle, event-time timeline). That UI design (T2-projection; includes the standing `2026-06-10.view-hardcodes-dogfood-data-dir` inbox item) must be settled alongside `T3-origin-provenance-schema` **before** M5's T3s build — the two co-constrain each other.
+
 ## 4. T3 candidates
 
 ### M5-scheduled
 - `T3-backfill-workflow` — orchestration script + state file + resumability.
+- `T3-why-triage-pass` — the §3.7 post-walk batch triage: hypothesis checklist presentation, recollected-decision capture, hitl-question emission for the unconfirmed.
+- `T3-historical-projection-ui` — event-time unfurling + origin-aware rendering in the flow view (with [[T2-projection]]); paired with T2-ontology's `T3-origin-provenance-schema`; both precede the build of the T3s above.
 - `T3-retrospective-mapping-template` — canonical YAML/markdown template + worked example.
 - `T3-mapping-note-generator` — agent that surveys a repo and proposes a draft mapping note for review.
 - `T3-t1-synthesis-from-readme` — for projects with no T1, agent generates minimal T1.

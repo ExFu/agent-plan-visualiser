@@ -50,7 +50,7 @@ Every event carries:
 
 **Commit metadata is carried once per commit, not on every event.** A single `commit.recorded` event terminates each commit's event group, carrying `author`, `date`, `message_first_line` in its attributes. All events between the previous `commit.recorded` (or log start) and the next belong to the closing one (**positional rollup**). Eliminates per-event redundancy when commits emit many events.
 
-No `commit_ref` field in the JSONL — see T2-storage for git-blame-based resolution.
+No `commit_ref` field in the JSONL — see T2-storage for git-blame-based resolution. (**Amended 2026-07-03**: this rule holds for *captured* events, whose seals are written pre-commit when no hash exists. Backfilled seals are the ruled exception — the hash exists at extraction time and anchors the block; see §3.12.)
 
 ### 3.2 Entity lifecycle events (10)
 
@@ -162,6 +162,28 @@ Renames (corrected 2026-06-08 — **supersedes** the prior "id never changes acr
 
 Sequential task numbering (e.g. `task-1`, `task-2`) is avoided in favour of semantic slugs to prevent parallel-branch collisions.
 
+### 3.12 Provenance and bitemporality (schema 0.4.0 — ratified 2026-07-03; lands with M5)
+
+Backfill (T2-ingest) forces apart two time axes the log has so far conflated, and the ontology makes both explicit rather than letting projections guess. **Ratified by operator ruling 2026-07-03; the schema files and enforcement land with M5's build — nothing below is live before then.**
+
+**Two time axes.** *Record time* is line position in the log — governed by the append-only law, never reordered. *Event time* is when the work actually happened — carried by each block's seal (`date`, and for backfilled blocks the anchored commit). Backfilled blocks **append at the record-time tail while anchoring to historical event time**; projections order by event time and use record time only as tiebreak. Derived states are computed over event-time order. The log thereby honestly records "when we learned it" separately from "when it happened" — no insertion-before, no history synthesis.
+
+**The `origin` field.** New optional common field `origin: "captured" | "backfilled"`. Absent = `captured` (every pre-0.4.0 event is contemporaneous by construction — no migration needed). Backfilled events additionally carry `attributes.backfill_run` (the run's id) so a run's output is queryable and, if it proves bad, auditable as a cohort. `origin` is deliberately not an overload of `confidence`: confidence distinguishes stated-vs-inferred *within a session that was there*; origin distinguishes *who was there when*. The `actor` of a backfilled event is the extraction agent; the historical author lives in the seal, as ever.
+
+**Backfilled block shape.** One block per historical commit, in historical order within the segment, each terminated by a `commit.recorded` seal quoting the historical commit's `message_first_line`/`author`/`date` **plus `attributes.commit_ref`** (the sha — the §3.1 exception: live capture seals pre-commit and cannot know its hash; backfill can, and the anchor must be unambiguous even when subjects collide). Positional rollup therefore works unchanged inside a backfilled segment, and the gate's seal↔commit correspondence check passes as-is (historical commits are reachable; matching is by message, log→git). The real repo commits that append a segment are ordinary captured commits — chunked for resumability, each transiting the guard normally.
+
+**Origin-aware enforcement.** Discipline checks (`implementation-on-draft`, `fulcrum-without-decision`, `resurrection-without-reopen`, sealed-tail) do not judge `origin: backfilled` events — they record what happened, not what should have happened; the methodology cannot be demanded retroactively of commits that predate adoption. Schema validity applies in full regardless of origin. This generalises the existing epoch-gating principle: epochs were keyed on `schema_version`; provenance keys on `origin`.
+
+**The Why: three epistemic tiers, never fabricated.** A fabricated rationale presented as a `decision` would poison the record's core claim (it cannot lie). Backfill therefore emits Why at exactly one of three strengths:
+
+1. **Recovered** — rationale that genuinely exists in the historical record (commit message, ADR, planning doc at that commit). Emitted as a real `decision`, its `text` quoting/citing the source (file + commit).
+2. **Recollected** — the human who was there confirms it during the post-walk triage pass. Emitted as a `decision` with the operator as `actor` (their say-so is the event, as with acceptance); post-hoc but human-vouched.
+3. **Inferred** — no source, no confirmation: **no `decision` is emitted.** Candidate rationales are emitted as a `hitl-question` ("why was X superseded? candidates: A / B / C"), attached to the affected plan under the normal `<parent-plan-id>.q<n>` scheme — explicitly open, non-authoritative, queryable, and rendered by projections as an open question, never as rationale.
+
+For backfilled fulcrum events the decision-pairing rule is satisfied by tiers 1–2; where only tier 3 exists, the paired `hitl-question` stands in and the origin-aware gate does not block. A later operator answer converts tier 3 to tier 2 append-only (the decision lands when given; the question closes).
+
+**Projection/UI contract.** `origin` is the field the historical-rendering UI keys on (ghosted/dashed treatment, provenance toggle, event-time timeline). The UI design and this schema evolution co-constrain each other and must be designed together before M5's T3s build — see T2-ingest §3.7 and T2-projection.
+
 ## 4. Approach — schema authoring
 
 JSON Schema is the chosen spec format (resolved this T2).
@@ -196,6 +218,9 @@ JSON Schema is the chosen spec format (resolved this T2).
 
 ### M2-scheduled
 - `T3-entity-accepted` — first deliberate ontology evolution (`0.2.0`→`0.3.0`): new `entity.accepted` standard event (draft→live, all 5 entity types, not a fulcrum), new `draft` derived state (`entity.created` lands `draft`), `entity.extended` becomes draft-preserving (otherwise still reopens). Authored; see plan file.
+
+### M5-scheduled
+- `T3-origin-provenance-schema` — the `0.3.0`→`0.4.0` evolution ratified in §3.12: `origin` common field, `attributes.backfill_run`, `commit_ref` on backfilled seals, origin-aware gate epochs, event-time state derivation. Authored at the M5 planning ceremony.
 
 ### Later
 - `T3-schema-versioning-discipline` (M2) — formal versioning + migration rules once first schema evolution arrives.

@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-03T15:45:06Z
+# Project state — generated 2026-07-03T16:12:51Z
 
-**Total events:** 388  ·  **Draft:** 13  ·  **Live:** 9  ·  **Dormant:** 0  ·  **Closed:** 42  ·  **Orphaned:** 0
+**Total events:** 392  ·  **Draft:** 13  ·  **Live:** 9  ·  **Dormant:** 0  ·  **Closed:** 42  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -12,7 +12,7 @@
 - **(T2 itself)**
   - `T2-analyser` (9 events): entity.progressed → entity.progressed → entity.progressed
   - `T2-extraction` (7 events): entity.accepted → entity.progressed → entity.extended
-  - `T2-ontology` (8 events): entity.extended → entity.extended → entity.extended
+  - `T2-ontology` (9 events): entity.extended → entity.extended → entity.extended
   - `T2-packaging` (7 events): entity.extended → entity.progressed → entity.extended
   - `T2-projection` (14 events): analysis.invalidated → entity.progressed → entity.extended
   - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
@@ -84,4 +84,4 @@ _No flapping closures._
 - **M4-fresh-install**: 3/5 T3 complete (60%); 1 live
 
 ---
-_64 entities · 86 relationships · 21 decisions._
+_64 entities · 86 relationships · 22 decisions._
