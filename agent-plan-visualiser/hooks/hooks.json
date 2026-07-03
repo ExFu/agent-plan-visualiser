@@ -1,0 +1,17 @@
+{
+  "description": "agent-plan-visualiser session orientation: on SessionStart, detect the repo's tracking fingerprint (data dir via the config resolution chain) and inject one orientation line. Untracked repos get silence. The git hooks sharing this directory (capture-guard, gate adapters) are NOT wired here — they are installed into each repo's .git/hooks by /apv-init.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/session-orient.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-03T15:30:04Z
+# Project state — generated 2026-07-03T15:34:00Z
 
-**Total events:** 376  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 41  ·  **Orphaned:** 0
+**Total events:** 381  ·  **Draft:** 13  ·  **Live:** 9  ·  **Dormant:** 0  ·  **Closed:** 42  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -22,7 +22,6 @@
 
 - **T2-packaging**
   - `T3-distribution` (4 events): relationship.spawns → entity.extended → entity.accepted
-  - `T3-session-orientation` (3 events): entity.created → relationship.spawns → entity.accepted
 
 ### By milestone
 
@@ -31,7 +30,6 @@
 
 - **M4-fresh-install**
   - `T3-distribution`
-  - `T3-session-orientation`
 
 ## Draft
 
@@ -83,7 +81,7 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 2/5 T3 complete (40%); 2 live
+- **M4-fresh-install**: 3/5 T3 complete (60%); 1 live
 
 ---
 _64 entities · 86 relationships · 21 decisions._

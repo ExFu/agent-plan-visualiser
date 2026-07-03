@@ -55,3 +55,12 @@ The plugin's Claude-side hook config (distinct from the git hooks sharing `hooks
 
 1. Does the one-liner include live entity counts (needs cache read — stale risk) or just the fingerprint facts? Lean: fingerprint facts only; counts are the analyser's job on demand.
 2. SessionStart in Cowork — same event model? Verify alongside T3-distribution's Cowork pass.
+
+## 7. Build notes (2026-07-03)
+
+- **Q1 resolved as leaned — fingerprint facts only.** `hooks/session-orient.sh` reads nothing but the config line and the log's existence: no cache, no git, no python. The line names the log path, the two per-moment skills, and this orientation skill; counts stay with the analyser.
+- **The fingerprint is the log itself**: a config file without an `events.jsonl` stays silent — half-attached repos don't get nagged (silence is a feature, §2.1 honoured).
+- `hooks/hooks.json` uses the plugin wrapper format (`{"hooks": {"SessionStart": [...]}}`), command via `${CLAUDE_PLUGIN_ROOT}`, 10s timeout. Its description explicitly disambiguates the Claude-side hook from the git hooks sharing `hooks/` (which /apv-init installs into `.git/hooks`).
+- The formal skill `skills/using-agent-plan-visualiser/SKILL.md` carries the T2-packaging §3.4 instruction shape: scripts-over-regeneration, `scripts/local/` save-back, cheatsheet/worked-examples/philosophies routing, ontology floor deferring to `schemas/0.3.0/` as authority.
+- Cheatsheet first pass: `cheatsheet/cheatsheet.md` (status read, rebuild, audits, gate-on-demand, flow view, save-back rule) + three worked examples (find-stalled-plans, trace-decision-history, pre-merge-cleanliness-check) — each riding existing scripts only.
+- Sandbox: `tests/orientation/run-orientation-sandbox.sh` covers §4.1–4.3 (tracked default/pinned/env-override, untracked and half-attached silence, hooks.json + skill lint). Q2 (Cowork) stays open for T3-distribution's pass.
