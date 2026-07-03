@@ -48,3 +48,12 @@ The walk cannot recover Why; the human who was there often can — but only if a
 
 1. Presentation surface: AskUserQuestion-driven in-session checklist vs a generated markdown checklist the operator annotates? Lean: in-session, one question per moment, resumable.
 2. Should recollected decisions carry a `recollected: true` marker beyond `origin: backfilled`, or is origin + operator-actor sufficient to reconstruct the tier? Lean: sufficient — derive, don't duplicate.
+
+## 7. Build notes (2026-07-03)
+
+Both §6 leans ratified: the checklist is in-session (`commands/apv-triage-why.md` — one AskUserQuestion per moment, candidates as options plus "Other" and an explicit leave-open; resumable; never pressures toward a candidate), and no `recollected` marker — `origin: backfilled` + the operator as actor reconstructs the tier.
+
+- **The deterministic half** is `scripts/backfill/triage-emit.py`: rulings JSON in; per confirmed/reworded moment a recollected `decision` (operator actor, the walk's candidates quoted inside the text for provenance, `event_ids` = the fulcrum's) plus `entity.completed` on the standing question; unknowns untouched — honestly open. All conversion events carry the run id (repudiating the run repudiates its triage).
+- **Idempotency is structural**: the hypotheses file is archived on consumption (re-run = "Nothing to do") and already-closed questions are skipped at the event level.
+- **Gate interaction verified**: the walk's tier-3 hitl stand-in keeps satisfying the fulcrum pairing after the question closes (pairing reads same-seal creation events, which are append-only), so triage never destabilises earlier blocks; the sandbox proves gate-green before and after triage, and the question derives `closed`.
+- The triage commit is an ordinary captured commit sealed by the caller (`triage(<run>): N recollected, M left open` — the command's closing step).

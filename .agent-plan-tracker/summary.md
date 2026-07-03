@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-03T17:14:09Z
+# Project state — generated 2026-07-03T17:56:28Z
 
-**Total events:** 432  ·  **Draft:** 13  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 45  ·  **Orphaned:** 0
+**Total events:** 445  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 48  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -19,12 +19,7 @@
 
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
-  - `M5-backfill` (4 events): relationship.spawns → entity.accepted → entity.extended
-
-- **T2-ingest**
-  - `T3-backfill-workflow` (3 events): entity.created → relationship.spawns → entity.accepted
-  - `T3-retrospective-mapping-template` (3 events): entity.created → relationship.spawns → entity.accepted
-  - `T3-why-triage-pass` (3 events): entity.created → relationship.spawns → entity.accepted
+  - `M5-backfill` (5 events): entity.accepted → entity.extended → entity.progressed
 
 - **T2-packaging**
   - `T3-distribution` (8 events): entity.progressed → verification.tested → verification.skipped
@@ -39,11 +34,6 @@
 
 - **M4-fresh-install**
   - `T3-distribution`
-
-- **M5-backfill**
-  - `T3-backfill-workflow`
-  - `T3-retrospective-mapping-template`
-  - `T3-why-triage-pass`
 
 ## Draft
 
@@ -96,7 +86,7 @@ _No flapping closures._
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
 - **M4-fresh-install**: 4/5 T3 complete (80%); 1 live
-- **M5-backfill**: 2/5 T3 complete (40%); 3 live
+- **M5-backfill**: 5/5 T3 complete (100%); 0 live
 
 ---
 _71 entities · 97 relationships · 23 decisions._

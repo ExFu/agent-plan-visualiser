@@ -53,3 +53,14 @@ The M5-lite orchestrator was deliberately scrappy — pulled forward to surface 
 
 1. Chunk size: fixed N commits vs token-budget-driven? Lean: fixed N (predictable resumability), configurable.
 2. Where do inline hypotheses live pending triage — `needs-review/hypotheses.jsonl` or the state file? Lean: separate hypotheses file, consumed and archived by the triage pass.
+
+## 7. Build notes (2026-07-03)
+
+Both §6 leans ratified: fixed-N chunks (`--chunk-size`, default 25, 0 = caller-managed) and a per-run hypotheses file (`needs-review/hypotheses-<run>.jsonl`, consumed-and-archived by triage).
+
+- **Adoption boundary auto-detected**: mine strictly before the commit whose subject matches the log's *first seal* (`--until` overrides); an empty log or a seal matching no commit falls through to mine-all. Backfill refuses to run without an existing `events.jsonl` — it appends to a live log, it does not create one (init's monopoly stands).
+- **Provenance is the orchestrator's word**: `origin`/`backfill_run`/`confidence: derived`/actor(=slugified historical author, `--actor-override` available) forced on every event; seals rebuilt from git ground truth (subject/author/date + `commit_ref`) — the sandbox's canned responses lie about all of it and are overridden. Write-side rules mirror the live extractor's stance in code: `entity.accepted`/`analysis.*` rejected, one-seal-last, fresh unique UUIDs, 0.4.0 schema validation failing closed.
+- **`--limit N` takes the most recent N of the range** (unchanged M5-lite semantics — sample near the boundary first, where extraction quality matters most); resume state is per-commit, so mixed limit/full runs interleave safely without duplicates.
+- **Chunk commits transit the guard** (stamp + commit `backfill(<run>): commits a..b, k blocks`) and the ref-update gate mid-run — historical seals resolve against reachable commits, so a mid-segment state is green by construction.
+- The extraction prompt rewritten to 0.4.0 with the three-tier Why rules (recovered must cite; unrecoverable becomes a tier-3 hitl-question with candidates; "an unrecoverable Why is NOT ambiguity"); the mapping note rides the bundle verbatim when present. README rewritten as pure instruction (no progress state).
+- Sandbox: `tests/backfill/run-backfill-sandbox.sh` — boundary detection, chunking, ground-truth override, resume-without-duplicates, gate + unfurl on the mined log, injection rejection, dry-run purity. ALL PASS with a stubbed model; the first live run is the M5 §4 rehearsal (operator-approved, sandbox copy).

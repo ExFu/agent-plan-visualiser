@@ -1,47 +1,65 @@
 #!/usr/bin/env python3
-"""Backfill orchestrator — walks git history of a target project, runs the
-per-commit extraction agent on each commit, appends events to the target's
-.agent-plan-tracker/events.jsonl.
+"""backfill.py — mine a repo's pre-adoption git history into the event log
+(T3-backfill-workflow; doctrine: T2-ingest §3.7, ontology: T2-ontology §3.12).
+
+Walks historical commits oldest-first, runs the extraction agent per commit,
+and appends one block per commit to the TARGET repo's live log — honestly:
+anchored (seals quote the historical commit and carry its sha), marked
+(`origin: "backfilled"` + a run id on every event, so a bad run is
+repudiable as a cohort), and never fabricating a Why (recovered rationale
+cites its source; everything else becomes candidate hypotheses collected
+for the post-walk triage pass — see triage-emit.py).
 
 Usage:
   backfill.py --project-path PATH [options]
 
 Options:
-  --project-path PATH    Absolute path to the target project's git repo.
-  --output PATH          Path to write events.jsonl. Default:
-                         <project-path>/.agent-plan-tracker/events.jsonl
-  --limit N              Only process the most recent N commits. Default: 20.
-  --from-commit REF      Start from this commit (exclusive). Walks forward.
-  --dry-run              Build input bundles + print to stdout; do not call Claude.
-  --prompt-path PATH     Path to extraction prompt. Default: sibling extract-commit-prompt.md
-  --schema-path PATH     Path to events.schema.json. Default: plugin's bundled schema.
-  --resume               Resume from .agent-plan-tracker/backfill-state.json if present.
-  --verbose              Verbose logging.
+  --project-path PATH    The target repo (its apvlib-resolved data dir is
+                         the destination — APV_DATA_DIR / .apv-config.toml
+                         / .apv, exactly like every other tool).
+  --run-id ID            Cohort id. Default: bf-<today>-<n> (date-embedded).
+  --until REF            Mine commits strictly BEFORE this commit. Default:
+                         the commit of the log's first seal (found by
+                         subject match) — i.e. everything pre-adoption.
+                         Empty log: all commits up to HEAD.
+  --limit N              Only the most recent N commits of the range (0 = all).
+  --chunk-size N         Commit the log to git every N blocks (default 25;
+                         0 = never commit — caller handles it).
+  --dry-run              Print bundles; no extraction, no writes.
+  --resume               Skip commits recorded in backfill-state.json.
+  --prompt-path PATH     Extraction prompt (default: sibling
+                         extract-commit-prompt.md).
+  --actor-override SLUG  Force the actor slug (default: per-commit author).
+  --verbose
 
-Behaviour:
-  - Walks commits in chronological order (oldest -> newest) within the chosen range.
-  - For each commit: builds bundle (diff, message, touched planning files, prior log
-    delta), invokes claude CLI (unless --dry-run), validates returned events,
-    appends to events.jsonl.
-  - On ambiguity.halt or validation failure: writes a needs-review file, saves state,
-    exits non-zero with instructions.
-  - Resumability: state lives in <output-dir>/backfill-state.json.
-
-Requires: claude CLI on PATH (unless --dry-run). Python 3 stdlib only.
+Halting: ambiguity, parse errors, validation failures and write-rule
+violations write <data>/needs-review/<sha>-*.md, save state and exit
+non-zero — subsequent runs with --resume continue past repaired commits.
+Model: APV_CLAUDE_BIN (default "claude"; tests inject a stub),
+APV_EXTRACT_MODEL (--model passthrough), APV_EXTRACT_TIMEOUT (default 600).
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import shutil
+import re
 import subprocess
+import shutil
 import sys
 import time
+import uuid
+from datetime import date
 from pathlib import Path
 
+SCRIPTS = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SCRIPTS))
+import apvlib  # noqa: E402
+
 DEFAULT_PROMPT = Path(__file__).resolve().parent / "extract-commit-prompt.md"
-DEFAULT_SCHEMA = Path(__file__).resolve().parents[2] / "schemas/0.1.0/events.schema.json"
+SCHEMA_PATH = SCRIPTS.parent / "schemas/0.4.0/events.schema.json"
+FORBIDDEN_TYPES = {"entity.accepted", "analysis.live-summary", "analysis.invalidated"}
+UUID4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
 
 def log(msg, verbose=False, force=False):
@@ -49,194 +67,279 @@ def log(msg, verbose=False, force=False):
         print(msg, file=sys.stderr, flush=True)
 
 
-def git(args, cwd, capture=True):
-    result = subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        capture_output=capture,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0 and capture:
+def git(args, cwd, check=True):
+    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if check and result.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
-    return result.stdout if capture else None
+    return result.stdout
 
 
-def list_commits(project_path: Path, limit: int, from_commit: str | None) -> list[str]:
-    """Return commits in chronological order (oldest first), most recent `limit` of them."""
+def slugify(text, max_len=24):
+    slug = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    return slug[:max_len].rstrip("-") or "unknown"
+
+
+# --------------------------- pre-flight ------------------------------------
+
+def first_sealed_commit(project_path: Path, events_path: Path):
+    """The adoption boundary: the commit whose subject matches the log's
+    FIRST seal. Backfill mines strictly before it (T2-ingest §3.7 —
+    'commits older than the log's first seal'). None when the log is empty
+    or holds no seal (mine everything)."""
+    first_subject = None
+    if events_path.exists():
+        with open(events_path) as f:
+            for raw in f:
+                try:
+                    ev = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if ev.get("type") == "commit.recorded":
+                    first_subject = (ev.get("attributes") or {}).get("message_first_line")
+                    break
+    if not first_subject:
+        return None
+    out = git(["log", "--format=%H%x00%s"], project_path)
+    for line in out.splitlines():
+        sha, _, subject = line.partition("\x00")
+        if subject == first_subject:
+            return sha
+    return None
+
+
+def list_commits(project_path: Path, until: str | None, limit: int) -> list[str]:
+    """Chronological (oldest first). `until` exclusive when given."""
     args = ["log", "--reverse", "--format=%H"]
-    if from_commit:
-        args.append(f"{from_commit}..HEAD")
+    if until:
+        args.append(until)   # ancestors of `until`...
     out = git(args, project_path).strip()
     commits = out.splitlines() if out else []
+    if until and commits and commits[-1] == git(["rev-parse", until], project_path).strip():
+        commits = commits[:-1]  # strictly before the boundary
     if limit > 0 and len(commits) > limit:
         commits = commits[-limit:]
     return commits
 
 
-def build_bundle(project_path: Path, commit_ref: str, prior_log_path: Path | None, verbose=False) -> str:
-    """Construct the input bundle the extraction agent sees for one commit."""
-    # Commit metadata
-    meta = git(
-        ["show", "-s", "--format=%an%n%aI%n%H%n%s%n----BODY----%n%b", commit_ref],
-        project_path,
-    ).strip()
-    parts = meta.split("\n----BODY----\n", 1)
-    head = parts[0].splitlines()
-    author = head[0] if len(head) > 0 else ""
-    date_iso = head[1] if len(head) > 1 else ""
-    full_hash = head[2] if len(head) > 2 else commit_ref
-    message_first_line = head[3] if len(head) > 3 else ""
-    body = parts[1] if len(parts) > 1 else ""
+def looks_non_native(project_path: Path) -> bool:
+    """Heuristic for the mapping-note warning: a native project has
+    planning/<id>.md files matching the tier/milestone id convention."""
+    planning = project_path / "planning"
+    if not planning.is_dir():
+        return True
+    pat = re.compile(r"^([A-Z]*T\d|M\d)")
+    return not any(pat.match(p.stem) for p in planning.glob("*.md"))
 
-    # Diff (full)
+
+# --------------------------- bundle ----------------------------------------
+
+def commit_meta(project_path: Path, commit_ref: str):
+    meta = git(["show", "-s", "--format=%an%n%aI%n%H%n%s", commit_ref], project_path).strip()
+    lines = meta.splitlines()
+    return {
+        "author": lines[0] if len(lines) > 0 else "",
+        "date_iso": lines[1] if len(lines) > 1 else "",
+        "sha": lines[2] if len(lines) > 2 else commit_ref,
+        "subject": lines[3] if len(lines) > 3 else "",
+    }
+
+
+def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
+                 mapping_note: str | None) -> str:
+    meta = commit_meta(project_path, commit_ref)
+    body = git(["show", "-s", "--format=%b", commit_ref], project_path)
     diff = git(["show", "--format=", commit_ref], project_path)
+    name_status = git(["show", "--name-status", "--format=", commit_ref], project_path).strip()
 
-    # List of files touched
-    name_status = git(
-        ["show", "--name-status", "--format=", commit_ref],
-        project_path,
-    ).strip()
-
-    # Planning files touched: read their new content (post-commit)
-    planning_files_content = []
+    planning_files = []
     for line in name_status.splitlines():
-        if not line.strip():
-            continue
-        parts2 = line.split("\t")
-        status = parts2[0]
-        files = parts2[1:]
-        for f in files:
+        parts = line.split("\t")
+        for f in parts[1:]:
             if f.startswith("planning/") and f.endswith(".md"):
                 try:
-                    content = git(["show", f"{commit_ref}:{f}"], project_path)
-                    planning_files_content.append((status, f, content))
+                    planning_files.append((parts[0], f, git(["show", f"{commit_ref}:{f}"], project_path)))
                 except RuntimeError:
-                    # File doesn't exist at this commit (e.g. deleted) — skip
                     pass
 
-    # Prior log delta — for now, pass the full prior log if exists, capped
-    prior_log_excerpt = ""
-    if prior_log_path and prior_log_path.exists():
-        try:
-            with open(prior_log_path) as f:
-                lines = f.readlines()
-            if len(lines) > 200:
-                prior_log_excerpt = (
-                    f"(prior log has {len(lines)} events; showing last 200)\n"
-                    + "".join(lines[-200:])
-                )
-            else:
-                prior_log_excerpt = "".join(lines)
-        except OSError:
-            prior_log_excerpt = ""
+    prior = ""
+    if events_path.exists():
+        lines = events_path.read_text().splitlines()
+        head = f"(prior log has {len(lines)} events; showing last 200)\n" if len(lines) > 200 else ""
+        prior = head + "\n".join(lines[-200:])
 
-    bundle = f"""## Input bundle — commit {full_hash[:12]}
-
-### Commit metadata
-
-- commit_hash: {full_hash}
-- commit_author: {author}
-- commit_date: {date_iso}
-- commit_message_first_line: {message_first_line}
-
-### Commit message (full)
-
-```
-{message_first_line}
-
-{body}
-```
-
-### Files touched (status, path)
-
-```
-{name_status}
-```
-
-### Diff (full)
-
-```diff
-{diff}
-```
-
-### Planning files at this commit (post-commit content)
-
-"""
-    if planning_files_content:
-        for status, path, content in planning_files_content:
+    bundle = (
+        f"## Input bundle — historical commit {meta['sha'][:12]}\n\n"
+        f"### Commit metadata\n\n"
+        f"- commit_hash: {meta['sha']}\n- commit_author: {meta['author']}\n"
+        f"- commit_date: {meta['date_iso']}\n- commit_message_first_line: {meta['subject']}\n\n"
+        f"### Commit message (full)\n\n```\n{meta['subject']}\n\n{body}```\n\n"
+        f"### Files touched\n\n```\n{name_status}\n```\n\n"
+        f"### Diff (full)\n\n```diff\n{diff}\n```\n\n"
+        f"### Planning files at this commit (post-commit content)\n\n"
+    )
+    if planning_files:
+        for status, path, content in planning_files:
             bundle += f"\n#### {status}  {path}\n\n```markdown\n{content}\n```\n"
     else:
-        bundle += "\n_(none — commit touches no `planning/` files)_\n"
-
-    bundle += "\n### Prior log (events extracted from earlier commits)\n\n"
-    if prior_log_excerpt:
-        bundle += f"```jsonl\n{prior_log_excerpt}```\n"
-    else:
-        bundle += "_(empty — this is the bootstrap commit)_\n"
-
+        bundle += "_(none)_\n"
+    if mapping_note:
+        bundle += f"\n### Retrospective mapping note (the project owner's translation brief)\n\n{mapping_note}\n"
+    bundle += "\n### Prior log (earlier events — ids and house style)\n\n"
+    bundle += f"```jsonl\n{prior}\n```\n" if prior else "_(empty — first mined commit)_\n"
     return bundle
 
 
-def invoke_extractor(prompt_text: str, bundle_text: str, claude_bin: str = "claude") -> str:
-    """Run `claude -p <full_prompt>` and return its stdout."""
-    full_prompt = (
-        prompt_text
-        + "\n\n---\n\n"
-        + bundle_text
-        + "\n\n---\n\nNow output the JSON array of events for this commit.\n"
-    )
-    # Pass via stdin to avoid shell-arg-length limits
+# --------------------------- extraction ------------------------------------
+
+def invoke_extractor(prompt_text: str, bundle_text: str) -> str:
+    claude_bin = os.environ.get("APV_CLAUDE_BIN", "claude")
+    timeout = int(os.environ.get("APV_EXTRACT_TIMEOUT", "600"))
+    cmd = [claude_bin, "-p", "--output-format", "text"]
+    model = os.environ.get("APV_EXTRACT_MODEL")
+    if model:
+        cmd += ["--model", model]
     result = subprocess.run(
-        [claude_bin, "-p", "--output-format", "text"],
-        input=full_prompt,
-        capture_output=True,
-        text=True,
-        timeout=600,
+        cmd, input=prompt_text + "\n\n---\n\n" + bundle_text +
+        "\n\n---\n\nNow output the JSON array of events for this commit.\n",
+        capture_output=True, text=True, timeout=timeout,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"claude CLI failed: {result.stderr.strip()}")
+        raise RuntimeError(f"extractor invocation failed: {result.stderr.strip()[:400]}")
     return result.stdout
 
 
-def parse_events_response(text: str) -> list[dict]:
-    """Extract JSON array from response, tolerating optional markdown fences."""
+def parse_events(text: str) -> list[dict]:
     s = text.strip()
-    if s.startswith("```"):
-        # Strip fences
-        first_newline = s.find("\n")
-        if first_newline > 0:
-            s = s[first_newline + 1:]
-        if s.rstrip().endswith("```"):
-            s = s.rstrip()[: -3].rstrip()
-    return json.loads(s)
+    s = re.sub(r"^```(json)?\s*", "", s)
+    s = re.sub(r"\s*```$", "", s)
+    start, end = s.find("["), s.rfind("]")
+    if start == -1 or end <= start:
+        raise ValueError("no JSON array in extractor response")
+    events = json.loads(s[start:end + 1])
+    if not isinstance(events, list) or not all(isinstance(e, dict) for e in events):
+        raise ValueError("extractor response is not a list of objects")
+    if not events:
+        raise ValueError("extractor returned an empty block")
+    return events
 
 
-def validate_events(events: list[dict], schema_path: Path) -> list[str]:
-    """Returns a list of error messages; empty list means valid."""
+class AmbiguityHalt(Exception):
+    def __init__(self, reason, candidates=None, question=None):
+        super().__init__(reason)
+        self.reason = reason
+        self.candidates = candidates or []
+        self.question = question or "Repair in-session, then re-run with --resume."
+
+
+def enforce(events: list[dict], meta: dict, run_id: str, actor: str,
+            seen_ids: set) -> list[dict]:
+    """Write-side rules in code (mirrors extract-commit.py's stance): the
+    orchestrator, not the model, guarantees the block's provenance and seal.
+    Returns the block to append; raises on violation."""
+    if len(events) == 1 and events[0].get("type") == "ambiguity.halt":
+        a = events[0].get("attributes") or {}
+        raise AmbiguityHalt(a.get("reason", "extractor declared ambiguity"),
+                            a.get("candidate_events"), a.get("needs_human_input"))
+
+    seals = [e for e in events if e.get("type") == "commit.recorded"]
+    if len(seals) != 1 or events[-1].get("type") != "commit.recorded":
+        raise ValueError("block must contain exactly one commit.recorded, last")
+
+    for e in events:
+        t = e.get("type", "")
+        if t in FORBIDDEN_TYPES or t == "ambiguity.halt":
+            raise ValueError(f"forbidden event type from extractor: {t} "
+                             "(entity.accepted is operator-only; write-side rule, not prompt)")
+        eid = e.get("event_id", "")
+        if not UUID4_RE.match(eid):
+            e["event_id"] = eid = str(uuid.uuid4())
+        if eid in seen_ids:
+            raise ValueError(f"event_id reuse: {eid}")
+        seen_ids.add(eid)
+        # Provenance is the orchestrator's word, never the model's
+        # (T2-ontology §3.12): every event marked, every event repudiable.
+        e["origin"] = "backfilled"
+        e["confidence"] = "derived"
+        e["schema_version"] = "0.4.0"
+        e["actor"] = actor
+        e["attributes"] = dict(e.get("attributes") or {})
+        e["attributes"]["backfill_run"] = run_id
+
+    seal = events[-1]
+    seal["attributes"]["commit_ref"] = meta["sha"]
+    seal["attributes"]["author"] = slugify(meta["author"])
+    seal["attributes"]["date"] = (meta["date_iso"] or "")[:10]
+    seal["attributes"]["message_first_line"] = meta["subject"]
+    seal.pop("entity_type", None)
+    seal.pop("entity_id", None)
+    return events
+
+
+def schema_validate(events: list[dict]):
     try:
-        from jsonschema import validate, ValidationError
+        from jsonschema import validate  # type: ignore
     except ImportError:
-        return [
-            f"jsonschema not available for {sys.executable}. "
-            f"Run: {sys.executable} -m pip install --user jsonschema"
-        ]
-    with open(schema_path) as f:
-        schema = json.load(f)
-    errors = []
-    for i, ev in enumerate(events):
-        if ev.get("type") == "ambiguity.halt":
-            continue  # not a real ontology event
-        try:
-            validate(instance=ev, schema=schema)
-        except ValidationError as e:
-            errors.append(f"event[{i}] ({ev.get('event_id', '?')}): {e.message}")
-    return errors
+        raise AmbiguityHalt(
+            f"jsonschema not installed for {sys.executable} — backfill fails "
+            "closed rather than appending unvalidated events. "
+            f"Run: {sys.executable} -m pip install --user jsonschema")
+    schema = json.loads(SCHEMA_PATH.read_text())
+    for e in events:
+        validate(instance=e, schema=schema)
 
 
-def is_ambiguity_halt(events: list[dict]) -> bool:
-    return len(events) == 1 and events[0].get("type") == "ambiguity.halt"
+def ordered(e: dict) -> dict:
+    keys = ("event_id", "type", "origin", "actor", "confidence",
+            "schema_version", "entity_type", "entity_id", "attributes")
+    return {k: e[k] for k in keys if k in e}
 
+
+# --------------------------- side channel + chunking ------------------------
+
+def collect_hypotheses(events: list[dict], meta: dict, hypo_path: Path):
+    """Tier-3 stand-ins (hitl-questions carrying fulcrum event_ids) are the
+    walk's inline hypotheses — collected for the triage pass, never stopped
+    for (T2-ingest §3.7)."""
+    entries = []
+    for e in events:
+        if e.get("type") == "entity.created" and e.get("entity_type") == "hitl-question":
+            a = e.get("attributes") or {}
+            if a.get("event_ids"):
+                entries.append({
+                    "question_entity_id": e.get("entity_id"),
+                    "fulcrum_event_ids": a["event_ids"],
+                    "summary": a.get("summary", ""),
+                    "commit_ref": meta["sha"],
+                    "commit_subject": meta["subject"],
+                    "commit_date": (meta["date_iso"] or "")[:10],
+                })
+    if entries:
+        hypo_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(hypo_path, "a") as f:
+            for entry in entries:
+                f.write(json.dumps(entry) + "\n")
+    return len(entries)
+
+
+def commit_chunk(project_path: Path, data_dir: Path, run_id: str,
+                 first_sha: str, last_sha: str, n_blocks: int):
+    rel = os.path.relpath(data_dir, project_path)
+    git(["add", rel], project_path)
+    (data_dir / ".last-capture").write_text(f"{int(time.time())}\n")
+    msg = f"backfill({run_id}): commits {first_sha[:7]}..{last_sha[:7]}, {n_blocks} blocks"
+    git(["commit", "-m", msg], project_path)
+    return msg
+
+
+def write_needs_review(data_dir: Path, sha: str, kind: str, body: str) -> Path:
+    d = data_dir / "needs-review"
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / f"{sha[:8]}-{kind}.md"
+    p.write_text(body)
+    return p
+
+
+# --------------------------- state ------------------------------------------
 
 def save_state(state_path: Path, state: dict):
     state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -250,116 +353,141 @@ def load_state(state_path: Path) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--project-path", required=True, type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--limit", type=int, default=20)
-    parser.add_argument("--from-commit", type=str, default=None)
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--prompt-path", type=Path, default=DEFAULT_PROMPT)
-    parser.add_argument("--schema-path", type=Path, default=DEFAULT_SCHEMA)
-    parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--verbose", "-v", action="store_true")
-    parser.add_argument("--claude-bin", default="claude")
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--project-path", required=True, type=Path)
+    ap.add_argument("--run-id", default=None)
+    ap.add_argument("--until", default=None)
+    ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--chunk-size", type=int, default=25)
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--prompt-path", type=Path, default=DEFAULT_PROMPT)
+    ap.add_argument("--actor-override", default=None)
+    ap.add_argument("--verbose", "-v", action="store_true")
+    args = ap.parse_args()
 
     project_path = args.project_path.resolve()
     if not (project_path / ".git").exists():
         sys.exit(f"ERROR: {project_path} is not a git repo")
 
-    output_path = args.output or (project_path / ".agent-plan-tracker/events.jsonl")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    data_dir = apvlib.apv_data_dir(project_path)
+    events_path = data_dir / "events.jsonl"
+    if not events_path.exists():
+        sys.exit(f"ERROR: no events.jsonl in {data_dir} — attach the repo first "
+                 "(/apv-init); backfill appends to a live log, it does not create one.")
 
-    state_path = output_path.parent / "backfill-state.json"
+    run_id = args.run_id or f"bf-{date.today().isoformat()}-a"
+    state_path = data_dir / "backfill-state.json"
+    hypo_path = data_dir / "needs-review" / f"hypotheses-{run_id}.jsonl"
     state = load_state(state_path) if args.resume else {}
-    processed_commits = set(state.get("processed_commits", []))
+    processed = set(state.get("processed_commits", []))
 
-    if not args.prompt_path.exists():
-        sys.exit(f"ERROR: prompt file not found: {args.prompt_path}")
+    # Mapping note (T3-retrospective-mapping-template §2.3): included in the
+    # brief verbatim when present; its absence on a non-native-looking repo
+    # is a warning, never a block.
+    mapping_note = None
+    note_path = data_dir / "retrospective-mapping.md"
+    if note_path.exists():
+        mapping_note = note_path.read_text()
+        log(f"mapping note: {note_path}", force=True)
+    elif looks_non_native(project_path):
+        log("WARNING: no retrospective-mapping.md and the project does not look "
+            "native to the T1/T2/T3 convention — extraction quality will suffer. "
+            f"Author one at {note_path} (template: retrospective-mapping-template.md).",
+            force=True)
+
     prompt_text = args.prompt_path.read_text()
+    claude_bin = os.environ.get("APV_CLAUDE_BIN", "claude")
+    if not args.dry_run and not shutil.which(claude_bin):
+        sys.exit(f"ERROR: {claude_bin} CLI not found on PATH (use --dry-run to inspect)")
 
-    if not args.dry_run and not shutil.which(args.claude_bin):
-        sys.exit(f"ERROR: {args.claude_bin} CLI not found on PATH (use --dry-run to skip)")
-
-    commits = list_commits(project_path, args.limit, args.from_commit)
+    until = args.until or first_sealed_commit(project_path, events_path)
+    commits = list_commits(project_path, until, args.limit)
     if not commits:
-        log("no commits to process", force=True)
+        log("nothing to mine — no commits before the adoption boundary", force=True)
         return
 
-    log(f"processing {len(commits)} commits ({commits[0][:8]} -> {commits[-1][:8]})", force=True)
+    boundary = until[:8] if until else "HEAD (empty-log mine-all)"
+    log(f"run {run_id}: {len(commits)} commit(s) before boundary {boundary}", force=True)
 
+    seen_ids = set()
+    if events_path.exists():
+        for line in events_path.read_text().splitlines():
+            m = re.search(r'"event_id":\s*"([^"]+)"', line)
+            if m:
+                seen_ids.add(m.group(1))
+
+    chunk_first = None
+    chunk_count = 0
+    n_hypo = 0
     for i, commit_ref in enumerate(commits, start=1):
-        if commit_ref in processed_commits:
-            log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  SKIP (already processed)", force=True)
+        if commit_ref in processed:
+            log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  SKIP (processed)", force=True)
             continue
-        log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  building bundle...", force=True)
-
-        bundle = build_bundle(project_path, commit_ref, output_path if output_path.exists() else None, args.verbose)
+        meta = commit_meta(project_path, commit_ref)
+        bundle = build_bundle(project_path, commit_ref, events_path, mapping_note)
 
         if args.dry_run:
-            print(f"\n{'=' * 80}\n=== DRY-RUN: bundle for {commit_ref[:8]} ({len(bundle)} chars) ===\n{'=' * 80}\n")
+            print(f"\n{'=' * 80}\n=== DRY-RUN bundle {commit_ref[:8]} ({len(bundle)} chars) ===\n")
             print(bundle[:3000])
             if len(bundle) > 3000:
-                print(f"\n... [{len(bundle) - 3000} more chars truncated in dry-run preview]")
-            print()
+                print(f"... [{len(bundle) - 3000} chars truncated]")
             continue
 
-        log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  invoking extractor ({len(bundle)} chars)...", force=True)
+        log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  extracting ({len(bundle)} chars)...", force=True)
         t0 = time.time()
+        raw = ""
         try:
-            response = invoke_extractor(prompt_text, bundle, args.claude_bin)
-        except subprocess.TimeoutExpired:
-            log(f"  TIMEOUT on commit {commit_ref}", force=True)
-            save_state(state_path, {"processed_commits": list(processed_commits), "last_failed": commit_ref})
-            sys.exit(2)
-        elapsed = time.time() - t0
+            raw = invoke_extractor(prompt_text, bundle)
+            events = parse_events(raw)
+            actor = args.actor_override or slugify(meta["author"])
+            events = enforce(events, meta, run_id, actor, seen_ids)
+            schema_validate(events)
+        except AmbiguityHalt as h:
+            p = write_needs_review(
+                data_dir, commit_ref, "ambiguity",
+                f"# Backfill halt — {meta['subject']}\n\nCommit: {commit_ref}\n\n"
+                f"Reason: {h.reason}\n\nNeeds human input: {h.question}\n\n"
+                f"Candidates:\n\n```json\n{json.dumps(h.candidates, indent=2)}\n```\n")
+            save_state(state_path, {"run_id": run_id,
+                                    "processed_commits": sorted(processed),
+                                    "last_halt": commit_ref})
+            sys.exit(f"HALT at {commit_ref[:8]} — see {p}; repair, then --resume")
+        except Exception as ex:
+            p = write_needs_review(
+                data_dir, commit_ref, "rejected",
+                f"# Backfill rejected — {meta['subject']}\n\nCommit: {commit_ref}\n\n"
+                f"Reason: {ex}\n\nRaw response:\n\n```\n{raw[:8000]}\n```\n")
+            save_state(state_path, {"run_id": run_id,
+                                    "processed_commits": sorted(processed),
+                                    "last_failed": commit_ref})
+            sys.exit(f"REJECTED at {commit_ref[:8]} — {ex}; see {p}; repair, then --resume")
 
-        try:
-            events = parse_events_response(response)
-        except json.JSONDecodeError as e:
-            log(f"  PARSE ERROR for commit {commit_ref}: {e}", force=True)
-            review_path = output_path.parent / f"needs-review/{commit_ref[:8]}-parse-error.md"
-            review_path.parent.mkdir(parents=True, exist_ok=True)
-            review_path.write_text(f"# Parse error\n\nCommit: {commit_ref}\n\nResponse:\n\n```\n{response}\n```\n")
-            save_state(state_path, {"processed_commits": list(processed_commits), "last_failed": commit_ref})
-            sys.exit(3)
+        with open(events_path, "a") as f:
+            for e in events:
+                f.write(json.dumps(ordered(e)) + "\n")
+        n_hypo += collect_hypotheses(events, meta, hypo_path)
+        processed.add(commit_ref)
+        chunk_first = chunk_first or commit_ref
+        chunk_count += 1
+        save_state(state_path, {"run_id": run_id, "processed_commits": sorted(processed)})
+        log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  OK ({len(events)} events, "
+            f"{time.time() - t0:.1f}s)", force=True)
 
-        if is_ambiguity_halt(events):
-            log(f"  AMBIGUITY HALT on commit {commit_ref}", force=True)
-            halt = events[0]["attributes"]
-            review_path = output_path.parent / f"needs-review/{commit_ref[:8]}-ambiguity.md"
-            review_path.parent.mkdir(parents=True, exist_ok=True)
-            review_path.write_text(
-                f"# Ambiguity halt\n\nCommit: {commit_ref}\n\n"
-                f"Reason: {halt.get('reason')}\n\n"
-                f"Needs human input: {halt.get('needs_human_input')}\n\n"
-                f"Candidate events (if you want to proceed):\n\n```json\n{json.dumps(halt.get('candidate_events', []), indent=2)}\n```\n"
-            )
-            save_state(state_path, {"processed_commits": list(processed_commits), "last_halt": commit_ref})
-            sys.exit(4)
+        if args.chunk_size > 0 and chunk_count >= args.chunk_size:
+            msg = commit_chunk(project_path, data_dir, run_id, chunk_first, commit_ref, chunk_count)
+            log(f"  chunk committed: {msg}", force=True)
+            chunk_first, chunk_count = None, 0
 
-        errors = validate_events(events, args.schema_path)
-        if errors:
-            log(f"  VALIDATION FAILED for commit {commit_ref}: {len(errors)} errors", force=True)
-            review_path = output_path.parent / f"needs-review/{commit_ref[:8]}-validation.md"
-            review_path.parent.mkdir(parents=True, exist_ok=True)
-            review_path.write_text(
-                f"# Validation failed\n\nCommit: {commit_ref}\n\n"
-                f"Errors:\n\n" + "\n".join(f"- {e}" for e in errors) + "\n\n"
-                f"Response:\n\n```json\n{json.dumps(events, indent=2)}\n```\n"
-            )
-            save_state(state_path, {"processed_commits": list(processed_commits), "last_failed": commit_ref})
-            sys.exit(5)
+    if not args.dry_run and args.chunk_size > 0 and chunk_count > 0:
+        msg = commit_chunk(project_path, data_dir, run_id, chunk_first, commits[-1], chunk_count)
+        log(f"  final chunk committed: {msg}", force=True)
 
-        with open(output_path, "a") as f:
-            for ev in events:
-                f.write(json.dumps(ev, separators=(",", ":")) + "\n")
-
-        processed_commits.add(commit_ref)
-        save_state(state_path, {"processed_commits": list(processed_commits)})
-        log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  OK ({len(events)} events, {elapsed:.1f}s)", force=True)
-
-    log(f"\ndone — {len(processed_commits)} commits processed, events in {output_path}", force=True)
+    if not args.dry_run:
+        log(f"\nrun {run_id} complete — {len(processed)} commit(s) mined; "
+            f"{n_hypo} hypothesis(es) queued for /apv-triage-why"
+            + (f" at {hypo_path}" if n_hypo else ""), force=True)
 
 
 if __name__ == "__main__":

@@ -48,3 +48,12 @@ For non-native projects the mapping note is the load-bearing artefact (T2-ingest
 ## 6. Open questions
 
 1. Should "known pivots" entries carry enough structure (commit ref + candidate rationale) to land directly as triage-pass input? Lean: yes — same entry shape as the hypotheses file, so the human's up-front knowledge and the walk's inferences meet in one checklist.
+
+## 7. Build notes (2026-07-03)
+
+§6 Q1 ratified with a refinement: known-pivots entries are a table (commit ref/subject, what pivoted, rationale in the owner's words) and are treated by the extractor as **recovered** rationale — citable decision sources — rather than triage input; only what the owner *can't* confidently supply goes through triage. The prompt states this explicitly ("the mapping note's known pivots are recovered rationale").
+
+- `scripts/backfill/retrospective-mapping-template.md`: YAML frontmatter for the structured parts, free-form markdown throughout ("a checklist, not a cage"), covering the T2-ingest §3.2 checklist. Placement `<data-dir>/retrospective-mapping.md`; archived automatically post-backfill (the orchestrator's flow docs carry the step).
+- `retrospective-mapping-example.md`: filled for the realistic non-native shape (ADRs + docs/architecture + issue-label blockers + squashed-history caveat).
+- Wiring per §2.3: the note rides the extraction bundle verbatim when present; pre-flight WARNS (never blocks) when absent on a non-native-looking target (heuristic: no `planning/*.md` matching the tier/milestone id convention).
+- Sandbox coverage inside `tests/backfill/run-backfill-sandbox.sh`: warn-on-absent, note-in-bundle, frontmatter parse of template + example.

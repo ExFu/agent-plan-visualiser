@@ -98,7 +98,10 @@ check "css origin badge present"        grep -q '.badge.origin-badge' "$CSS"
 check "js syntax valid"                 node --check "$APP"
 
 echo "== grep audit: no dogfood literals in view/ outside legacy fallbacks"
-STRAYS=$(grep -rn "agent-plan-tracker" "$PLUGIN_HOME/view" | grep -v "legacy\|fallbacks for plain" | grep -v '\.\./\.\./\.agent-plan-tracker' || true)
+# Dot-anchored deliberately: the hardcodes were data-dir paths
+# (.agent-plan-tracker), and the rename audit's own doctrine dot-guards
+# the data dir's real name.
+STRAYS=$(grep -rn '\.agent-plan-tracker' "$PLUGIN_HOME/view" | grep -v "legacy\|fallbacks for plain" | grep -v '\.\./\.\./\.agent-plan-tracker' || true)
 if [ -n "$STRAYS" ]; then
   echo "  FAIL: stray dogfood literals:"; echo "$STRAYS" | sed 's/^/    | /'
   FAIL=1
