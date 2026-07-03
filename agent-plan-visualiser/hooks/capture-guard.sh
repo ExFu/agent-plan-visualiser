@@ -15,6 +15,18 @@
 # Git runs pre-commit hooks from the top of the working tree, so relative
 # paths below resolve against the repo root.
 
+# Extractor deferral: when the autonomous extractor owns this repo's
+# commit-msg slot (opt-in, /apv-init --with-extractor), capture is produced
+# or verified THERE — commit-msg is the only blocking hook that receives
+# the commit message the seal needs, and it runs after pre-commit, so this
+# guard must stand aside or uncaptured non-session commits could never
+# reach it. The extractor applies the same staleness contract and no-ops
+# when a session capture is already fresh.
+EXTRACT_HOOK="$(git rev-parse --git-path hooks 2>/dev/null)/commit-msg"
+if [ -x "$EXTRACT_HOOK" ] && grep -q "apv-extract" "$EXTRACT_HOOK" 2>/dev/null; then
+  exit 0
+fi
+
 # Data dir resolution mirrors apvlib: APV_DATA_DIR env var -> committed
 # .apv-config.toml [storage] data_dir -> default .apv/. The config read is
 # a deliberate one-key POSIX sed (this hook stays dependency-free and

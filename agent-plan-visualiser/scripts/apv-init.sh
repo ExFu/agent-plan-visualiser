@@ -33,6 +33,7 @@ set -uo pipefail
 
 AT="all"
 ACCEPT_CLAUDE_MD=0
+WITH_EXTRACTOR=0
 for arg in "$@"; do
   case "$arg" in
     --at=all)        AT="all" ;;
@@ -40,8 +41,9 @@ for arg in "$@"; do
     --at=ref-update) AT="ref-update" ;;
     --at=manual)     AT="manual" ;;
     --accept-claude-md) ACCEPT_CLAUDE_MD=1 ;;
+    --with-extractor)   WITH_EXTRACTOR=1 ;;
     *)
-      echo "usage: apv-init.sh [--at=all|pre-push|ref-update|manual] [--accept-claude-md]" >&2
+      echo "usage: apv-init.sh [--at=all|pre-push|ref-update|manual] [--with-extractor] [--accept-claude-md]" >&2
       exit 2
       ;;
   esac
@@ -128,16 +130,24 @@ TOML
   report created ".apv-config.toml" "default gate lists; data_dir = \"$DATA_DIR\""
 fi
 
-# --- 3. gitignore the local capture stamp ------------------------------------
-# The stamp is per-checkout local state the guard consumes; it must never be
-# tracked. One line, appended once.
-STAMP_LINE="$DATA_DIR/.last-capture"
-if [ -f .gitignore ] && grep -qxF "$STAMP_LINE" .gitignore; then
-  report ok ".gitignore" "$STAMP_LINE already ignored"
+# --- 3. gitignore the local capture state ------------------------------------
+# The stamp (guard) and the pending-extract flag (extractor's post-commit
+# half) are per-checkout local state; never tracked. One line each,
+# appended once.
+IGNORED_ALL=1
+for LOCAL_LINE in "$DATA_DIR/.last-capture" "$DATA_DIR/.pending-extract"; do
+  if [ -f .gitignore ] && grep -qxF "$LOCAL_LINE" .gitignore; then
+    :
+  else
+    IGNORED_ALL=0
+    { [ -f .gitignore ] && [ -n "$(tail -c 1 .gitignore 2>/dev/null)" ] && echo; } >> .gitignore 2>/dev/null || true
+    printf '# agent-plan-visualiser local capture state — never tracked\n%s\n' "$LOCAL_LINE" >> .gitignore
+  fi
+done
+if [ "$IGNORED_ALL" -eq 1 ]; then
+  report ok ".gitignore" "local capture state already ignored"
 else
-  { [ -f .gitignore ] && [ -n "$(tail -c 1 .gitignore 2>/dev/null)" ] && echo; } >> .gitignore 2>/dev/null || true
-  printf '# agent-plan-visualiser local capture stamp — never tracked\n%s\n' "$STAMP_LINE" >> .gitignore
-  report created ".gitignore" "added $STAMP_LINE"
+  report created ".gitignore" "ignoring $DATA_DIR/.last-capture + .pending-extract"
 fi
 
 # --- 4. hooks -----------------------------------------------------------------
@@ -171,6 +181,12 @@ else
   fi
   if [ "$AT" = "all" ] || [ "$AT" = "ref-update" ]; then
     run_installer "reference-transaction (gate)" bash "$TOOLCHAIN_HOME/scripts/install-gate.sh" --at=ref-update "${GATE_HOME_ARGS[@]}"
+  fi
+  # Autonomous capture is opt-in (T3-autonomous-extractor §2.2): the
+  # commit-msg extractor produces captures for non-session committers;
+  # the pre-commit guard detects it and defers.
+  if [ "$WITH_EXTRACTOR" -eq 1 ]; then
+    run_installer "commit-msg (apv-extract)" bash "$TOOLCHAIN_HOME/scripts/install-extractor.sh" "${GATE_HOME_ARGS[@]}"
   fi
 fi
 

@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-03T16:30:12Z
+# Project state — generated 2026-07-03T16:46:46Z
 
-**Total events:** 416  ·  **Draft:** 13  ·  **Live:** 16  ·  **Dormant:** 0  ·  **Closed:** 42  ·  **Orphaned:** 0
+**Total events:** 422  ·  **Draft:** 13  ·  **Live:** 15  ·  **Dormant:** 0  ·  **Closed:** 43  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,9 +20,6 @@
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
   - `M5-backfill` (4 events): relationship.spawns → entity.accepted → entity.extended
-
-- **T2-extraction**
-  - `T3-autonomous-extractor` (3 events): entity.created → relationship.spawns → entity.accepted
 
 - **T2-ingest**
   - `T3-backfill-workflow` (3 events): entity.created → relationship.spawns → entity.accepted
@@ -47,7 +44,6 @@
   - `M5-backfill`
 
 - **M4-fresh-install**
-  - `T3-autonomous-extractor`
   - `T3-distribution`
 
 - **M5-backfill**
@@ -107,7 +103,7 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 3/5 T3 complete (60%); 2 live
+- **M4-fresh-install**: 4/5 T3 complete (80%); 1 live
 - **M5-backfill**: 0/5 T3 complete (0%); 5 live
 
 ---

@@ -32,9 +32,13 @@ reference-transaction hooks keep an untrustworthy log off main either way.
   `apv-merge` (landing doctrine), `using-agent-plan-visualiser` (the
   formal orientation/spec floor).
 - **Command** — `/apv-init`: idempotent attach/audit/repair of any repo.
+  `--with-extractor` opts in to autonomous capture: commits made outside a
+  Claude session (editors, CI, collaborators) are extracted by `claude -p`
+  at commit time — sealed like any capture, write-side rules enforced in
+  code, ambiguity blocks the commit to `needs-review/`.
 - **Hooks** — a SessionStart one-liner orients any session in a tracked
-  repo (`hooks/hooks.json`); the git hooks (capture-guard, gate adapters)
-  are installed per-repo by `/apv-init`.
+  repo (`hooks/hooks.json`); the git hooks (capture-guard, gate adapters,
+  optional extractor pair) are installed per-repo by `/apv-init`.
 - **Scripts** — the pipeline (`repack-validate.sh`), the boundary gate
   (`gate-check.sh`), audits, timelines, the view server, the bundle
   builder.
