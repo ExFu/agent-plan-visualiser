@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-03T18:20:48Z
+# Project state — generated 2026-07-05T13:29:30Z
 
-**Total events:** 449  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 48  ·  **Orphaned:** 0
+**Total events:** 451  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 48  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -22,7 +22,7 @@
   - `M5-backfill` (7 events): entity.progressed → entity.extended → entity.progressed
 
 - **T2-packaging**
-  - `T3-distribution` (8 events): entity.progressed → verification.tested → verification.skipped
+  - `T3-distribution` (9 events): verification.tested → verification.skipped → entity.progressed
 
 ### By milestone
 
