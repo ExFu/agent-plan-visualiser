@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# apv — the APV command dispatcher (toolchain side).
+#
+# Projects attached via apv-init get a generated bin/apv shim that execs this
+# file with the toolchain path baked in, so inside a tracked repo the surface
+# is `./bin/apv <cmd>`. For a repo that is not yet attached, run this file
+# directly by path: `<toolchain>/bin/apv init`.
+#
+#   apv [serve] [--port N] [--host H]   view server (default subcommand)
+#   apv init [apv-init flags]           attach or repair the current repo
+#   apv backfill [backfill flags]       mine pre-adoption history into the log
+#                                       (--project-path defaults to this repo;
+#                                       run from a NORMAL terminal — claude -p
+#                                       auth does not work inside a Claude
+#                                       Code session)
+#   apv refresh                         rebuild cache + projection + summary
+#
+# Symlink-safe: the toolchain home resolves from this file's REAL location.
+set -euo pipefail
+SELF="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${BASH_SOURCE[0]}")"
+TOOLCHAIN="$(dirname "$(dirname "$SELF")")"
+
+usage() {
+  cat <<'USAGE'
+usage: apv [command] [args]
+
+  serve [--port N] [--host H]   view server (default when no command given)
+  init [apv-init flags]         attach or repair the current repo
+  backfill [backfill flags]     mine pre-adoption git history into the log
+  refresh                       rebuild cache + projection + summary
+  help                          this text
+USAGE
+}
+
+CMD="${1:-serve}"
+if [ $# -gt 0 ]; then shift; fi
+
+case "$CMD" in
+  serve)
+    exec "$TOOLCHAIN/bin/apv-serve" "$@"
+    ;;
+  init)
+    exec bash "$TOOLCHAIN/scripts/apv-init.sh" "$@"
+    ;;
+  backfill)
+    # Bulk extraction runs on Sonnet unless the caller overrides (operator
+    # cost ruling 2026-07-03).
+    export APV_EXTRACT_MODEL="${APV_EXTRACT_MODEL:-sonnet}"
+    for a in "$@"; do
+      case "$a" in --project-path*) exec python3 "$TOOLCHAIN/scripts/backfill/backfill.py" "$@" ;; esac
+    done
+    ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+      echo "apv backfill: not inside a git repository (or pass --project-path)" >&2
+      exit 2
+    }
+    exec python3 "$TOOLCHAIN/scripts/backfill/backfill.py" --project-path "$ROOT" "$@"
+    ;;
+  refresh)
+    python3 "$TOOLCHAIN/scripts/cache-build.py"
+    python3 "$TOOLCHAIN/scripts/projection-emit.py"
+    python3 "$TOOLCHAIN/scripts/summary-emit.py"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  -*)
+    # bare flags mean serve: `apv --port 9000` == `apv serve --port 9000`
+    exec "$TOOLCHAIN/bin/apv-serve" "$CMD" "$@"
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

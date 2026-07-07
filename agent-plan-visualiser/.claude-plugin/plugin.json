@@ -1,6 +1,6 @@
 {
   "name": "agent-plan-visualiser",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Event-sourced planning methodology with git-history extraction and projection. Walks a project's git history, extracts structured events against a defined ontology, and provides projections (audits, diagrams, status reports) over the resulting event log.",
   "author": {
     "name": "Alastair Brayne"

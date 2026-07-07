@@ -139,15 +139,14 @@ fi
 
 # --- 3. command launcher -----------------------------------------------------
 # A short project-root entry point — `bin/apv` — so nobody has to type
-# `python3 <toolchain>/scripts/serve.py`. It is a tiny dispatcher (today just
-# `apv serve`, bare `apv` defaulting to serve) so the name stays honest and
-# the surface can grow (apv gate, apv capture, ...) without a rename.
+# `python3 <toolchain>/scripts/...` by hand. The shim is a pure passthrough
+# to the toolchain's bin/apv dispatcher (serve / init / backfill / refresh),
+# so new subcommands arrive with a plugin update, no re-init needed.
 # Generated (never hand-authored), untracked — like the gate hooks it bakes
 # the machine- and version-specific toolchain path — and regenerated on every
 # init so a plugin update that moves the toolchain home is picked up by a
-# re-run. Delegates to bin/apv-serve, the single serve implementation.
-# Because bin/ is project-owned, a pre-existing NON-apv bin/apv is refused,
-# never clobbered (the hook installers' contract, applied here).
+# re-run. Because bin/ is project-owned, a pre-existing NON-apv bin/apv is
+# refused, never clobbered (the hook installers' contract, applied here).
 LAUNCHER_PATH="bin/apv"
 LAUNCHER_OK=1
 # Write the desired launcher to $1. The dispatcher body goes through a QUOTED
@@ -165,10 +164,7 @@ gen_launcher() {
     printf '# version-specific. After a plugin update, re-run /apv-init to refresh it.\n'
     printf 'TOOLCHAIN=%q\n' "$TOOLCHAIN_HOME"
     cat <<'LAUNCH'
-case "${1:-}" in
-  ""|serve) [ "${1:-}" = serve ] && shift; exec "$TOOLCHAIN/bin/apv-serve" "$@" ;;
-  *) echo "usage: apv [serve] [--port N] [--host H]" >&2; exit 2 ;;
-esac
+exec "$TOOLCHAIN/bin/apv" "$@"
 LAUNCH
   } > "$1"
 }
