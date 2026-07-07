@@ -193,6 +193,33 @@ check "rule named"                      grep -qi "operator-only" <<<"$OUT"
 check "needs-review written"            sh -c "ls .apv/needs-review/*-rejected.md >/dev/null 2>&1"
 check "nothing appended"                [ "$(grep -c '' .apv/events.jsonl)" -eq "$LOG_LINES" ]
 
+# --- Case 4b: lifecycle without created (bounded-window hole) -------------------
+# The exfu rehearsal regression: with --limit, a plan can be MODIFIED inside
+# the window but created before it; a block that progresses it without
+# opening its lifecycle must be refused pre-append, not at the chunk gate.
+echo "== write-side rules: lifecycle against an unknown entity is rejected pre-append"
+git init -q -b main "$SANDBOX/refhole"
+cd "$SANDBOX/refhole" || exit 2
+git config user.email r@example.invalid && git config user.name "Ref"
+echo y > plan.md && git add -A && git commit -qm "hist: tweaks a pre-window plan"
+SHA_R="$(git rev-parse HEAD)"
+mkdir -p .apv
+cat > "$FAKE_DIR/${SHA_R:0:8}.json" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.progressed", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "plan", "entity_id": "PRE-WINDOW", "attributes": {"summary": "progressed but never created — creating commit predates the window"}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "m", "confidence": "derived", "schema_version": "0.4.0", "attributes": {"author": "m", "date": "2025-01-01", "message_first_line": "x"}}
+]
+JSON
+cat >> .apv/events.jsonl <<JSON
+{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-07-03", "message_first_line": "never matches either"}}
+JSON
+RH_LINES="$(grep -c '' .apv/events.jsonl)"
+run python3 "$BF" --project-path "$PWD" --run-id bf-refhole --chunk-size 0
+check "run rejects"                     [ "$CODE" -ne 0 ]
+check "created-first rule named"        grep -q "no entity.created" <<<"$OUT"
+check "needs-review written"            sh -c "ls .apv/needs-review/*-rejected.md >/dev/null 2>&1"
+check "nothing appended"                [ "$(grep -c '' .apv/events.jsonl)" -eq "$RH_LINES" ]
+
 # --- Case 5: mapping note ---------------------------------------------------------
 echo "== mapping note: warns when absent on non-native, included when present"
 cd "$SANDBOX/project" || exit 2
@@ -204,6 +231,12 @@ check "note in the dry-run bundle"      grep -q "acme-storefront" <<<"$OUT"
 check "dry-run appended nothing"        [ "$(grep -c '' "$SANDBOX/inject/.apv/events.jsonl")" -eq "$LOG_LINES" ]
 check "template frontmatter parses"     sh -c "head -1 '$PLUGIN/scripts/backfill/retrospective-mapping-template.md' | grep -qx -- ---"
 check "example frontmatter parses"      sh -c "head -1 '$PLUGIN/scripts/backfill/retrospective-mapping-example.md' | grep -qx -- ---"
+
+# The bundle carries the COMPLETE created-entity list (log-relative
+# created-first is only checkable by the model if it can see what exists).
+run python3 "$BF" --project-path "$SANDBOX/project" --run-id bf-known --dry-run
+check "known-entities list in bundle"   grep -q "plan LIVE-A" <<<"$OUT"
+check "mined entities listed too"       grep -q "plan HIST-NEW" <<<"$OUT"
 
 echo
 if [ "$FAIL" -eq 0 ]; then

@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-07T13:30:49Z
+# Project state — generated 2026-07-07T13:56:12Z
 
-**Total events:** 472  ·  **Draft:** 12  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 52  ·  **Orphaned:** 0
+**Total events:** 480  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 52  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -19,10 +19,10 @@
 
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
-  - `M5-backfill` (8 events): entity.extended → entity.progressed → verification.deferred
+  - `M5-backfill` (10 events): entity.progressed → verification.tested → verification.deferred
 
 - **T2-packaging**
-  - `T3-distribution` (10 events): verification.skipped → entity.progressed → verification.deferred
+  - `T3-distribution` (12 events): entity.progressed → verification.tested → verification.deferred
 
 ### By milestone
 
@@ -38,7 +38,7 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 70 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 73 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -61,6 +61,7 @@
   - `2026-05-23.snapshot-trigger-config` (45d untriaged)
   - `2026-05-23.verification-overhaul-candidate-model` (45d untriaged)
   - `2026-06-10.view-hardcodes-dogfood-data-dir` (27d untriaged)
+  - `2026-07-07.backfill-sandbox-triage-check-fails`
 - **plan**
   - `T2-ingest`
 
@@ -101,4 +102,4 @@ _No flapping closures._
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 
 ---
-_74 entities · 103 relationships · 25 decisions._
+_75 entities · 103 relationships · 25 decisions._

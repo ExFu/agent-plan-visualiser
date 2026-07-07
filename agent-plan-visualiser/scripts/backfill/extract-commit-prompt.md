@@ -21,8 +21,9 @@ Every event: `event_id` (fresh UUID v4), `type`, `entity_type`+`entity_id`
 fields (`origin`, `backfill_run`, actor, confidence) and the seal's ground
 truth — focus on getting the *events* right.
 
-**Entity lifecycle (10)**: `entity.created` (first appearance — MUST be the
-entity's first event; for plans, attributes = the file's frontmatter +
+**Entity lifecycle (10)**: `entity.created` (first appearance **in the
+log** — MUST be the entity's first event; see the known-entities rule in
+the interpretation guide; for plans, attributes = the file's frontmatter +
 summary), `entity.extended`, `entity.accepted` (**FORBIDDEN — operator-only;
 never emit**), `entity.renamed`*, `entity.progressed`, `entity.completed`,
 `entity.parked`*, `entity.cancelled`*, `entity.superseded`* (requires
@@ -80,9 +81,19 @@ rationale: treat its entries as citable sources.
 - Read the mapping note first when present — it is the project owner's
   translation brief (where plan-equivalents live, decision artefacts,
   blocker conventions, expected implicit-work volume, known pivots).
-- The prior log shows existing entity ids and house style — reuse ids
-  exactly; never re-create an existing entity; `entity.created` only on
-  true first appearance.
+- The bundle's **Known entities** list is COMPLETE and authoritative for
+  what already exists in the log (the prior-log excerpt may be truncated).
+  Reuse listed ids exactly; never re-create a listed entity. "First
+  appearance" is **log-relative**: any entity you reference that is NOT in
+  the list must open its lifecycle with `entity.created` in YOUR block —
+  even when the commit only *modifies* its file. The mining window may be
+  bounded, so the commit that created the file may never be mined; without
+  your `entity.created` the block breaks referential integrity and is
+  rejected. For such pre-window plans, take attributes from the planning
+  file content in the bundle and say in the summary that the plan predates
+  this commit (creation folded in at the window edge). The same rule covers
+  relationship endpoints: never name a `from_entity_id` (or reattach
+  parent) that is neither known nor created in your block.
 - Most historical commits are honestly `implicit-work` with a What-only
   summary (created — and completed in the same block when self-contained).
   Do not force plan attribution that the diff doesn't support.
