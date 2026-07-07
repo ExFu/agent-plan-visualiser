@@ -66,6 +66,16 @@ SCHEMA_PATH = SCRIPTS.parent / "schemas/0.4.0/events.schema.json"
 DIFF_CAP = 120_000
 FORBIDDEN_TYPES = {"entity.accepted", "analysis.live-summary", "analysis.invalidated"}
 UUID4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+# Mirror of gate-composite's blocking referential classes — keep in sync.
+LIFECYCLE_TYPES = {
+    "entity.created", "entity.extended", "entity.accepted", "entity.renamed",
+    "entity.progressed", "entity.completed", "entity.parked",
+    "entity.cancelled", "entity.superseded", "entity.reopened",
+}
+RELATIONSHIP_FROM_TYPES = {
+    "relationship.spawns", "relationship.depends-on",
+    "relationship.addendum-to", "relationship.alongside",
+}
 
 
 def log(msg, verbose=False, force=False):
@@ -151,7 +161,7 @@ def commit_meta(project_path: Path, commit_ref: str):
 
 
 def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
-                 mapping_note: str | None) -> str:
+                 mapping_note: str | None, known_created: set) -> str:
     meta = commit_meta(project_path, commit_ref)
     body = git(["show", "-s", "--format=%b", commit_ref], project_path)
     diff = git(["show", "--format=", commit_ref], project_path)
@@ -196,6 +206,17 @@ def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
         bundle += "_(none)_\n"
     if mapping_note:
         bundle += f"\n### Retrospective mapping note (the project owner's translation brief)\n\n{mapping_note}\n"
+    # COMPLETE, unlike the prior-log excerpt below (truncated on big logs):
+    # the extractor's created-first duty is log-relative, so it must be able
+    # to see exactly which entities already exist. Surfaced by the exfu
+    # rehearsal: a bounded window (--limit) makes 'modified here, created
+    # before the window' plans real, and referencing them without an
+    # entity.created corrupts the record.
+    bundle += "\n### Known entities (COMPLETE list of entities already created in the log)\n\n"
+    if known_created:
+        bundle += "\n".join(f"- {etype} {eid}" for etype, eid in sorted(known_created)) + "\n"
+    else:
+        bundle += "_(none — nothing exists yet; every entity you reference needs entity.created)_\n"
     bundle += "\n### Prior log (earlier events — ids and house style)\n\n"
     bundle += f"```jsonl\n{prior}\n```\n" if prior else "_(empty — first mined commit)_\n"
     return bundle
@@ -244,7 +265,7 @@ class AmbiguityHalt(Exception):
 
 
 def enforce(events: list[dict], meta: dict, run_id: str, actor: str,
-            seen_ids: set) -> list[dict]:
+            seen_ids: set, known_created: set, known_existing: set) -> list[dict]:
     """Write-side rules in code (mirrors extract-commit.py's stance): the
     orchestrator, not the model, guarantees the block's provenance and seal.
     Returns the block to append; raises on violation."""
@@ -284,6 +305,44 @@ def enforce(events: list[dict], meta: dict, run_id: str, actor: str,
     seal["attributes"]["message_first_line"] = meta["subject"]
     seal.pop("entity_type", None)
     seal.pop("entity_id", None)
+
+    # Referential backstop — mirrors gate-composite's BLOCKING classes so a
+    # defective block is refused here, before append, not commits later at
+    # the chunk-commit gate (surfaced by the exfu rehearsal: --limit windows
+    # produce plans modified in-window but created before it; the prompt now
+    # demands log-relative created-first, this enforces it in code).
+    # Simplification vs the gate: entity.renamed id-resolution is not
+    # replayed — a rename-shaped false halt is recoverable via needs-review
+    # + --resume; silent corruption is not.
+    block_entities = {(e["entity_type"], e["entity_id"]) for e in events
+                      if e.get("entity_type") and e.get("entity_id")}
+    block_created = {(e["entity_type"], e["entity_id"]) for e in events
+                     if e.get("type") == "entity.created"
+                     and e.get("entity_type") and e.get("entity_id")}
+    for e in events:
+        t, a = e.get("type", ""), e.get("attributes") or {}
+        if t in LIFECYCLE_TYPES and t != "entity.created":
+            key = (e.get("entity_type"), e.get("entity_id"))
+            if key[0] and key[1] and key not in known_created and key not in block_created:
+                raise ValueError(
+                    f"{t} against {key[0]} '{key[1]}' with no entity.created in the "
+                    "log or this block — created-first is log-relative: when the "
+                    "creating commit predates the mining window, the block must open "
+                    "the entity's lifecycle itself")
+        elif t in RELATIONSHIP_FROM_TYPES:
+            fkey = (a.get("from_entity_type") or "plan", a.get("from_entity_id"))
+            if fkey[1] and fkey not in known_existing and fkey not in block_entities:
+                raise ValueError(
+                    f"{t}: from-entity {fkey[0]} '{fkey[1]}' names no known entity "
+                    "in the log or this block")
+        elif t == "relationship.reattached":
+            for fld in ("from_parent", "to_parent"):
+                pid = a.get(fld)
+                if pid and ("plan", pid) not in known_existing \
+                        and ("plan", pid) not in block_entities:
+                    raise ValueError(
+                        f"{t}: {fld} plan '{pid}' names no known entity "
+                        "in the log or this block")
     return events
 
 
@@ -339,7 +398,18 @@ def commit_chunk(project_path: Path, data_dir: Path, run_id: str,
     git(["add", rel], project_path)
     (data_dir / ".last-capture").write_text(f"{int(time.time())}\n")
     msg = f"backfill({run_id}): commits {first_sha[:7]}..{last_sha[:7]}, {n_blocks} blocks"
-    git(["commit", "-m", msg], project_path)
+    try:
+        git(["commit", "-m", msg], project_path)
+    except RuntimeError as ex:
+        # Most likely the repo's own gate hook refusing the log. The mined
+        # blocks are safe in the working tree and state is saved per commit —
+        # halt on the sanctioned path instead of an unhandled traceback.
+        sys.exit(
+            f"HALT: chunk commit refused —\n{ex}\n\n"
+            "The mined blocks are appended to the log (working tree, "
+            "uncommitted) and backfill-state.json is current. Repair the log "
+            "(integrity defects are repaired, not overridden), commit it, "
+            "then re-run with --resume to continue the walk.")
     return msg
 
 
@@ -424,11 +494,24 @@ def main():
     log(f"run {run_id}: {len(commits)} commit(s) before boundary {boundary}", force=True)
 
     seen_ids = set()
+    known_created = set()   # (entity_type, entity_id) with an entity.created
+    known_existing = set()  # (entity_type, entity_id) named by ANY event
     if events_path.exists():
         for line in events_path.read_text().splitlines():
-            m = re.search(r'"event_id":\s*"([^"]+)"', line)
-            if m:
-                seen_ids.add(m.group(1))
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                m = re.search(r'"event_id":\s*"([^"]+)"', line)
+                if m:
+                    seen_ids.add(m.group(1))
+                continue
+            if ev.get("event_id"):
+                seen_ids.add(ev["event_id"])
+            if ev.get("entity_type") and ev.get("entity_id"):
+                key = (ev["entity_type"], ev["entity_id"])
+                known_existing.add(key)
+                if ev.get("type") == "entity.created":
+                    known_created.add(key)
 
     chunk_first = None
     chunk_count = 0
@@ -438,7 +521,8 @@ def main():
             log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  SKIP (processed)", force=True)
             continue
         meta = commit_meta(project_path, commit_ref)
-        bundle = build_bundle(project_path, commit_ref, events_path, mapping_note)
+        bundle = build_bundle(project_path, commit_ref, events_path, mapping_note,
+                              known_created)
 
         if args.dry_run:
             print(f"\n{'=' * 80}\n=== DRY-RUN bundle {commit_ref[:8]} ({len(bundle)} chars) ===\n")
@@ -454,7 +538,8 @@ def main():
             raw = invoke_extractor(prompt_text, bundle)
             events = parse_events(raw)
             actor = args.actor_override or slugify(meta["author"])
-            events = enforce(events, meta, run_id, actor, seen_ids)
+            events = enforce(events, meta, run_id, actor, seen_ids,
+                             known_created, known_existing)
             schema_validate(events)
         except AmbiguityHalt as h:
             p = write_needs_review(
@@ -479,6 +564,12 @@ def main():
         with open(events_path, "a") as f:
             for e in events:
                 f.write(json.dumps(ordered(e)) + "\n")
+        for e in events:
+            if e.get("entity_type") and e.get("entity_id"):
+                key = (e["entity_type"], e["entity_id"])
+                known_existing.add(key)
+                if e.get("type") == "entity.created":
+                    known_created.add(key)
         n_hypo += collect_hypotheses(events, meta, hypo_path)
         processed.add(commit_ref)
         chunk_first = chunk_first or commit_ref
