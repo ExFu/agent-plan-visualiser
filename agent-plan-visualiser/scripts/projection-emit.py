@@ -16,8 +16,8 @@ DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 CACHE = DATA_DIR / "cache.sqlite"
 OUT = DATA_DIR / "projection.json"
 
-SCHEMA_VERSION = "0.4.0"
-ONTOLOGY_VERSION = "0.4.0"
+SCHEMA_VERSION = "0.5.0"
+ONTOLOGY_VERSION = "0.5.0"
 
 
 def compute_milestone_progress(entities, relationships):
@@ -63,6 +63,77 @@ def compute_milestone_progress(entities, relationships):
             elif ent["derived_state"] == "closed":
                 slot["completed_t3_count"] += 1
     return progress
+
+
+def compute_attention(conn, entities, milestone_progress):
+    """The operator-attention block (T3-pending-ceremony-surfacing +
+    T3-verification-deferred): things only the operator can move, surfaced
+    rather than discovered by accident. Three queues:
+    - pending_acceptance: plans sitting draft (the ceremony-prompting-gap
+      lesson — nothing prompted a pending ceremony, so a plan sat 23 days
+      while everyone believed it built). Inbox items are excluded: draft is
+      their correct untriaged state.
+    - pending_closure: live milestones whose scheduled T3s are all closed —
+      ceremony owed, or only definition-of-done legs remain.
+    - deferred_verifications: entities whose latest verification.* event is
+      verification.deferred (the 0.5.0 'skipped-but-coming-back' event);
+      any later verification event on the entity resolves the deferral."""
+    pending_acceptance = []
+    for eid, born_line in conn.execute("""
+        SELECT e.entity_id, (
+          SELECT MIN(line_no) FROM events ev
+          WHERE ev.entity_type = 'plan' AND ev.entity_id = e.entity_id
+        )
+        FROM entities e
+        WHERE e.entity_type = 'plan' AND e.derived_state = 'draft'
+        ORDER BY e.entity_id"""):
+        row = conn.execute(
+            "SELECT date, COUNT(*) OVER () FROM commits "
+            "WHERE first_event_line_no > ? ORDER BY first_event_line_no LIMIT 1",
+            (born_line or 0,),
+        ).fetchone()
+        created_date = conn.execute(
+            "SELECT MIN(date) FROM commits WHERE last_event_line_no >= ?",
+            (born_line or 0,),
+        ).fetchone()[0]
+        pending_acceptance.append({
+            "entity_id": eid,
+            "created_date": created_date,
+            "commits_since": row[1] if row else 0,
+        })
+
+    pending_closure = []
+    for mid, prog in sorted(milestone_progress.items()):
+        ment = entities.get(f"plan:{mid}")
+        if (ment and ment["derived_state"] == "live"
+                and prog["scheduled_t3_count"] > 0
+                and prog["completed_t3_count"] == prog["scheduled_t3_count"]):
+            pending_closure.append(mid)
+
+    latest = {}
+    for row in conn.execute("""
+        SELECT entity_type, entity_id, type, attributes, line_no, commit_date
+        FROM events
+        WHERE type LIKE 'verification.%' AND entity_id IS NOT NULL
+        ORDER BY line_no ASC"""):
+        latest[(row["entity_type"], row["entity_id"])] = row
+    deferred = []
+    for row in sorted(latest.values(), key=lambda r: r["line_no"]):
+        if row["type"] != "verification.deferred":
+            continue
+        attrs = json.loads(row["attributes"] or "{}")
+        deferred.append({
+            "entity_type": row["entity_type"],
+            "entity_id": row["entity_id"],
+            "reason": attrs.get("reason", ""),
+            "deferred_date": row["commit_date"],
+        })
+
+    return {
+        "pending_acceptance": pending_acceptance,
+        "pending_closure": pending_closure,
+        "deferred_verifications": deferred,
+    }
 
 
 def main():
@@ -169,6 +240,7 @@ def main():
         "unknown_count": state_counts["unknown"],
     }
     milestone_progress = compute_milestone_progress(entities, relationships)
+    attention = compute_attention(conn, entities, milestone_progress)
 
     projection = {
         "generated_at": datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -179,6 +251,7 @@ def main():
         "decisions": decisions,
         "summary_stats": summary_stats,
         "milestone_progress": milestone_progress,
+        "attention": attention,
         "latest_summary_by_entity": latest_summary_by_entity,
         "summaries": summaries,
     }

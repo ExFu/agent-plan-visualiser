@@ -6,7 +6,7 @@ set -uo pipefail
 # accepting every prior epoch's events, so one pass covers a whole log.
 # (The gate's per-version routing stays strict; this default serves the
 # repack pipeline and manual runs.)
-SCHEMA="${1:-agent-plan-visualiser/schemas/0.4.0/events.schema.json}"
+SCHEMA="${1:-agent-plan-visualiser/schemas/0.5.0/events.schema.json}"
 # Data dir defaults to .agent-plan-tracker/; override with APV_DATA_DIR
 # (relative paths resolve against the cwd, expected to be the repo root).
 DATA_DIR="${APV_DATA_DIR:-.agent-plan-tracker}"
