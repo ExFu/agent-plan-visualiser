@@ -17,11 +17,12 @@
 #      backfill / refresh). Untracked and regenerated each run — it bakes
 #      the machine-/version-specific toolchain path, exactly like the gate
 #      hooks. Lives inside the data dir, not the project root's ./bin
-#      (that is project surface). A pre-existing non-apv file at the path
-#      is refused, never clobbered; an old root-level `bin/apv` of ours is
+#      (that is project surface). A `./apv` symlink at the repo root gives
+#      the short invocation. A pre-existing non-apv file at either path is
+#      refused, never clobbered; an old root-level `bin/apv` of ours is
 #      migrated (removed + gitignore pair cleaned).
 #   4. Gitignore the local per-checkout state (`.last-capture`,
-#      `.pending-extract`, `<data-dir>/bin/apv`).
+#      `.pending-extract`, `<data-dir>/bin/apv`, `/apv`).
 #   5. Hooks: the existing installers (capture-guard pre-commit; gate
 #      pre-push; gate ref-update), with the toolchain home baked into the
 #      gate copies when the toolchain lives OUTSIDE the repo (plugin-cache
@@ -225,6 +226,35 @@ else
   fi
 fi
 
+# --- 3b. convenience symlink ---------------------------------------------------
+# `./apv` -> <data-dir>/bin/apv gives the short invocation without occupying
+# the project's bin/ (operator ruling 2026-07-07: root bin/ is project
+# surface; a dotfile-adjacent symlink is not). Relative target, so the repo
+# can move. Untracked like the launcher. A foreign ./apv is refused; a
+# dangling symlink (e.g. after a data-dir rename) is repaired.
+SYMLINK_PATH="apv"
+SYMLINK_OK=0
+if [ "$LAUNCHER_OK" -eq 1 ]; then
+  SYMLINK_OK=1
+  if [ -L "$SYMLINK_PATH" ] && [ "$(readlink "$SYMLINK_PATH")" = "$LAUNCHER_PATH" ]; then
+    report ok "./$SYMLINK_PATH" "-> $LAUNCHER_PATH"
+  elif [ -L "$SYMLINK_PATH" ] && [ ! -e "$SYMLINK_PATH" ]; then
+    ln -sfn "$LAUNCHER_PATH" "$SYMLINK_PATH"
+    report updated "./$SYMLINK_PATH" "dangling link repaired -> $LAUNCHER_PATH"
+  elif [ -e "$SYMLINK_PATH" ] && grep -q "apv:launcher" "$SYMLINK_PATH" 2>/dev/null; then
+    # an apv launcher (old copy, or a link to one elsewhere) — safe to retarget
+    ln -sfn "$LAUNCHER_PATH" "$SYMLINK_PATH"
+    report updated "./$SYMLINK_PATH" "-> $LAUNCHER_PATH"
+  elif [ -e "$SYMLINK_PATH" ] || [ -L "$SYMLINK_PATH" ]; then
+    report REFUSED "./$SYMLINK_PATH" "exists and is not an apv launcher link — not overwriting"
+    SYMLINK_OK=0
+    FAIL=1
+  else
+    ln -s "$LAUNCHER_PATH" "$SYMLINK_PATH"
+    report created "./$SYMLINK_PATH" "-> $LAUNCHER_PATH"
+  fi
+fi
+
 # --- 4. gitignore the local per-checkout state -------------------------------
 # The stamp (guard), the pending-extract flag (extractor's post-commit half),
 # and the generated command launcher are per-checkout local state; never
@@ -232,6 +262,9 @@ fi
 # out — we do not ignore a file we do not own.)
 IGNORE_LINES=("$DATA_DIR/.last-capture" "$DATA_DIR/.pending-extract")
 [ "$LAUNCHER_OK" -eq 1 ] && IGNORE_LINES+=("$LAUNCHER_PATH")
+# "/apv" is root-anchored — a bare "apv" pattern would ignore any file named
+# apv at any depth in the project.
+[ "$SYMLINK_OK" -eq 1 ] && IGNORE_LINES+=("/apv")
 IGNORED_ALL=1
 for LOCAL_LINE in "${IGNORE_LINES[@]}"; do
   if [ -f .gitignore ] && grep -qxF "$LOCAL_LINE" .gitignore; then
@@ -330,7 +363,7 @@ if [ "$FAIL" -eq 0 ]; then
   echo "  - Work normally; run /apv-capture after each logical unit of work,"
   echo "    immediately before committing. The guard catches you if you forget."
   echo "  - Land branches on main via /apv-merge; the gate keeps main trustworthy."
-  echo "  - See the UI: run ./$LAUNCHER_PATH (then open the printed view URL)."
+  echo "  - See the UI: run ./apv (then open the printed view URL)."
   echo "  - This attaches from NOW: history before today is not mined (that is"
   echo "    backfill, a separate opt-in step)."
 else
