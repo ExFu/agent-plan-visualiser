@@ -20,7 +20,7 @@ EVENTS = DATA_DIR / "events.jsonl"
 CACHE = DATA_DIR / "cache.sqlite"
 # Toolchain content resolves against THIS script's home, never the target
 # repo — on a plugin install the schemas live in the plugin cache.
-SCHEMA_DDL = Path(__file__).resolve().parents[1] / "schemas/0.4.0/cache.schema.sql"
+SCHEMA_DDL = Path(__file__).resolve().parents[1] / "schemas/0.5.0/cache.schema.sql"
 
 STATE_FROM_EVENT = {
     "entity.created": "draft",

@@ -21,7 +21,7 @@ You (the in-session agent) are the extractor. You have full session context: you
 - Each invocation appends one block ending in `commit.recorded` (the seal). Events between the previous seal and yours belong to your commit (**positional rollup**).
 - If you realise events are missing *after* sealing: never edit prior lines. Fold the omission into your **next** capture, noting it in that event's summary. (If you haven't committed yet and the omission is serious, ask the operator.)
 
-## 2. Ontology quick reference — schema 0.3.0, 26 event types
+## 2. Ontology quick reference — schema 0.3.0 (+0.5.0's `verification.deferred`), 27 event types
 
 ### Entity lifecycle (10)
 
@@ -46,9 +46,11 @@ You (the in-session agent) are the extractor. You have full session context: you
 
 `blocker.raised`, `blocker.progressed` (requires `attributes.note`), `blocker.closed`.
 
-### Verification (4)
+### Verification (5)
 
-`verification.claimed`, `verification.tested` (typically `test_type`, `command`, `result`), `verification.skipped` (requires `reason`), `verification.failed`.
+`verification.claimed`, `verification.tested` (typically `test_type`, `command`, `result`), `verification.skipped` (requires `reason`), `verification.failed`, `verification.deferred` (requires `reason`).
+
+`verification.deferred` vs `verification.skipped`: **skipped** = not doing it, recorded honestly, nobody is expected to return; **deferred** = operator-directed "can't do this leg now (wrong environment, wrong moment) but we mean to come back". A deferral stays *open* — surfaced by the summary's *Awaiting operator* section and the gate's `deferred-verification` warn — until a later `verification.*` event on the same entity resolves it. Emit `verification.deferred` with `schema_version: "0.5.0"` (the epoch that introduced it); all other events stay `"0.3.0"`.
 
 ### Relationships (5)
 

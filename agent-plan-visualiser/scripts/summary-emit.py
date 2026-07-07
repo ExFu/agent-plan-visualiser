@@ -3,7 +3,9 @@
 
 Data dir defaults to .agent-plan-tracker/; override with APV_DATA_DIR (apvlib.apv_data_dir).
 """
+import datetime
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -89,6 +91,38 @@ def main():
                 lines.append(f"  - `{e['entity_id']}`")
             lines.append("")
 
+    # Awaiting operator — the attention queues (ceremonies + deferrals).
+    # Tolerate an older projection.json without the block.
+    attention = p.get("attention") or {}
+    acc = attention.get("pending_acceptance") or []
+    clo = attention.get("pending_closure") or []
+    dfr = attention.get("deferred_verifications") or []
+    lines.append("## Awaiting operator")
+    lines.append("")
+    if not (acc or clo or dfr):
+        lines.append("_Nothing waiting on the operator._")
+        lines.append("")
+    else:
+        if acc:
+            lines.append("**Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):")
+            for a in acc:
+                since = f", {a['commits_since']} commit(s) ago" if a.get("commits_since") is not None else ""
+                created = f"authored {a['created_date'][:10]}" if a.get("created_date") else "authoring date unknown"
+                lines.append(f"- `{a['entity_id']}` ({created}{since})")
+            lines.append("")
+        if clo:
+            lines.append("**Closure ceremonies pending** (all scheduled T3s closed; milestone still live):")
+            for mid in clo:
+                lines.append(f"- `{mid}`")
+            lines.append("")
+        if dfr:
+            lines.append("**Deferred verifications** (operator legs to come back to):")
+            for d in dfr:
+                when = f" (deferred {d['deferred_date'][:10]})" if d.get("deferred_date") else ""
+                reason = f": {d['reason']}" if d.get("reason") else ""
+                lines.append(f"- `{d['entity_id']}`{when}{reason}")
+            lines.append("")
+
     # Draft
     lines.append("## Draft")
     lines.append("")
@@ -99,10 +133,22 @@ def main():
         by_type = defaultdict(list)
         for e in drafts:
             by_type[e["entity_type"]].append(e)
+        # Inbox ids embed their capture date (<YYYY-MM-DD>.<slug>) — surface
+        # triage debt as age so "append-only capture surface" stays honest.
+        gen_date = datetime.date.fromisoformat(p["generated_at"][:10])
+
+        def age_note(eid):
+            m = re.match(r"^(\d{4}-\d{2}-\d{2})\.", eid)
+            if not m:
+                return ""
+            days = (gen_date - datetime.date.fromisoformat(m.group(1))).days
+            return f" ({days}d untriaged)" if days > 0 else ""
+
         for et in sorted(by_type.keys()):
             lines.append(f"- **{et}**")
             for e in sorted(by_type[et], key=lambda x: x["entity_id"]):
-                lines.append(f"  - `{e['entity_id']}`")
+                note = age_note(e["entity_id"]) if et == "inbox-item" else ""
+                lines.append(f"  - `{e['entity_id']}`{note}")
     lines.append("")
 
     # Blocked

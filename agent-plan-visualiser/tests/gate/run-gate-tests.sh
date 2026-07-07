@@ -10,7 +10,7 @@ FAIL=0
 
 # Fixture caches are derived — rebuild from scratch every run so a stale
 # cache (same event count, different content) can't mask a regression.
-rm -f fixture-corrupt/cache.sqlite fixture-drift/cache.sqlite
+rm -f fixture-corrupt/cache.sqlite fixture-drift/cache.sqlite fixture-attention/cache.sqlite
 
 check() { # check <desc> <test-expr...>
   local desc="$1"; shift
@@ -73,7 +73,20 @@ run_case "drift fixture / drift promoted to blocking" fixture-drift config-flip-
 check "exit 1"                                  [ "$CODE" -eq 1 ]
 check "BLOCK [drift] present"                   grep -q '^BLOCK \[drift\]' <<<"$OUT"
 
-# --- Case 5: the real log, repo defaults (§4.1) --------------------------
+# --- Case 5: attention surfaces, default config ---------------------------
+# T3-pending-ceremony-surfacing + T3-verification-deferred (M5.1): a draft
+# plan and an all-T3s-closed-but-live milestone warn as pending ceremonies;
+# an open verification.deferred warns until a later verification.* resolves
+# it. All advisory — exit 0, no BLOCK lines.
+run_case "attention fixture / default config" fixture-attention config-default.toml
+check "exit 0 (all advisory)"                   [ "$CODE" -eq 0 ]
+check_absent "no BLOCK lines"                   '^BLOCK'
+check "acceptance ceremony pending"             grep -q "^WARN \[pending-ceremony\].*'FIX-ATT-DRAFT' is draft" <<<"$OUT"
+check "closure ceremony pending"                grep -q "^WARN \[pending-ceremony\].*'M9-fix-att' has all 1 scheduled T3(s) closed" <<<"$OUT"
+check "open deferral warns with reason"         grep -q "^WARN \[deferred-verification\].*'T3-fix-att-open'.*operator leg pending" <<<"$OUT"
+check_absent "resolved deferral stays quiet"    "T3-fix-att-healed"
+
+# --- Case 6: the real log, repo defaults (§4.1) --------------------------
 echo "== real log / repo defaults"
 OUT="$(cd "$REPO_ROOT" && python3 agent-plan-visualiser/scripts/gate-composite.py 2>&1)"
 CODE=$?

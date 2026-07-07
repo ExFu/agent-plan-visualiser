@@ -104,7 +104,10 @@ DEFAULT_BLOCKING = [
     "schema", "referential", "sealed-tail", "implementation-on-draft",
     "resurrection-without-reopen", "fulcrum-without-decision",
 ]
-DEFAULT_WARN = ["drift", "orphans", "stalled", "long-blockers"]
+DEFAULT_WARN = [
+    "drift", "orphans", "stalled", "long-blockers",
+    "pending-ceremony", "deferred-verification",
+]
 
 LONG_BLOCKER_COMMITS = 5  # warn when a live blocker has outlived N commits
 
@@ -578,6 +581,87 @@ def check_long_blockers(ctx):
     return out
 
 
+def check_pending_ceremony(ctx):
+    """Ceremonies are enforced lazily (draft gate, operator-only acceptance)
+    but nothing PROMPTS one — the 2026-07-03.ceremony-prompting-gap lesson:
+    an authored-but-unaccepted plan sat 23 days while everyone believed it
+    built. Two flavours, both advisory:
+    - acceptance pending: a plan in draft (inbox items are excluded — draft
+      is their correct untriaged resting state);
+    - closure pending: a live milestone whose scheduled T3s are all closed —
+      either its ceremony is owed or its definition-of-done legs are the
+      only thing left, and both deserve the operator's eye."""
+    conn = ctx.cache()
+    out = []
+    for eid, born_line in conn.execute("""
+        SELECT e.entity_id, (
+          SELECT MIN(line_no) FROM events ev
+          WHERE ev.entity_type = 'plan' AND ev.entity_id = e.entity_id
+        )
+        FROM entities e
+        WHERE e.entity_type = 'plan' AND e.derived_state = 'draft'
+        ORDER BY e.entity_id""").fetchall():
+        n = conn.execute(
+            "SELECT COUNT(*) FROM commits WHERE first_event_line_no > ?",
+            (born_line or 0,),
+        ).fetchone()[0]
+        out.append(
+            f"plan '{eid}' is draft — acceptance ceremony pending "
+            f"({n} commit(s) since authoring; the draft gate blocks "
+            f"implementation against it meanwhile)"
+        )
+    for mid, sched, closed in conn.execute("""
+        SELECT r.from_entity_id,
+               COUNT(*) AS scheduled,
+               SUM(CASE WHEN c.derived_state = 'closed' THEN 1 ELSE 0 END)
+        FROM relationships r
+        JOIN entities m ON m.entity_type = 'plan' AND m.entity_id = r.from_entity_id
+        JOIN entities c ON c.entity_type = r.to_entity_type AND c.entity_id = r.to_entity_id
+        WHERE r.relationship_type = 'spawns'
+          AND r.from_entity_id GLOB 'M[0-9]*'
+          AND r.to_entity_id GLOB 'T3-*'
+          AND m.derived_state = 'live'
+        GROUP BY r.from_entity_id
+        ORDER BY r.from_entity_id""").fetchall():
+        if sched and closed == sched:
+            out.append(
+                f"milestone '{mid}' has all {sched} scheduled T3(s) closed but is "
+                f"still live — closure ceremony (or its remaining definition-of-done "
+                f"legs) pending"
+            )
+    return out
+
+
+def check_deferred_verification(ctx):
+    """Open operator deferrals (verification.deferred, the 0.5.0 epoch):
+    'skipped, but we mean to come back'. An entity's deferral is open while
+    its LATEST verification.* event is a deferral; any later verification
+    event on the same entity resolves it. Advisory by design — a deferral
+    is an honest recorded state, not corruption; this check is the
+    come-back-to-it prompt."""
+    conn = ctx.cache()
+    latest = {}  # (entity_type, entity_id) -> (line_no, attributes_json)
+    for et, eid, typ, attrs, line in conn.execute("""
+        SELECT entity_type, entity_id, type, attributes, line_no
+        FROM events
+        WHERE type LIKE 'verification.%' AND entity_id IS NOT NULL
+        ORDER BY line_no ASC"""):
+        latest[(et, eid)] = (typ, attrs, line)
+    out = []
+    for (et, eid), (typ, attrs, line) in sorted(latest.items(), key=lambda kv: kv[1][2]):
+        if typ != "verification.deferred":
+            continue
+        try:
+            reason = json.loads(attrs or "{}").get("reason", "")
+        except json.JSONDecodeError:
+            reason = ""
+        out.append(
+            f"{et} '{eid}' has an open deferred verification (line {line})"
+            + (f": {reason}" if reason else "")
+        )
+    return out
+
+
 CHECKS = {
     "schema": check_schema,
     "referential": check_referential,
@@ -589,6 +673,8 @@ CHECKS = {
     "orphans": check_orphans,
     "stalled": check_stalled,
     "long-blockers": check_long_blockers,
+    "pending-ceremony": check_pending_ceremony,
+    "deferred-verification": check_deferred_verification,
 }
 
 
