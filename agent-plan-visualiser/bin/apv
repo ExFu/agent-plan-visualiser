@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # apv — the APV command dispatcher (toolchain side).
 #
-# Projects attached via apv-init get a generated bin/apv shim that execs this
-# file with the toolchain path baked in, so inside a tracked repo the surface
-# is `./bin/apv <cmd>`. For a repo that is not yet attached, run this file
-# directly by path: `<toolchain>/bin/apv init`.
+# Projects attached via apv-init get a generated shim at <data-dir>/bin/apv
+# (e.g. `.apv/bin/apv`) that execs this file with the toolchain path baked in.
+# For a repo that is not yet attached, run this file directly by path:
+# `<toolchain>/bin/apv init`.
 #
 #   apv [serve] [--port N] [--host H]   view server (default subcommand)
 #   apv init [apv-init flags]           attach or repair the current repo

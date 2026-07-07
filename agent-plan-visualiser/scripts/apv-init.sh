@@ -12,14 +12,16 @@
 #      events.jsonl — this is THE one sanctioned creation site; the capture
 #      skill refuses to create it — plus schema-version.txt; write
 #      `.apv-config.toml` with the default gate lists.
-#   3. Command launcher: generate `bin/apv` at the repo root, a short entry
-#      point (tiny dispatcher — today `apv serve`; delegates to the
-#      toolchain's bin/apv-serve). Untracked and regenerated each run — it
-#      bakes the machine-/version-specific toolchain path, exactly like the
-#      gate hooks. A pre-existing non-apv `bin/apv` is refused, never
-#      clobbered.
+#   3. Command launcher: generate `<data-dir>/bin/apv`, a short entry point
+#      (passthrough to the toolchain's bin/apv dispatcher: serve / init /
+#      backfill / refresh). Untracked and regenerated each run — it bakes
+#      the machine-/version-specific toolchain path, exactly like the gate
+#      hooks. Lives inside the data dir, not the project root's ./bin
+#      (that is project surface). A pre-existing non-apv file at the path
+#      is refused, never clobbered; an old root-level `bin/apv` of ours is
+#      migrated (removed + gitignore pair cleaned).
 #   4. Gitignore the local per-checkout state (`.last-capture`,
-#      `.pending-extract`, `bin/apv`).
+#      `.pending-extract`, `<data-dir>/bin/apv`).
 #   5. Hooks: the existing installers (capture-guard pre-commit; gate
 #      pre-push; gate ref-update), with the toolchain home baked into the
 #      gate copies when the toolchain lives OUTSIDE the repo (plugin-cache
@@ -138,17 +140,49 @@ TOML
 fi
 
 # --- 3. command launcher -----------------------------------------------------
-# A short project-root entry point — `bin/apv` — so nobody has to type
+# A short entry point — `<data-dir>/bin/apv` — so nobody has to type
 # `python3 <toolchain>/scripts/...` by hand. The shim is a pure passthrough
 # to the toolchain's bin/apv dispatcher (serve / init / backfill / refresh),
 # so new subcommands arrive with a plugin update, no re-init needed.
 # Generated (never hand-authored), untracked — like the gate hooks it bakes
 # the machine- and version-specific toolchain path — and regenerated on every
 # init so a plugin update that moves the toolchain home is picked up by a
-# re-run. Because bin/ is project-owned, a pre-existing NON-apv bin/apv is
-# refused, never clobbered (the hook installers' contract, applied here).
-LAUNCHER_PATH="bin/apv"
+# re-run. It lives INSIDE the data dir (operator ruling 2026-07-07): the
+# project root's ./bin is for what the project itself exposes, and this
+# launcher is tracker tooling, not project surface. A pre-existing NON-apv
+# file at the path is refused, never clobbered (the hook installers'
+# contract, applied here).
+LAUNCHER_PATH="$DATA_DIR/bin/apv"
 LAUNCHER_OK=1
+# Migration (transitional): between 2026-07-07 and this ruling, init generated
+# the launcher at the project root. Remove OUR old copy (marker-verified) and
+# its gitignore pair so a stale ignore line never hides a real bin/apv the
+# project later exposes. A root bin/apv without the marker is not ours: leave
+# it alone.
+OLD_LAUNCHER="bin/apv"
+if [ "$OLD_LAUNCHER" != "$LAUNCHER_PATH" ] && [ -f "$OLD_LAUNCHER" ] \
+    && grep -q "apv:launcher" "$OLD_LAUNCHER" 2>/dev/null; then
+  rm -f "$OLD_LAUNCHER"
+  rmdir bin 2>/dev/null || true   # only if the launcher was its sole content
+  if [ -f .gitignore ] && grep -qxF "$OLD_LAUNCHER" .gitignore; then
+    python3 - "$OLD_LAUNCHER" <<'PY'
+import sys
+target = sys.argv[1]
+comment = "# agent-plan-visualiser local per-checkout state — never tracked"
+lines = open(".gitignore").read().splitlines()
+out, i = [], 0
+while i < len(lines):
+    if lines[i] == target:
+        if out and out[-1] == comment:
+            out.pop()
+        i += 1
+        continue
+    out.append(lines[i]); i += 1
+open(".gitignore", "w").write("\n".join(out) + ("\n" if out else ""))
+PY
+  fi
+  report migrated "$OLD_LAUNCHER" "relocated to $LAUNCHER_PATH (root bin/ is project surface)"
+fi
 # Write the desired launcher to $1. The dispatcher body goes through a QUOTED
 # heredoc (no expansion — its `case`/`)`/`$@` are literal, and there is no
 # surrounding command substitution to close early), while the one dynamic
@@ -209,7 +243,7 @@ for LOCAL_LINE in "${IGNORE_LINES[@]}"; do
   fi
 done
 IGNORE_DETAIL=".last-capture + .pending-extract"
-[ "$LAUNCHER_OK" -eq 1 ] && IGNORE_DETAIL="$IGNORE_DETAIL + bin/apv"
+[ "$LAUNCHER_OK" -eq 1 ] && IGNORE_DETAIL="$IGNORE_DETAIL + $LAUNCHER_PATH"
 if [ "$IGNORED_ALL" -eq 1 ]; then
   report ok ".gitignore" "local per-checkout state already ignored"
 else
