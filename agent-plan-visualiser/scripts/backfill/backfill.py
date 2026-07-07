@@ -50,6 +50,7 @@ import re
 import subprocess
 import shutil
 import sys
+import tempfile
 import time
 import uuid
 from datetime import date
@@ -227,24 +228,34 @@ def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
 
 # --------------------------- extraction ------------------------------------
 
-def invoke_extractor(prompt_text: str, bundle_text: str):
+def invoke_extractor(prompt_text: str, bundle_text: str, workdir=None):
     """Run the extractor; return (response_text, cost_usd_or_None).
 
     Uses --output-format json so the CLI reports total_cost_usd per call (the
     walk sums these — the run is billed silently otherwise). The envelope wraps
     the model's text in `.result`; we unwrap it and read the cost. When stdout
     is NOT a result envelope we treat it as raw text with unknown cost — that is
-    the stubbed test model (APV_CLAUDE_BIN), which emits a bare JSON array."""
+    the stubbed test model (APV_CLAUDE_BIN), which emits a bare JSON array.
+
+    Runs in a NEUTRAL temp cwd: the bundle is self-contained text, and the
+    target project's own hooks/settings/state must not touch the session.
+    Real-run incident (exfu_website, 2026-07-07): an autopilot Stop hook
+    found stale project state, told the headless session to keep working,
+    and the extraction's completed JSON was buried behind dozens of
+    hook-fighting turns — claude -p returns the LAST message, so the walk
+    saw an empty result. --max-turns is the belt-and-braces cost cap should
+    any user-level hook still interfere (extraction is single-turn by
+    design); an exceeded cap surfaces as an error envelope, loudly."""
     claude_bin = os.environ.get("APV_CLAUDE_BIN", "claude")
     timeout = int(os.environ.get("APV_EXTRACT_TIMEOUT", "600"))
-    cmd = [claude_bin, "-p", "--output-format", "json"]
+    cmd = [claude_bin, "-p", "--output-format", "json", "--max-turns", "4"]
     model = os.environ.get("APV_EXTRACT_MODEL")
     if model:
         cmd += ["--model", model]
     result = subprocess.run(
         cmd, input=prompt_text + "\n\n---\n\n" + bundle_text +
         "\n\n---\n\nNow output the JSON array of events for this commit.\n",
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True, text=True, timeout=timeout, cwd=workdir,
     )
     if result.returncode != 0:
         raise RuntimeError(f"extractor invocation failed: {result.stderr.strip()[:400]}")
@@ -255,7 +266,17 @@ def invoke_extractor(prompt_text: str, bundle_text: str):
         return raw, None
     if isinstance(env, dict) and "result" in env:
         cost = env.get("total_cost_usd")
-        return env.get("result") or "", (float(cost) if isinstance(cost, (int, float)) else None)
+        cost = float(cost) if isinstance(cost, (int, float)) else None
+        text = env.get("result") or ""
+        if env.get("is_error") or not text.strip():
+            # Don't hand an empty/failed result to the parser — surface the
+            # session diagnosis (subtype, turns, cost) in needs-review.
+            raise RuntimeError(
+                "extractor session failed "
+                f"(is_error={env.get('is_error')}, subtype={env.get('subtype')}, "
+                f"num_turns={env.get('num_turns')}, cost=${cost if cost is not None else '?'}) "
+                f"— envelope head: {raw[:600]}")
+        return text, cost
     return raw, None
 
 
@@ -535,6 +556,9 @@ def main():
                 if ev.get("type") == "entity.created":
                     known_created.add(key)
 
+    # Extractor sessions run here, not in the project — see invoke_extractor.
+    extract_cwd = tempfile.mkdtemp(prefix="apv-extract-")
+
     chunk_first = None
     chunk_count = 0
     n_hypo = 0
@@ -558,7 +582,7 @@ def main():
         raw = ""
         cost = None
         try:
-            raw, cost = invoke_extractor(prompt_text, bundle)
+            raw, cost = invoke_extractor(prompt_text, bundle, extract_cwd)
             events = parse_events(raw)
             actor = args.actor_override or slugify(meta["author"])
             events = enforce(events, meta, run_id, actor, seen_ids,
