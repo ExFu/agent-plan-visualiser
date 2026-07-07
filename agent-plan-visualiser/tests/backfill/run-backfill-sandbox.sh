@@ -132,6 +132,10 @@ check "alpha not yet mined"             sh -c "! grep -q 'alpha groundwork' .apv
 echo "== resume: finishes the range, no duplicates"
 run python3 "$BF" --project-path "$PWD" --run-id bf-test-a --resume --chunk-size 10
 check "resume exits 0"                  [ "$CODE" -eq 0 ]
+# The walk reports cumulative extractor spend. The stub emits bare JSON arrays
+# (no result envelope), so cost is unknown and the line carries the partial note.
+check "cost line reported"              grep -q "extractor cost:" <<<"$OUT"
+check "stub cost marked partial"        grep -q "some calls reported no cost" <<<"$OUT"
 check "alpha mined on resume"           grep -q '"message_first_line": "hist: alpha groundwork"' .apv/events.jsonl
 check "beta mined exactly once"         [ "$(grep -c '"message_first_line": "hist: beta replaces the old approach"' .apv/events.jsonl)" -eq 1 ]
 check "adoption commit NOT mined"       sh -c "! grep -q \"\\\"commit_ref\\\": \\\"$ADOPT_SHA\\\"\" .apv/events.jsonl"

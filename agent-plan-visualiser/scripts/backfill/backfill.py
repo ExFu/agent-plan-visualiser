@@ -37,6 +37,9 @@ violations write <data>/needs-review/<sha>-*.md, save state and exit
 non-zero — subsequent runs with --resume continue past repaired commits.
 Model: APV_CLAUDE_BIN (default "claude"; tests inject a stub),
 APV_EXTRACT_MODEL (--model passthrough), APV_EXTRACT_TIMEOUT (default 600).
+Cost: the extractor runs with --output-format json; the walk sums each call's
+total_cost_usd and reports the cumulative spend (persisted in
+backfill-state.json, so a --resume run continues the tally).
 """
 from __future__ import annotations
 
@@ -224,10 +227,17 @@ def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
 
 # --------------------------- extraction ------------------------------------
 
-def invoke_extractor(prompt_text: str, bundle_text: str) -> str:
+def invoke_extractor(prompt_text: str, bundle_text: str):
+    """Run the extractor; return (response_text, cost_usd_or_None).
+
+    Uses --output-format json so the CLI reports total_cost_usd per call (the
+    walk sums these — the run is billed silently otherwise). The envelope wraps
+    the model's text in `.result`; we unwrap it and read the cost. When stdout
+    is NOT a result envelope we treat it as raw text with unknown cost — that is
+    the stubbed test model (APV_CLAUDE_BIN), which emits a bare JSON array."""
     claude_bin = os.environ.get("APV_CLAUDE_BIN", "claude")
     timeout = int(os.environ.get("APV_EXTRACT_TIMEOUT", "600"))
-    cmd = [claude_bin, "-p", "--output-format", "text"]
+    cmd = [claude_bin, "-p", "--output-format", "json"]
     model = os.environ.get("APV_EXTRACT_MODEL")
     if model:
         cmd += ["--model", model]
@@ -238,7 +248,15 @@ def invoke_extractor(prompt_text: str, bundle_text: str) -> str:
     )
     if result.returncode != 0:
         raise RuntimeError(f"extractor invocation failed: {result.stderr.strip()[:400]}")
-    return result.stdout
+    raw = result.stdout
+    try:
+        env = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw, None
+    if isinstance(env, dict) and "result" in env:
+        cost = env.get("total_cost_usd")
+        return env.get("result") or "", (float(cost) if isinstance(cost, (int, float)) else None)
+    return raw, None
 
 
 def parse_events(text: str) -> list[dict]:
@@ -464,6 +482,10 @@ def main():
     hypo_path = data_dir / "needs-review" / f"hypotheses-{run_id}.jsonl"
     state = load_state(state_path) if args.resume else {}
     processed = set(state.get("processed_commits", []))
+    # Cumulative extractor spend. Persisted so a --resume run continues the
+    # tally across sessions rather than reporting only the resumed leg.
+    total_cost = float(state.get("cost_usd", 0.0)) if args.resume else 0.0
+    cost_partial = False  # any call this session reported no cost (e.g. stub)
 
     # Mapping note (T3-retrospective-mapping-template §2.3): included in the
     # brief verbatim when present; its absence on a non-native-looking repo
@@ -534,8 +556,9 @@ def main():
         log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  extracting ({len(bundle)} chars)...", force=True)
         t0 = time.time()
         raw = ""
+        cost = None
         try:
-            raw = invoke_extractor(prompt_text, bundle)
+            raw, cost = invoke_extractor(prompt_text, bundle)
             events = parse_events(raw)
             actor = args.actor_override or slugify(meta["author"])
             events = enforce(events, meta, run_id, actor, seen_ids,
@@ -549,6 +572,7 @@ def main():
                 f"Candidates:\n\n```json\n{json.dumps(h.candidates, indent=2)}\n```\n")
             save_state(state_path, {"run_id": run_id,
                                     "processed_commits": sorted(processed),
+                                    "cost_usd": round(total_cost, 6),
                                     "last_halt": commit_ref})
             sys.exit(f"HALT at {commit_ref[:8]} — see {p}; repair, then --resume")
         except Exception as ex:
@@ -558,6 +582,7 @@ def main():
                 f"Reason: {ex}\n\nRaw response:\n\n```\n{raw[:8000]}\n```\n")
             save_state(state_path, {"run_id": run_id,
                                     "processed_commits": sorted(processed),
+                                    "cost_usd": round(total_cost, 6),
                                     "last_failed": commit_ref})
             sys.exit(f"REJECTED at {commit_ref[:8]} — {ex}; see {p}; repair, then --resume")
 
@@ -571,12 +596,19 @@ def main():
                 if e.get("type") == "entity.created":
                     known_created.add(key)
         n_hypo += collect_hypotheses(events, meta, hypo_path)
+        if cost is not None:
+            total_cost += cost
+        else:
+            cost_partial = True
         processed.add(commit_ref)
         chunk_first = chunk_first or commit_ref
         chunk_count += 1
-        save_state(state_path, {"run_id": run_id, "processed_commits": sorted(processed)})
+        save_state(state_path, {"run_id": run_id,
+                                "processed_commits": sorted(processed),
+                                "cost_usd": round(total_cost, 6)})
+        cost_note = f", ${cost:.4f}" if cost is not None else ""
         log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  OK ({len(events)} events, "
-            f"{time.time() - t0:.1f}s)", force=True)
+            f"{time.time() - t0:.1f}s{cost_note})", force=True)
 
         if args.chunk_size > 0 and chunk_count >= args.chunk_size:
             msg = commit_chunk(project_path, data_dir, run_id, chunk_first, commit_ref, chunk_count)
@@ -591,6 +623,10 @@ def main():
         log(f"\nrun {run_id} complete — {len(processed)} commit(s) mined; "
             f"{n_hypo} hypothesis(es) queued for /apv-triage-why"
             + (f" at {hypo_path}" if n_hypo else ""), force=True)
+        # cumulative across --resume legs (persisted in backfill-state.json);
+        # '+' when some calls reported no cost (a stub model, or older CLI).
+        approx = "+ (some calls reported no cost)" if cost_partial else ""
+        log(f"  extractor cost: ${total_cost:.2f} {approx}".rstrip(), force=True)
 
 
 if __name__ == "__main__":
