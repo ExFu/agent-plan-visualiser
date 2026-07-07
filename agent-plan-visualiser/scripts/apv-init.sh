@@ -12,17 +12,18 @@
 #      events.jsonl — this is THE one sanctioned creation site; the capture
 #      skill refuses to create it — plus schema-version.txt; write
 #      `.apv-config.toml` with the default gate lists.
-#   3. Command launcher: generate `<data-dir>/bin/apv`, a short entry point
-#      (passthrough to the toolchain's bin/apv dispatcher: serve / init /
-#      backfill / refresh). Untracked and regenerated each run — it bakes
-#      the machine-/version-specific toolchain path, exactly like the gate
-#      hooks. Lives inside the data dir, not the project root's ./bin
-#      (that is project surface). A `./apv` symlink at the repo root gives
-#      the short invocation. A pre-existing non-apv file at either path is
-#      refused, never clobbered; an old root-level `bin/apv` of ours is
-#      migrated (removed + gitignore pair cleaned).
+#   3. Command launcher: generate `<data-dir>/bin/apv` plus a `./apv`
+#      symlink at the repo root — the entry points to the toolchain's
+#      bin/apv dispatcher (serve / init / backfill / refresh). Both are
+#      MACHINE-INDEPENDENT and safe to commit: the shim bakes no paths and
+#      resolves the toolchain at run time (APV_HOME -> vendored ->
+#      `<data-dir>/.toolchain-home` -> Claude plugin cache, newest). The
+#      pointer file is the only machine-specific piece and stays local
+#      (gitignored, refreshed per init). A pre-existing non-apv file at
+#      either path is refused, never clobbered; transitional layouts
+#      (root-level bin/apv; shim/symlink gitignore pairs) are migrated.
 #   4. Gitignore the local per-checkout state (`.last-capture`,
-#      `.pending-extract`, `<data-dir>/bin/apv`, `/apv`).
+#      `.pending-extract`, `<data-dir>/.toolchain-home`).
 #   5. Hooks: the existing installers (capture-guard pre-commit; gate
 #      pre-push; gate ref-update), with the toolchain home baked into the
 #      gate copies when the toolchain lives OUTSIDE the repo (plugin-cache
@@ -145,63 +146,106 @@ fi
 # `python3 <toolchain>/scripts/...` by hand. The shim is a pure passthrough
 # to the toolchain's bin/apv dispatcher (serve / init / backfill / refresh),
 # so new subcommands arrive with a plugin update, no re-init needed.
-# Generated (never hand-authored), untracked — like the gate hooks it bakes
-# the machine- and version-specific toolchain path — and regenerated on every
-# init so a plugin update that moves the toolchain home is picked up by a
-# re-run. It lives INSIDE the data dir (operator ruling 2026-07-07): the
-# project root's ./bin is for what the project itself exposes, and this
-# launcher is tracker tooling, not project surface. A pre-existing NON-apv
+# The shim is MACHINE-INDEPENDENT (operator ruling 2026-07-07: repo content
+# carries zero machine-specific dependency — the plugin runs wherever the
+# repo is checked out, not on the machine that attached it): it resolves the
+# toolchain at run time (APV_HOME -> vendored -> <data-dir>/.toolchain-home
+# -> Claude plugin cache) and is therefore safe to commit. It lives INSIDE
+# the data dir (same ruling: the project root's ./bin is for what the
+# project itself exposes; this is tracker tooling). A pre-existing NON-apv
 # file at the path is refused, never clobbered (the hook installers'
 # contract, applied here).
 LAUNCHER_PATH="$DATA_DIR/bin/apv"
 LAUNCHER_OK=1
-# Migration (transitional): between 2026-07-07 and this ruling, init generated
-# the launcher at the project root. Remove OUR old copy (marker-verified) and
-# its gitignore pair so a stale ignore line never hides a real bin/apv the
-# project later exposes. A root bin/apv without the marker is not ours: leave
-# it alone.
+
+# Remove our comment+entry pairs from .gitignore. Pair-scoped: an entry is
+# only removed when immediately preceded by our exact comment line — a bare
+# same-named line the project added for its own reasons is not ours to touch.
+remove_ignore_pairs() {
+  [ -f .gitignore ] || return 0
+  python3 - "$@" <<'PY'
+import sys
+targets = set(sys.argv[1:])
+comment = "# agent-plan-visualiser local per-checkout state — never tracked"
+lines = open(".gitignore").read().splitlines()
+out, i, changed = [], 0, False
+while i < len(lines):
+    if lines[i] in targets and out and out[-1] == comment:
+        out.pop(); i += 1; changed = True
+        continue
+    out.append(lines[i]); i += 1
+if changed:
+    open(".gitignore", "w").write("\n".join(out) + ("\n" if out else ""))
+PY
+}
+
+# Migration (transitional): on 2026-07-07 init briefly generated the launcher
+# at the project root. Remove OUR old copy (marker-verified) and its
+# gitignore pair so a stale ignore line never hides a real bin/apv the
+# project later exposes. A root bin/apv without the marker is not ours:
+# leave it alone.
 OLD_LAUNCHER="bin/apv"
 if [ "$OLD_LAUNCHER" != "$LAUNCHER_PATH" ] && [ -f "$OLD_LAUNCHER" ] \
     && grep -q "apv:launcher" "$OLD_LAUNCHER" 2>/dev/null; then
   rm -f "$OLD_LAUNCHER"
   rmdir bin 2>/dev/null || true   # only if the launcher was its sole content
-  if [ -f .gitignore ] && grep -qxF "$OLD_LAUNCHER" .gitignore; then
-    python3 - "$OLD_LAUNCHER" <<'PY'
-import sys
-target = sys.argv[1]
-comment = "# agent-plan-visualiser local per-checkout state — never tracked"
-lines = open(".gitignore").read().splitlines()
-out, i = [], 0
-while i < len(lines):
-    if lines[i] == target:
-        if out and out[-1] == comment:
-            out.pop()
-        i += 1
-        continue
-    out.append(lines[i]); i += 1
-open(".gitignore", "w").write("\n".join(out) + ("\n" if out else ""))
-PY
-  fi
+  remove_ignore_pairs "$OLD_LAUNCHER"
   report migrated "$OLD_LAUNCHER" "relocated to $LAUNCHER_PATH (root bin/ is project surface)"
 fi
-# Write the desired launcher to $1. The dispatcher body goes through a QUOTED
-# heredoc (no expansion — its `case`/`)`/`$@` are literal, and there is no
-# surrounding command substitution to close early), while the one dynamic
-# value (the toolchain path) is baked via `printf %q`, which shell-quotes any
-# path safely. The `apv:launcher` marker on line 2 is the foreign-file guard's
-# fingerprint.
+# Migration (transitional): 0.5.3/0.5.4 gitignored the shim and the ./apv
+# symlink; both are machine-independent now and may be committed — stale
+# ignore lines would silently keep them out of the repo.
+remove_ignore_pairs "$DATA_DIR/bin/apv" "/apv"
+# Write the desired launcher to $1. The shim is STATIC — nothing machine-
+# specific is baked (operator ruling 2026-07-07: zero machine dependency in
+# repo content; the plugin is resolved on whatever machine the repo is
+# checked out to). It locates the toolchain at RUN time: APV_HOME override,
+# a toolchain vendored inside the repo, the local pointer file
+# <data-dir>/.toolchain-home (written by init, never committed), then the
+# Claude plugin cache (newest installed version). Being byte-identical on
+# every machine, the shim and the ./apv symlink are safe to commit. The
+# `apv:launcher` marker on line 2 is the foreign-file guard's fingerprint.
 gen_launcher() {
-  {
-    printf '#!/usr/bin/env bash\n'
-    printf '# apv:launcher (generated) — local APV command launcher.\n'
-    printf '# GENERATED by apv-init; UNTRACKED and regenerated on re-init. Do not\n'
-    printf '# commit or hand-edit: the toolchain path below is machine- and\n'
-    printf '# version-specific. After a plugin update, re-run /apv-init to refresh it.\n'
-    printf 'TOOLCHAIN=%q\n' "$TOOLCHAIN_HOME"
-    cat <<'LAUNCH'
-exec "$TOOLCHAIN/bin/apv" "$@"
+  cat > "$1" <<'LAUNCH'
+#!/usr/bin/env bash
+# apv:launcher (generated by apv-init) — machine-independent; safe to commit.
+# Resolves the APV toolchain at run time; nothing machine-specific is baked.
+# Order: APV_HOME -> vendored in this repo -> <data-dir>/.toolchain-home
+# (local, untracked) -> Claude plugin cache (newest install).
+set -euo pipefail
+# realpath: we are usually invoked via the ./apv symlink — the data dir is
+# where the SHIM lives, not where the link does.
+self="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$0")"
+self_dir="$(dirname "$self")"
+data_dir="$(dirname "$self_dir")"
+
+usable() { [ -n "${1:-}" ] && [ -x "$1/bin/apv" ]; }
+
+if usable "${APV_HOME:-}"; then
+  exec "$APV_HOME/bin/apv" "$@"
+fi
+repo_root="$(git -C "$self_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "$repo_root" ] && usable "$repo_root/agent-plan-visualiser"; then
+  exec "$repo_root/agent-plan-visualiser/bin/apv" "$@"
+fi
+if [ -f "$data_dir/.toolchain-home" ]; then
+  pinned="$(head -n 1 "$data_dir/.toolchain-home")"
+  if usable "$pinned"; then
+    exec "$pinned/bin/apv" "$@"
+  fi
+fi
+cache="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache"
+newest="$(ls -d "$cache"/*/agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1 || true)"
+newest="${newest%/}"
+if usable "$newest"; then
+  exec "$newest/bin/apv" "$@"
+fi
+echo "apv: APV toolchain not found (tried \$APV_HOME, a vendored agent-plan-visualiser/," >&2
+echo "apv: $data_dir/.toolchain-home, and $cache)." >&2
+echo "apv: install the plugin (/plugin install agent-plan-visualiser@apv) or set APV_HOME," >&2
+echo "apv: then re-run — or re-attach with /apv-init." >&2
+exit 127
 LAUNCH
-  } > "$1"
 }
 LAUNCHER_TMP="$(mktemp)"
 gen_launcher "$LAUNCHER_TMP"
@@ -220,9 +264,29 @@ else
   chmod +x "$LAUNCHER_PATH"
   rm -f "$LAUNCHER_TMP"
   if [ "$had_launcher" -eq 1 ]; then
-    report updated "$LAUNCHER_PATH" "toolchain path refreshed"
+    report updated "$LAUNCHER_PATH" "shim refreshed (machine-independent; safe to commit)"
   else
     report created "$LAUNCHER_PATH" "run it: ./$LAUNCHER_PATH (serves the view UI)"
+  fi
+fi
+
+# --- 3a. local toolchain pointer ----------------------------------------------
+# <data-dir>/.toolchain-home pins THIS checkout to the toolchain that
+# attached it (the dev checkout for vendored-adjacent setups, the plugin
+# cache otherwise). It is per-checkout local state — gitignored, refreshed
+# on every init — and only a fallback hint: the shim prefers it over cache
+# discovery but survives its absence, so a clone on another machine works
+# without it.
+PIN_PATH="$DATA_DIR/.toolchain-home"
+if [ -f "$PIN_PATH" ] && [ "$(cat "$PIN_PATH")" = "$TOOLCHAIN_HOME" ]; then
+  report ok "$PIN_PATH" "local toolchain pointer"
+else
+  had_pin=0; [ -f "$PIN_PATH" ] && had_pin=1
+  printf '%s\n' "$TOOLCHAIN_HOME" > "$PIN_PATH"
+  if [ "$had_pin" -eq 1 ]; then
+    report updated "$PIN_PATH" "-> $TOOLCHAIN_HOME"
+  else
+    report created "$PIN_PATH" "-> $TOOLCHAIN_HOME"
   fi
 fi
 
@@ -230,8 +294,9 @@ fi
 # `./apv` -> <data-dir>/bin/apv gives the short invocation without occupying
 # the project's bin/ (operator ruling 2026-07-07: root bin/ is project
 # surface; a dotfile-adjacent symlink is not). Relative target, so the repo
-# can move. Untracked like the launcher. A foreign ./apv is refused; a
-# dangling symlink (e.g. after a data-dir rename) is repaired.
+# can move — and, like the shim it points at, machine-independent and safe
+# to commit. A foreign ./apv is refused; a dangling symlink (e.g. after a
+# data-dir rename) is repaired.
 SYMLINK_PATH="apv"
 SYMLINK_OK=0
 if [ "$LAUNCHER_OK" -eq 1 ]; then
@@ -257,14 +322,10 @@ fi
 
 # --- 4. gitignore the local per-checkout state -------------------------------
 # The stamp (guard), the pending-extract flag (extractor's post-commit half),
-# and the generated command launcher are per-checkout local state; never
-# tracked. One line each, appended once. (A refused foreign bin/apv is left
-# out — we do not ignore a file we do not own.)
-IGNORE_LINES=("$DATA_DIR/.last-capture" "$DATA_DIR/.pending-extract")
-[ "$LAUNCHER_OK" -eq 1 ] && IGNORE_LINES+=("$LAUNCHER_PATH")
-# "/apv" is root-anchored — a bare "apv" pattern would ignore any file named
-# apv at any depth in the project.
-[ "$SYMLINK_OK" -eq 1 ] && IGNORE_LINES+=("/apv")
+# and the toolchain pointer are per-checkout local state; never tracked.
+# One line each, appended once. The shim and ./apv symlink are deliberately
+# NOT here — they are machine-independent and may be committed.
+IGNORE_LINES=("$DATA_DIR/.last-capture" "$DATA_DIR/.pending-extract" "$DATA_DIR/.toolchain-home")
 IGNORED_ALL=1
 for LOCAL_LINE in "${IGNORE_LINES[@]}"; do
   if [ -f .gitignore ] && grep -qxF "$LOCAL_LINE" .gitignore; then
@@ -275,8 +336,7 @@ for LOCAL_LINE in "${IGNORE_LINES[@]}"; do
     printf '# agent-plan-visualiser local per-checkout state — never tracked\n%s\n' "$LOCAL_LINE" >> .gitignore
   fi
 done
-IGNORE_DETAIL=".last-capture + .pending-extract"
-[ "$LAUNCHER_OK" -eq 1 ] && IGNORE_DETAIL="$IGNORE_DETAIL + $LAUNCHER_PATH"
+IGNORE_DETAIL=".last-capture + .pending-extract + .toolchain-home"
 if [ "$IGNORED_ALL" -eq 1 ]; then
   report ok ".gitignore" "local per-checkout state already ignored"
 else
