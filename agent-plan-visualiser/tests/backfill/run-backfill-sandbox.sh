@@ -246,6 +246,140 @@ run python3 "$BF" --project-path "$SANDBOX/project" --run-id bf-known --dry-run
 check "known-entities list in bundle"   grep -q "plan LIVE-A" <<<"$OUT"
 check "mined entities listed too"       grep -q "plan HIST-NEW" <<<"$OUT"
 
+# --- Case 6: headless isolation --------------------------------------------------
+# Second real-run incident (OMC, 2026-07): USER-scope plugin hooks fire inside
+# `claude -p` regardless of cwd — the neutral temp cwd (0.5.6) only removes
+# project scope. The walk must pass --safe-mode (all customizations off, auth
+# intact) when the CLI advertises it, and never pass it to a CLI that doesn't
+# (older CLIs hard-error on unknown flags).
+echo "== isolation: --safe-mode passed iff the CLI advertises it"
+git init -q -b main "$SANDBOX/iso"
+cd "$SANDBOX/iso" || exit 2
+git config user.email iso@example.invalid && git config user.name "Iso"
+echo i > iso.txt && git add -A && git commit -qm "hist: isolated work"
+SHA_ISO="$(git rev-parse HEAD)"
+mkdir -p .apv
+cat > "$FAKE_DIR/${SHA_ISO:0:8}.json" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_ISO:0:7}.isolated-work", "attributes": {"summary": "Isolated work."}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_ISO:0:7}.isolated-work", "attributes": {"summary": "Self-contained."}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "attributes": {"author": "m", "date": "2025-01-01", "message_first_line": "x"}}
+]
+JSON
+cat >> .apv/events.jsonl <<JSON
+{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-07-03", "message_first_line": "no match — mine all"}}
+JSON
+
+# Argv-recording stub that ADVERTISES --safe-mode/--strict-mcp-config in --help.
+FAKE_ISO="$SANDBOX/fake-claude-iso"
+cat > "$FAKE_ISO" <<'PY'
+#!/usr/bin/env python3
+import os, re, sys
+if "--help" in sys.argv:
+    print("  --safe-mode          all customizations disabled")
+    print("  --strict-mcp-config  only --mcp-config servers")
+    sys.exit(0)
+with open(os.environ["ARGV_LOG"], "a") as f:
+    f.write(" ".join(sys.argv[1:]) + "\n")
+bundle = sys.stdin.read()
+m = re.search(r"commit_hash: ([0-9a-f]{40})", bundle)
+path = os.path.join(os.environ["FAKE_DIR"], (m.group(1)[:8] if m else "none") + ".json")
+sys.stdout.write(open(path).read())
+PY
+chmod +x "$FAKE_ISO"
+export ARGV_LOG="$SANDBOX/argv-iso.log"
+run env APV_CLAUDE_BIN="$FAKE_ISO" python3 "$BF" --project-path "$PWD" --run-id bf-iso --chunk-size 0
+check "advertising walk exits 0"        [ "$CODE" -eq 0 ]
+check "safe-mode passed"                grep -q -- "--safe-mode" "$ARGV_LOG"
+check "strict-mcp-config passed"        grep -q -- "--strict-mcp-config" "$ARGV_LOG"
+
+# The plain stub (no --help support) must NOT receive the flags: argv-recording
+# stub that advertises nothing.
+FAKE_OLD="$SANDBOX/fake-claude-old"
+cat > "$FAKE_OLD" <<'PY'
+#!/usr/bin/env python3
+import os, re, sys
+if "--help" in sys.argv:
+    print("  --output-format <fmt>")
+    sys.exit(0)
+with open(os.environ["ARGV_LOG"], "a") as f:
+    f.write(" ".join(sys.argv[1:]) + "\n")
+bundle = sys.stdin.read()
+m = re.search(r"commit_hash: ([0-9a-f]{40})", bundle)
+path = os.path.join(os.environ["FAKE_DIR"], (m.group(1)[:8] if m else "none") + ".json")
+sys.stdout.write(open(path).read())
+PY
+chmod +x "$FAKE_OLD"
+git init -q -b main "$SANDBOX/iso-old"
+cd "$SANDBOX/iso-old" || exit 2
+git config user.email old@example.invalid && git config user.name "Old"
+echo o > old.txt && git add -A && git commit -qm "hist: isolated work"
+SHA_OLD="$(git rev-parse HEAD)"
+cp "$FAKE_DIR/${SHA_ISO:0:8}.json" "$FAKE_DIR/${SHA_OLD:0:8}.json"
+mkdir -p .apv
+cat >> .apv/events.jsonl <<JSON
+{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-07-03", "message_first_line": "no match — mine all"}}
+JSON
+export ARGV_LOG="$SANDBOX/argv-old.log"
+run env APV_CLAUDE_BIN="$FAKE_OLD" python3 "$BF" --project-path "$PWD" --run-id bf-old --chunk-size 0
+check "non-advertising walk exits 0"    [ "$CODE" -eq 0 ]
+check "safe-mode withheld from old CLI" sh -c "! grep -q -- '--safe-mode' '$SANDBOX/argv-old.log'"
+unset ARGV_LOG
+
+# --- Case 7: spurious kill survived ----------------------------------------------
+# The OMC incident's second lesson: the claude process died non-zero with EMPTY
+# stderr after the extraction had completed — the walk lost paid work and the
+# needs-review was a forensic dead end. A single non-zero exit is retried once
+# (loudly); a repeat halts with the exit code and stream heads in the diagnosis.
+echo "== spurious kill: one non-zero exit is retried; a repeat halts with diagnosis"
+FAKE_FLAKY="$SANDBOX/fake-claude-flaky"
+cat > "$FAKE_FLAKY" <<'PY'
+#!/usr/bin/env python3
+import os, re, sys
+if "--help" in sys.argv:
+    sys.exit(0)
+marker = os.environ["FLAKY_MARKER"]
+if not os.path.exists(marker):
+    open(marker, "w").close()
+    sys.exit(1)  # spurious kill: non-zero, empty stderr, empty stdout
+bundle = sys.stdin.read()
+m = re.search(r"commit_hash: ([0-9a-f]{40})", bundle)
+path = os.path.join(os.environ["FAKE_DIR"], (m.group(1)[:8] if m else "none") + ".json")
+sys.stdout.write(open(path).read())
+PY
+chmod +x "$FAKE_FLAKY"
+git init -q -b main "$SANDBOX/flaky"
+cd "$SANDBOX/flaky" || exit 2
+git config user.email f@example.invalid && git config user.name "Flaky"
+echo f > f.txt && git add -A && git commit -qm "hist: isolated work"
+SHA_F="$(git rev-parse HEAD)"
+cp "$FAKE_DIR/${SHA_ISO:0:8}.json" "$FAKE_DIR/${SHA_F:0:8}.json"
+mkdir -p .apv
+cat >> .apv/events.jsonl <<JSON
+{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-07-03", "message_first_line": "no match — mine all"}}
+JSON
+export FLAKY_MARKER="$SANDBOX/flaky-once"
+run env APV_CLAUDE_BIN="$FAKE_FLAKY" python3 "$BF" --project-path "$PWD" --run-id bf-flaky --chunk-size 0
+check "walk survives one spurious kill" [ "$CODE" -eq 0 ]
+check "retry announced"                 grep -qi "retry" <<<"$OUT"
+check "block landed after retry"        grep -q "isolated-work" .apv/events.jsonl
+
+FAKE_DEAD="$SANDBOX/fake-claude-dead"
+printf '#!/bin/sh\nexit 1\n' > "$FAKE_DEAD" && chmod +x "$FAKE_DEAD"
+rm -rf "$SANDBOX/flaky/.apv/needs-review"
+git init -q -b main "$SANDBOX/dead"
+cd "$SANDBOX/dead" || exit 2
+git config user.email d@example.invalid && git config user.name "Dead"
+echo d > d.txt && git add -A && git commit -qm "hist: doomed"
+mkdir -p .apv
+cat >> .apv/events.jsonl <<JSON
+{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-07-03", "message_first_line": "no match — mine all"}}
+JSON
+run env APV_CLAUDE_BIN="$FAKE_DEAD" python3 "$BF" --project-path "$PWD" --run-id bf-dead --chunk-size 0
+check "repeat failure halts"            [ "$CODE" -ne 0 ]
+check "exit code in diagnosis"          grep -q "exit 1" <<<"$OUT"
+unset FLAKY_MARKER
+
 echo
 if [ "$FAIL" -eq 0 ]; then
   echo "backfill sandbox: ALL PASS"

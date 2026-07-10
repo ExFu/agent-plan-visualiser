@@ -245,20 +245,40 @@ def invoke_extractor(prompt_text: str, bundle_text: str, workdir=None):
     hook-fighting turns — claude -p returns the LAST message, so the walk
     saw an empty result. --max-turns is the belt-and-braces cost cap should
     any user-level hook still interfere (extraction is single-turn by
-    design); an exceeded cap surfaces as an error envelope, loudly."""
+    design); an exceeded cap surfaces as an error envelope, loudly.
+
+    USER-scope config is out of cwd's reach — second incident (OMC,
+    2026-07-09): a user-global plugin's hooks fired inside the headless
+    session and the claude process died non-zero with empty stderr AFTER
+    the extraction had completed. apvlib.claude_isolation_flags probes the
+    installed CLI and adds --safe-mode (all customizations off, auth
+    intact) plus the older-CLI fallbacks it supports. A non-zero exit is
+    retried once — the incident class is a spurious kill of finished work;
+    a repeat halts with the exit code and stream heads so the needs-review
+    is a diagnosis, not a dead end."""
     claude_bin = os.environ.get("APV_CLAUDE_BIN", "claude")
     timeout = int(os.environ.get("APV_EXTRACT_TIMEOUT", "600"))
-    cmd = [claude_bin, "-p", "--output-format", "json", "--max-turns", "4"]
+    cmd = [claude_bin, "-p", *apvlib.claude_isolation_flags(claude_bin),
+           "--output-format", "json", "--max-turns", "4"]
     model = os.environ.get("APV_EXTRACT_MODEL")
     if model:
         cmd += ["--model", model]
-    result = subprocess.run(
-        cmd, input=prompt_text + "\n\n---\n\n" + bundle_text +
-        "\n\n---\n\nNow output the JSON array of events for this commit.\n",
-        capture_output=True, text=True, timeout=timeout, cwd=workdir,
-    )
+    input_text = (prompt_text + "\n\n---\n\n" + bundle_text +
+                  "\n\n---\n\nNow output the JSON array of events for this commit.\n")
+    for attempt in (1, 2):
+        result = subprocess.run(cmd, input=input_text, capture_output=True,
+                                text=True, timeout=timeout, cwd=workdir)
+        if result.returncode == 0:
+            break
+        if attempt == 1:
+            log(f"    extractor exited {result.returncode} "
+                f"(stderr: {result.stderr.strip()[:200] or '(empty)'}) — retrying once",
+                force=True)
     if result.returncode != 0:
-        raise RuntimeError(f"extractor invocation failed: {result.stderr.strip()[:400]}")
+        raise RuntimeError(
+            f"extractor invocation failed twice (exit {result.returncode}); "
+            f"stderr: {result.stderr.strip()[:400] or '(empty)'}; "
+            f"stdout head: {result.stdout.strip()[:200] or '(empty)'}")
     raw = result.stdout
     try:
         env = json.loads(raw)

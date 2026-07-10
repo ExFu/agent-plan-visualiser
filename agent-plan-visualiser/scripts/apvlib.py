@@ -101,6 +101,50 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+# Headless extractor isolation (backfill.py + extract-commit.py). Two real-run
+# incidents shaped this: a target project's autopilot Stop hook hijacked the
+# session (exfu_website, 2026-07-07 — fixed by the neutral temp cwd), then a
+# USER-scope plugin's hooks killed the claude process outright, non-zero exit,
+# empty stderr, after extraction had completed (OMC, 2026-07-09). cwd isolation
+# cannot reach user scope; these flags can. Each is added only when the
+# installed CLI advertises it in --help — older CLIs hard-error on unknown
+# flags, so degrading to fewer layers beats failing every call.
+#   --safe-mode           all customizations off (plugins, hooks, MCP,
+#                         CLAUDE.md); auth and model selection work normally
+#   --settings {...}      disableAllHooks — the hook vector, on CLIs that
+#                         predate --safe-mode
+#   --strict-mcp-config   no ambient MCP servers
+_ISOLATION_CANDIDATES = (
+    ("--safe-mode", ["--safe-mode"]),
+    ("--settings", ["--settings", '{"disableAllHooks": true}']),
+    ("--strict-mcp-config", ["--strict-mcp-config"]),
+)
+_isolation_cache: dict = {}
+
+
+def claude_isolation_flags(claude_bin: str) -> list:
+    """Isolation flags the installed `claude` supports, probed from --help
+    once per binary per process. A failed/hanging probe (missing binary,
+    stubbed test model) yields [] — the invocation then proceeds exactly as
+    it would have before isolation existed."""
+    if claude_bin in _isolation_cache:
+        return _isolation_cache[claude_bin]
+    import subprocess
+    try:
+        help_text = subprocess.run(
+            [claude_bin, "--help"], capture_output=True, text=True,
+            stdin=subprocess.DEVNULL, timeout=20,
+        ).stdout
+    except Exception:
+        help_text = ""
+    flags = []
+    for token, args in _ISOLATION_CANDIDATES:
+        if token in help_text:
+            flags += args
+    _isolation_cache[claude_bin] = flags
+    return flags
+
+
 def apv_data_dir(repo_root: Path, config_path=None) -> Path:
     """Resolve the tracking data directory (events.jsonl, cache, projection...).
 

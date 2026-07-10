@@ -34,6 +34,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from datetime import date
@@ -168,16 +169,37 @@ class AmbiguityHalt(Exception):
 
 
 def invoke_model(prompt: str, bundle: str) -> str:
+    """Single-turn headless extraction, isolated from ambient session config.
+
+    Same hardening as backfill.py's invoke_extractor (both real-run incidents
+    hit that walk first — the doctrine lives on apvlib.claude_isolation_flags):
+    a NEUTRAL temp cwd so the repo's own hooks/settings never load, probed
+    isolation flags (--safe-mode et al.) so user-scope plugin hooks never
+    load either, --max-turns as the cost cap, one retry on a spurious
+    non-zero exit, and a halt that carries the exit code and stream heads."""
     claude_bin = os.environ.get("APV_CLAUDE_BIN", "claude")
     timeout = int(os.environ.get("APV_EXTRACT_TIMEOUT", "240"))
-    cmd = [claude_bin, "-p", "--output-format", "text"]
+    cmd = [claude_bin, "-p", *apvlib.claude_isolation_flags(claude_bin),
+           "--output-format", "text", "--max-turns", "4"]
     model = os.environ.get("APV_EXTRACT_MODEL")
     if model:
         cmd += ["--model", model]
-    r = subprocess.run(cmd, input=prompt + "\n\n# INPUT BUNDLE\n\n" + bundle,
-                       capture_output=True, text=True, timeout=timeout)
+    workdir = tempfile.mkdtemp(prefix="apv-extract-")
+    input_text = prompt + "\n\n# INPUT BUNDLE\n\n" + bundle
+    for attempt in (1, 2):
+        r = subprocess.run(cmd, input=input_text, capture_output=True,
+                           text=True, timeout=timeout, cwd=workdir)
+        if r.returncode == 0:
+            break
+        if attempt == 1:
+            print(f"apv-extract: extractor exited {r.returncode} "
+                  f"(stderr: {r.stderr.strip()[:200] or '(empty)'}) — retrying once",
+                  file=sys.stderr)
     if r.returncode != 0:
-        raise RuntimeError(f"extractor invocation failed: {r.stderr.strip()[:400]}")
+        raise RuntimeError(
+            f"extractor invocation failed twice (exit {r.returncode}); "
+            f"stderr: {r.stderr.strip()[:400] or '(empty)'}; "
+            f"stdout head: {r.stdout.strip()[:200] or '(empty)'}")
     return r.stdout
 
 

@@ -160,6 +160,46 @@ check "commit blocked"                  [ "$CODE" -ne 0 ]
 check "resurrection named"              grep -qi "resurrection" <<<"$OUT"
 git reset -q zombie.txt && rm zombie.txt
 
+# --- Case: headless isolation ---------------------------------------------------
+# Second real-run incident class (OMC, 2026-07): user-scope plugin hooks fire
+# inside `claude -p` and can kill/hijack the session. The live extractor must
+# pass --safe-mode when the CLI advertises it (probed — older CLIs hard-error
+# on unknown flags) and run in a neutral cwd, not the target repo.
+echo "== isolation: --safe-mode passed iff advertised; neutral cwd"
+sleep 1
+FAKE_ISO="$SANDBOX/fake-claude-iso"
+cat > "$FAKE_ISO" <<'PY'
+#!/usr/bin/env python3
+import os, sys
+if "--help" in sys.argv:
+    print("  --safe-mode  all customizations disabled")
+    sys.exit(0)
+with open(os.environ["ARGV_LOG"], "a") as f:
+    f.write(" ".join(sys.argv[1:]) + "\ncwd=" + os.getcwd() + "\n")
+sys.stdin.read()
+sys.stdout.write(open(os.environ["FAKE_RESPONSE"]).read())
+PY
+chmod +x "$FAKE_ISO"
+GOOD_ISO="$SANDBOX/good-iso.json"
+cat > "$GOOD_ISO" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.tweak-cards", "attributes": {"summary": "Card styling tweak, no plan touched."}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.tweak-cards", "attributes": {"summary": "Self-contained; landed with this commit."}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "WRONG", "date": "1999-01-01", "message_first_line": "WRONG SUBJECT"}}
+]
+JSON
+export ARGV_LOG="$SANDBOX/argv-ext.log"
+echo ".card { border: 0; }" > cards.css
+git add cards.css
+export FAKE_RESPONSE="$GOOD_ISO"
+run env APV_CLAUDE_BIN="$FAKE_ISO" git commit -m "tweak cards"
+check "commit passes under iso stub"    [ "$CODE" -eq 0 ]
+check "safe-mode passed"                grep -q -- "--safe-mode" "$ARGV_LOG"
+# Physical path: /tmp is a symlink on macOS and os.getcwd() resolves it.
+REPO_PHYS="$(pwd -P)"
+check "extractor cwd is not the repo"   sh -c "grep '^cwd=' '$ARGV_LOG' | grep -qv \"cwd=$REPO_PHYS\""
+unset ARGV_LOG
+
 # --- Optional live smoke (APV_LIVE_EXTRACT=1) ----------------------------------
 if [ "${APV_LIVE_EXTRACT:-0}" = "1" ]; then
   echo "== live smoke: real claude -p extraction"
