@@ -230,9 +230,14 @@ if [ -n "$repo_root" ] && usable "$repo_root/agent-plan-visualiser"; then
 fi
 if [ -f "$data_dir/.toolchain-home" ]; then
   pinned="$(head -n 1 "$data_dir/.toolchain-home")"
-  if usable "$pinned"; then
-    exec "$pinned/bin/apv" "$@"
-  fi
+  # A pin into the plugin cache would freeze this checkout at whatever
+  # version attached it (old cache versions stay on disk) — cache installs
+  # are resolved by discovery below, newest wins. Pins are for dev/custom
+  # toolchains only.
+  case "$pinned" in
+    */plugins/cache/*) : ;;
+    *) if usable "$pinned"; then exec "$pinned/bin/apv" "$@"; fi ;;
+  esac
 fi
 cache="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache"
 newest="$(ls -d "$cache"/*/agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1 || true)"
@@ -278,17 +283,32 @@ fi
 # discovery but survives its absence, so a clone on another machine works
 # without it.
 PIN_PATH="$DATA_DIR/.toolchain-home"
-if [ -f "$PIN_PATH" ] && [ "$(cat "$PIN_PATH")" = "$TOOLCHAIN_HOME" ]; then
-  report ok "$PIN_PATH" "local toolchain pointer"
-else
-  had_pin=0; [ -f "$PIN_PATH" ] && had_pin=1
-  printf '%s\n' "$TOOLCHAIN_HOME" > "$PIN_PATH"
-  if [ "$had_pin" -eq 1 ]; then
-    report updated "$PIN_PATH" "-> $TOOLCHAIN_HOME"
-  else
-    report created "$PIN_PATH" "-> $TOOLCHAIN_HOME"
-  fi
-fi
+case "$TOOLCHAIN_HOME" in
+  */plugins/cache/*)
+    # Plugin-cache install: never pin. Old cache versions stay on disk, so a
+    # pin would freeze this checkout at the attaching version; the shim's
+    # discovery resolves the newest install every run.
+    if [ -f "$PIN_PATH" ]; then
+      rm -f "$PIN_PATH"
+      report migrated "$PIN_PATH" "removed — cache installs resolve by discovery (newest)"
+    else
+      report ok "$PIN_PATH" "not needed — cache installs resolve by discovery (newest)"
+    fi
+    ;;
+  *)
+    if [ -f "$PIN_PATH" ] && [ "$(cat "$PIN_PATH")" = "$TOOLCHAIN_HOME" ]; then
+      report ok "$PIN_PATH" "local toolchain pointer"
+    else
+      had_pin=0; [ -f "$PIN_PATH" ] && had_pin=1
+      printf '%s\n' "$TOOLCHAIN_HOME" > "$PIN_PATH"
+      if [ "$had_pin" -eq 1 ]; then
+        report updated "$PIN_PATH" "-> $TOOLCHAIN_HOME"
+      else
+        report created "$PIN_PATH" "-> $TOOLCHAIN_HOME"
+      fi
+    fi
+    ;;
+esac
 
 # --- 3b. convenience symlink ---------------------------------------------------
 # `./apv` -> <data-dir>/bin/apv gives the short invocation without occupying
