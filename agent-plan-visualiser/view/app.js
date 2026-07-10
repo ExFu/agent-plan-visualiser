@@ -403,7 +403,7 @@ function renderFlow(projection, events, content) {
     <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#c62828"/></svg> fulcrum (parked/cancelled/etc.)</span>
     <span><svg width="14" height="14"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" fill="#6a1b9a"/></svg> primary summary</span>
     <span><svg width="14" height="14"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" fill="white" stroke="#6a1b9a" stroke-width="1.5"/></svg> derived summary</span>
-    <span style="margin-left:1rem;color:#666;">solid line = entity spine · dashed = spawns · dotted = live continuation to "now" (click LIVE badge for timeline)</span>
+    <span style="margin-left:1rem;color:#666;">solid line = entity spine · dashed = spawns · dotted = live continuation to "now" (click LIVE badge for timeline) · grey dot at "now" = closed (click for summary)</span>
   `;
   content.appendChild(legend);
 
@@ -883,14 +883,18 @@ function computeFlowLayout(projection, events, aggregate) {
   }
 
   // 9. Continuation lines + "now" badges for live/dormant/orphaned entities.
+  // Closed entities also get a badge (rendered as a small dot, not a pill) but
+  // no continuation line — a dotted line means "still running to now", and a
+  // closed lifeline genuinely ends at its last event.
   const continuations = [];
   const nowBadges = [];
   for (const [ekey, entity] of Object.entries(entities)) {
-    if (!["live", "dormant", "orphaned"].includes(entity.derived_state)) continue;
+    const isClosed = entity.derived_state === "closed";
+    if (!isClosed && !["live", "dormant", "orphaned"].includes(entity.derived_state)) continue;
     const ns = entityNodes[ekey];
     if (!ns || !ns.length) continue;
     const last = ns[ns.length - 1];
-    continuations.push({ fromNode: last, x2: nowX - 22, y: last.y });
+    if (!isClosed) continuations.push({ fromNode: last, x2: nowX - 22, y: last.y });
     nowBadges.push({
       x: nowX,
       y: last.y,
@@ -1128,6 +1132,9 @@ function renderFlowSVG(layout) {
   svg.appendChild(nodeG);
 
   // "Now" badges on the right — click to see entity's recent timeline.
+  // Live/dormant/orphaned get the full pill. Closed entities get a small
+  // muted dot instead — visible at a glance without competing with the live
+  // badges — and click through to the same summary/timeline sidebar.
   const nowG = createNS("g", { class: "now-badges" });
   for (const b of layout.nowBadges) {
     const entityKey = `plan:${b.entityId}`;
@@ -1136,27 +1143,36 @@ function renderFlowSVG(layout) {
     if (!entity) {
       entity = Object.values(state.projection.entities).find(e => e.entity_id === b.entityId);
     }
-    const rect = createNS("rect", {
-      class: `now-badge ${b.state}`,
-      x: layout.nowX - 20, y: b.y - 7,
-      width: 40, height: 14, rx: 3,
-    });
-    const text = textNS({
-      class: "now-badge-text",
-      x: layout.nowX, y: b.y + 4,
-      "text-anchor": "middle",
-    }, b.state.toUpperCase().slice(0, 4));
+    const isClosed = b.state === "closed";
+    let shape, text = null;
+    if (isClosed) {
+      shape = createNS("circle", {
+        class: "now-marker closed",
+        cx: layout.nowX, cy: b.y, r: 4.5,
+      });
+    } else {
+      shape = createNS("rect", {
+        class: `now-badge ${b.state}`,
+        x: layout.nowX - 20, y: b.y - 7,
+        width: 40, height: 14, rx: 3,
+      });
+      text = textNS({
+        class: "now-badge-text",
+        x: layout.nowX, y: b.y + 4,
+        "text-anchor": "middle",
+      }, b.state.toUpperCase().slice(0, 4));
+    }
     // SVG <title> for hover hint
     const titleEl = createNS("title");
-    titleEl.textContent = `${b.entityId} (${b.state}) — click for recent timeline`;
-    rect.appendChild(titleEl);
+    titleEl.textContent = `${b.entityId} (${b.state}) — click for ${isClosed ? "summary" : "recent timeline"}`;
+    shape.appendChild(titleEl);
     if (entity) {
       const handler = () => showLiveStatus(entity);
-      rect.addEventListener("click", handler);
-      text.addEventListener("click", handler);
+      shape.addEventListener("click", handler);
+      if (text) text.addEventListener("click", handler);
     }
-    nowG.appendChild(rect);
-    nowG.appendChild(text);
+    nowG.appendChild(shape);
+    if (text) nowG.appendChild(text);
   }
   svg.appendChild(nowG);
 
