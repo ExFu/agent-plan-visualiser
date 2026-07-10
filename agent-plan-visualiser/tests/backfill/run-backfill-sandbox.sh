@@ -160,9 +160,13 @@ check "question closed"                 sh -c "grep 'HIST-OLD.q1' .apv/events.js
 check "hypotheses archived"             [ -f .apv/archive/hypotheses-bf-test-a.jsonl ]
 run python3 "$PLUGIN/scripts/backfill/triage-emit.py" --project-path "$PWD" --run-id bf-test-a --rulings "$SANDBOX/rulings.json" --actor al
 check "re-run is a no-op"               grep -q "Nothing to do" <<<"$OUT"
-# Seal the triage block so the tail is coherent, then gate.
+# Seal the triage block so the tail is coherent, then gate. The seal date
+# must be TODAY: the mined blocks are sealed with their commits' real dates
+# (also today — the sandbox fabricates its "history" at run time), and
+# cache-build replays state in event-time order, so a triage seal pinned in
+# the past would fold the question's close BEFORE its creation.
 cat >> .apv/events.jsonl <<JSON
-{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-07-03", "message_first_line": "triage(bf-test-a): 1 recollected, 0 left open"}}
+{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "$(date +%Y-%m-%d)", "message_first_line": "triage(bf-test-a): 1 recollected, 0 left open"}}
 JSON
 git add -A && date +%s > .apv/.last-capture
 run git commit -qm "triage(bf-test-a): 1 recollected, 0 left open"
