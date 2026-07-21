@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T15:12:50Z
+# Project state — generated 2026-07-21T15:16:50Z
 
-**Total events:** 575  ·  **Draft:** 13  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 56  ·  **Orphaned:** 0
+**Total events:** 578  ·  **Draft:** 13  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 57  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -25,9 +25,6 @@
 - **T2-packaging**
   - `T3-distribution` (38 events): verification.tested → entity.progressed → verification.tested
 
-- **T2-projection**
-  - `T3-html-view-interactivity` (3 events): entity.created → relationship.spawns → entity.accepted
-
 - **T2-storage**
   - `T3-multi-project` (5 events): entity.accepted → entity.progressed → verification.tested
 
@@ -45,16 +42,14 @@
 - **M4-fresh-install**
   - `T3-distribution`
 
-- **M6-dashboard**
-  - `T3-html-view-interactivity`
-
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 101 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 102 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
+- `M6-dashboard`
 
 ## Draft
 
@@ -109,7 +104,7 @@ _No flapping closures._
 - **M4-fresh-install**: 4/5 T3 complete (80%); 1 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
-- **M6-dashboard**: 2/3 T3 complete (66%); 1 live
+- **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 
 ---
 _82 entities · 111 relationships · 28 decisions._
