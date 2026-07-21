@@ -13,7 +13,7 @@ You (the in-session agent) are the extractor. You have full session context: you
 
 - `DATA_DIR` = `$APV_DATA_DIR` if set (absolute, or relative to repo root), else `.agent-plan-tracker/`.
 - Events file: `$DATA_DIR/events.jsonl`. Never create it implicitly — if it doesn't exist, stop and ask the operator (the project may not be initialised).
-- Emit events at `schema_version: "0.3.0"`. Precise field shapes: `agent-plan-visualiser/schemas/0.3.0/events.schema.json` (and `plan-frontmatter.schema.json` for plan attributes).
+- Emit events at `schema_version: "0.3.0"` (two later-epoch exceptions — see §2 and §5). Precise field shapes: `agent-plan-visualiser/schemas/0.3.0/events.schema.json` (and `plan-frontmatter.schema.json` for plan attributes).
 
 ## 1. When to run
 
@@ -21,7 +21,7 @@ You (the in-session agent) are the extractor. You have full session context: you
 - Each invocation appends one block ending in `commit.recorded` (the seal). Events between the previous seal and yours belong to your commit (**positional rollup**).
 - If you realise events are missing *after* sealing: never edit prior lines. Fold the omission into your **next** capture, noting it in that event's summary. (If you haven't committed yet and the omission is serious, ask the operator.)
 
-## 2. Ontology quick reference — schema 0.3.0 (+0.5.0's `verification.deferred`), 27 event types
+## 2. Ontology quick reference — schema 0.3.0 (+0.5.0's `verification.deferred`, +0.6.0's `project.assigned`), 28 event types
 
 ### Entity lifecycle (10)
 
@@ -59,7 +59,11 @@ You (the in-session agent) are the extractor. You have full session context: you
 - `relationship.spawns` — `entity_id` is the spawned child; `from_*` the spawner. Emit alongside `entity.created` for every new plan with a parent.
 - `relationship.depends-on` — `entity_id` is the dependent.
 - `relationship.addendum-to`, `relationship.alongside` (commutative; pick the later-created entity as `entity_id`).
-- `relationship.reattached` — **the sole exception**: `attributes.from_parent` + `attributes.to_parent` (not `from_entity_*`). This is the move primitive; it supersedes the prior spawns edge in projections.
+- `relationship.reattached` — **the sole exception**: `attributes.from_parent` + `attributes.to_parent` (not `from_entity_*`). This is the **parent-move** primitive (milestone/theme axes); it supersedes the prior spawns edge in projections. It is NOT for sub-project membership — that's `project.assigned` (below).
+
+### Project membership (1)
+
+`project.assigned` — assert the focal entity's sub-project membership (multi-project repos, T3-multi-project): `attributes.project` required (a `[projects.<name>]` registry name, or `main`); optional `from_project`, `summary`. **State-neutral** — retrospectively valid on open or **closed** entities without reopening (the `entity.renamed` precedent, so no resurrection concern); latest-recorded wins; once recorded, the attribute is authoritative over planning-root derivation (a later file move alone will NOT change membership). **Fulcrum — paired `decision` required**; one decision may cover a bulk assignment by listing every event_id. Emit with `schema_version: "0.6.0"` (the epoch that introduced it).
 
 ### Meta (1)
 
@@ -113,7 +117,7 @@ Every event:
 - `entity_type` / `entity_id` — required for all events **except** `decision` and `commit.recorded` (both subject-less).
 - `actor` — who did/decided the work (handle, e.g. `"al"`). Acceptance events carry the accepting operator.
 - `confidence` — `explicit` (stated in plan/commit/conversation) or `derived` (inferred).
-- `schema_version` — `"0.3.0"`.
+- `schema_version` — `"0.3.0"` (epoch exceptions: `verification.deferred` → `"0.5.0"`, `project.assigned` → `"0.6.0"` — each event stamps the epoch that introduced it).
 - `attributes` — per-type extras (§2). Always include a human-useful `summary` on lifecycle events.
 
 **Mechanics**: append with python3 + `json.dumps` (default separators, default ensure_ascii), one object per line, key order `event_id, type, actor, confidence, schema_version, entity_type, entity_id, attributes`:

@@ -69,10 +69,14 @@ project `main` → else `unassigned` (a deliberately visible triage bucket).
 The view gains a project filter (all three views) and badges; summary.md a
 `## By project` rollup; the gate's drift check walks every root and WARNs
 on a plan id present in two roots (entity ids are repo-global). No
-`[projects]` tables → single-project behaviour, unchanged. Note:
-membership annotations on **closed** entities are not possible append-only
-(`entity.extended` on a closed entity trips the resurrection blocker) —
-closed unmatched entities stay `unassigned`, honestly.
+`[projects]` tables → single-project behaviour, unchanged. Retrospective
+membership (re)assignment — including on **closed** entities — is
+`project.assigned` (0.6.0): a state-neutral membership assertion (the
+`entity.renamed` precedent — no resurrection, no reopening needed), fulcrum
+(paired decision required; one decision covers a bulk assignment).
+Latest-recorded wins; once asserted, the attribute is authoritative over
+planning-root derivation. Procedure:
+`cheatsheet/worked-examples/assign-entity-to-project.md`.
 
 Inside it: `events.jsonl` (canonical, append-only — all integrity
 discipline applies here) plus derived, rebuildable artefacts
@@ -91,10 +95,14 @@ The authority is `schemas/0.3.0/events.schema.json` (+
 `superseded`, `reopened`); `decision` ×1 (subject-less arc metadata —
 `attributes.text` + `event_ids[]`); blockers ×3; verification ×4
 (`claimed`/`tested`/`skipped`/`failed`); relationships ×5 (`spawns`,
-`depends-on`, `addendum-to`, `alongside`, `reattached` — the move
-primitive); `commit.recorded` ×1 (the seal: last event of every block, its
-`message_first_line` matches the commit's first line exactly); analysis ×2
-(tool-emitted).
+`depends-on`, `addendum-to`, `alongside`, `reattached` — the parent-move
+primitive on the milestone/theme axes; sub-project membership moves via
+`project.assigned` instead); `commit.recorded` ×1 (the seal: last event of
+every block, its `message_first_line` matches the commit's first line
+exactly); analysis ×2 (tool-emitted). Later epochs add
+`verification.deferred` (0.5.0) and `project.assigned` (0.6.0 — the
+state-neutral, fulcrum membership assertion, §3); the newest epoch's
+schema is the superset authority for validating a whole log.
 
 **5 entity types**: `plan` (ID = frontmatter `id`; filename must equal
 `<id>.md`), `blocker`, `hitl-question`, `implicit-work`, `inbox-item`.

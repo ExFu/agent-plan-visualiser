@@ -10,7 +10,8 @@ FAIL=0
 
 # Fixture caches are derived — rebuild from scratch every run so a stale
 # cache (same event count, different content) can't mask a regression.
-rm -f fixture-corrupt/cache.sqlite fixture-drift/cache.sqlite fixture-attention/cache.sqlite
+rm -f fixture-corrupt/cache.sqlite fixture-drift/cache.sqlite fixture-attention/cache.sqlite \
+      fixture-project-move/cache.sqlite fixture-project-move-nodecision/cache.sqlite
 
 check() { # check <desc> <test-expr...>
   local desc="$1"; shift
@@ -102,6 +103,31 @@ check "acceptance ceremony pending"             grep -q "^WARN \[pending-ceremon
 check "closure ceremony pending"                grep -q "^WARN \[pending-ceremony\].*'M9-fix-att' has all 1 scheduled T3(s) closed" <<<"$OUT"
 check "open deferral warns with reason"         grep -q "^WARN \[deferred-verification\].*'T3-fix-att-open'.*operator leg pending" <<<"$OUT"
 check_absent "resolved deferral stays quiet"    "T3-fix-att-healed"
+
+# --- Case 5b: project.assigned on a CLOSED entity is gate-clean -----------
+# T3-retrospective-project-annotation: the membership assertion is
+# state-neutral (absent from STATE_FROM_EVENT), so annotating a closed
+# entity must NOT trip resurrection-without-reopen; the paired decision
+# satisfies the fulcrum check; the cache folds the project while the
+# derived state stays closed.
+run_case "project assignment on closed entity / default config" fixture-project-move config-default.toml
+check "exit 0"                                  [ "$CODE" -eq 0 ]
+check_absent "no BLOCK lines"                   '^BLOCK'
+check_absent "no resurrection block"            '\[resurrection-without-reopen\]'
+PMROW="$(sqlite3 fixture-project-move/cache.sqlite \
+  "SELECT project || '|' || derived_state FROM entities WHERE entity_id='FIX-PM';")"
+check "cache folds project=rootb, still closed" [ "$PMROW" = "rootb|closed" ]
+
+# --- Case 5c: project.assigned negatives ----------------------------------
+# Unpaired assignment -> fulcrum block; assignment naming an unknown entity
+# -> referential block (project.assigned events don't self-establish
+# existence); 0.3.0-stamped assignment -> schema block (epoch stamping
+# self-polices via per-version routing).
+run_case "project assignment negatives / default config" fixture-project-move-nodecision config-default.toml
+check "exit 1"                                  [ "$CODE" -eq 1 ]
+check "fulcrum block names project.assigned"    grep -q '^BLOCK \[fulcrum-without-decision\].*project\.assigned' <<<"$OUT"
+check "referential block names FIX-GHOST"       grep -q "^BLOCK \[referential\].*'FIX-GHOST'" <<<"$OUT"
+check "schema block on the 0.3.0-stamped event" grep -q '^BLOCK \[schema\].*\[0\.3\.0\]' <<<"$OUT"
 
 # --- Case 6: the real log, repo defaults (§4.1) --------------------------
 echo "== real log / repo defaults"

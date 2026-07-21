@@ -16,8 +16,8 @@ DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 CACHE = DATA_DIR / "cache.sqlite"
 OUT = DATA_DIR / "projection.json"
 
-SCHEMA_VERSION = "0.5.0"
-ONTOLOGY_VERSION = "0.5.0"
+SCHEMA_VERSION = "0.6.0"
+ONTOLOGY_VERSION = "0.6.0"
 
 
 def compute_milestone_progress(entities, relationships):
