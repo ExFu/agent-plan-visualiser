@@ -1761,11 +1761,11 @@ async function showPlanMarkdown(entity) {
       : `<pre>${escapeHtml(body)}</pre>`;
     panel.innerHTML = `
       <h3 class="md-title">${escapeHtml(entity.entity_id)}</h3>
-      <p class="meta-line"><span class="badge ${entity.derived_state}">${entity.derived_state}</span> · ${escapeHtml(entity.entity_type)} · <code>${escapeHtml(path)}</code></p>
+      <p class="meta-line"><span class="badge ${entity.derived_state}">${entity.derived_state}</span> · ${escapeHtml(entity.entity_type)} · <code>${escapeHtml(res.url)}</code></p>
       <div class="md-content">${rendered}</div>
     `;
   } catch (e) {
-    panel.innerHTML = `<p>Failed to load <code>${escapeHtml(entity.entity_id)}</code>: ${escapeHtml(e.message)}</p><p class="hint">Path tried: <code>${escapeHtml(path)}</code></p>`;
+    panel.innerHTML = `<p>Failed to load <code>${escapeHtml(entity.entity_id)}</code>: ${escapeHtml(e.message)}</p><p class="hint">Paths tried: <code>${escapeHtml(paths.join(", "))}</code></p>`;
   }
 }
 
@@ -2570,14 +2570,20 @@ const SavedSummary = {
 
   async _renderInner(panel, entity, summary) {
 
-    // Load freeform markdown lazily.
+    // Load freeform markdown lazily. Served route first (/data/ resolves the
+    // configured data dir); the ../../ relative path is the file:// fallback.
     let freeform = "";
-    try {
-      const path = `../../${summary.freeform_path}`;
-      const res = await fetch(path);
-      if (res.ok) freeform = await res.text();
-    } catch {
-      freeform = "";
+    if (summary.freeform_path) {
+      try {
+        const basename = summary.freeform_path.split("/").pop();
+        const res = await fetchFirst([
+          `/data/summaries/${basename}`,
+          `../../${summary.freeform_path}`,
+        ]);
+        freeform = await res.text();
+      } catch {
+        freeform = "";
+      }
     }
 
     const isDerived = summary.source === "derived";
