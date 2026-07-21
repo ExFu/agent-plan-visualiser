@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T14:59:38Z
+# Project state — generated 2026-07-21T15:02:01Z
 
-**Total events:** 555  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 54  ·  **Orphaned:** 0
+**Total events:** 564  ·  **Draft:** 17  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 54  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -41,7 +41,11 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 97 commit(s) ago)
+- `M6-dashboard` (authored 2026-07-21, 0 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 98 commit(s) ago)
+- `T3-html-view-interactivity` (authored 2026-07-21, 0 commit(s) ago)
+- `T3-view-attention-panel` (authored 2026-07-21, 0 commit(s) ago)
+- `T3-view-defect-fixes` (authored 2026-07-21, 0 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -62,7 +66,11 @@
   - `2026-06-10.view-hardcodes-dogfood-data-dir` (41d untriaged)
   - `2026-07-07.dist-sandbox-test-reference-stale` (14d untriaged)
 - **plan**
+  - `M6-dashboard`
   - `T2-ingest`
+  - `T3-html-view-interactivity`
+  - `T3-view-attention-panel`
+  - `T3-view-defect-fixes`
 
 ## Blocked
 
@@ -99,6 +107,7 @@ _No flapping closures._
 - **M4-fresh-install**: 4/5 T3 complete (80%); 1 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
+- **M6-dashboard**: 0/3 T3 complete (0%); 0 live
 
 ---
-_78 entities · 104 relationships · 28 decisions._
+_82 entities · 111 relationships · 28 decisions._
