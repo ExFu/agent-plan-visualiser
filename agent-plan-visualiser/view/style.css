@@ -1470,3 +1470,17 @@ button:disabled {
   color: #8d6e00;
   margin-right: 0.4rem;
 }
+
+/* ===== Shared entity search (T3-html-view-interactivity) ===== */
+.entity-search {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--fg);
+  width: 11rem;
+  margin-right: 0.5rem;
+}
+.entity-search:focus { outline: 2px solid var(--btn-primary); outline-offset: -1px; }

@@ -39,6 +39,9 @@ const state = {
   // in flowFilters, which is flow-scoped/band-keyed): one control applies
   // to board, tree, and flow alike.
   projectFilter: "all",
+  // Text search (T3-html-view-interactivity) — view-independent like
+  // projectFilter: one input, matches entity ids across board/tree/flow.
+  searchQuery: "",
   // Flow view — T3 (leaf) rows are grouped into bands by `flowAggregate`,
   // INDEPENDENT of which parent bands are shown. "none" = one flat T3 band.
   flowAggregate: "milestone", // "milestone" | "t2" | "none"
@@ -164,6 +167,7 @@ async function main() {
   document.getElementById("btn-tree").addEventListener("click", () => switchView("tree"));
   document.getElementById("btn-flow").addEventListener("click", () => switchView("flow"));
   renderProjectChip();
+  renderSearchBox();
   buildDecisionIndex();
   renderAttentionPanel();
 
@@ -260,6 +264,70 @@ function projectMatch(e) {
   return state.projectFilter === "all" || (e.project || "main") === state.projectFilter;
 }
 
+// ---------------------------------------------------------------------------
+// Shared search + lifecycle filters (T3-html-view-interactivity) — one
+// filter, three views, following the projectFilter precedent. The lifecycle
+// value keeps its historical home in state.flowFilters.lifecycle (flow's
+// chips predate the sharing); board/tree read and write the same field.
+// ---------------------------------------------------------------------------
+
+function searchMatch(e) {
+  const q = (state.searchQuery || "").trim().toLowerCase();
+  return !q || e.entity_id.toLowerCase().includes(q);
+}
+
+function lifecycleMatch(e) {
+  const lc = state.flowFilters.lifecycle;
+  if (lc === "open") return e.derived_state !== "closed";
+  if (lc === "closed") return e.derived_state === "closed";
+  return true;
+}
+
+// Chip strip factory — the single lifecycle control component, rendered by
+// all three views (flow sub-toolbar, board/tree filter bars). One shared
+// button system, no per-view clones.
+function lifecycleChips(rerender) {
+  const wrap = document.createElement("span");
+  wrap.className = "lifecycle-filter";
+  wrap.appendChild(document.createTextNode("show:"));
+  for (const [val, label, title] of [
+    ["all", "All", "Show every entity"],
+    ["open", "Open", "Hide closed entities — keep live / dormant / orphaned"],
+    ["closed", "Closed", "Show only closed entities"],
+  ]) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.title = title;
+    if (state.flowFilters.lifecycle === val) b.classList.add("active");
+    b.addEventListener("click", () => { state.flowFilters.lifecycle = val; rerender(); });
+    wrap.appendChild(b);
+  }
+  return wrap;
+}
+
+// Main-toolbar search input. Lives outside #content so the input (and its
+// focus) survives view re-renders; keystrokes are debounced because a flow
+// re-render recomputes the full layout.
+function renderSearchBox() {
+  const toolbar = document.querySelector(".toolbar");
+  if (!toolbar || document.getElementById("entity-search")) return;
+  const input = document.createElement("input");
+  input.type = "search";
+  input.id = "entity-search";
+  input.className = "entity-search";
+  input.placeholder = "filter ids…";
+  input.title = "Filter board, tree and flow by entity id (substring, case-insensitive)";
+  let t = null;
+  input.addEventListener("input", () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      state.searchQuery = input.value;
+      switchView(state.currentView);
+    }, 150);
+  });
+  toolbar.insertBefore(input, toolbar.querySelector(".toolbar-spacer"));
+}
+
 function projectBadge(e) {
   if (!Array.isArray(state.projection?.projects) || !e.project || e.project === "main") return "";
   return ` <span class="badge project-badge" title="Project: ${escapeHtml(e.project)}">${escapeHtml(e.project)}</span>`;
@@ -307,10 +375,15 @@ function switchView(view) {
 // ---------------------------------------------------------------------------
 
 function renderBoard(p, content) {
+  const bar = document.createElement("div");
+  bar.className = "sub-toolbar";
+  bar.appendChild(lifecycleChips(() => switchView("board")));
+  content.appendChild(bar);
   const states = ["live", "dormant", "orphaned", "unknown", "closed"];
   for (const stateName of states) {
     const entries = Object.values(p.entities)
-      .filter(e => e.derived_state === stateName && projectMatch(e));
+      .filter(e => e.derived_state === stateName && projectMatch(e)
+                   && searchMatch(e) && lifecycleMatch(e));
     if (!entries.length) continue;
     const sec = document.createElement("section");
     sec.className = "section";
@@ -321,6 +394,9 @@ function renderBoard(p, content) {
     for (const e of entries) grid.appendChild(card(e));
     sec.appendChild(grid);
     content.appendChild(sec);
+  }
+  if (!content.querySelector(".section")) {
+    content.insertAdjacentHTML("beforeend", '<p class="hint">No entities match the current filters.</p>');
   }
 }
 
@@ -377,30 +453,39 @@ function renderTree(p, content) {
     if (a.tier === 1) return true;
     return false;
   });
-  // Project filter (T3-multi-project): keep subtrees containing a match;
-  // non-matching ANCESTORS of a match stay visible, ghosted, so the
+  // Combined filters (project / search / lifecycle): keep subtrees containing
+  // a match; non-matching ANCESTORS of a match stay visible, ghosted, so the
   // hierarchy remains navigable.
+  const nodeMatches = (e) => projectMatch(e) && searchMatch(e) && lifecycleMatch(e);
   const subtreeMatches = (e) => {
-    if (projectMatch(e)) return true;
+    if (nodeMatches(e)) return true;
     const ch = (children[`plan:${e.entity_id}`] || []).map(k => p.entities[k]).filter(Boolean);
     return ch.some(subtreeMatches);
   };
+  const bar = document.createElement("div");
+  bar.className = "sub-toolbar";
+  bar.appendChild(lifecycleChips(() => switchView("tree")));
+  content.appendChild(bar);
   const sec = document.createElement("section");
   sec.className = "section";
   sec.innerHTML = "<h2>Plan hierarchy</h2>";
   const wrap = document.createElement("div");
-  for (const root of roots.filter(subtreeMatches).sort((a, b) => a.entity_id.localeCompare(b.entity_id))) {
-    wrap.appendChild(treeNode(root, p, children, subtreeMatches));
+  const shownRoots = roots.filter(subtreeMatches).sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+  for (const root of shownRoots) {
+    wrap.appendChild(treeNode(root, p, children, subtreeMatches, nodeMatches));
+  }
+  if (!shownRoots.length) {
+    wrap.innerHTML = '<p class="hint">No plans match the current filters.</p>';
   }
   sec.appendChild(wrap);
   content.appendChild(sec);
 }
 
-function treeNode(entity, p, children, subtreeMatches) {
+function treeNode(entity, p, children, subtreeMatches, nodeMatches) {
   const div = document.createElement("div");
   div.className = "tree-node"
     + (entity.origin && entity.origin !== "captured" ? ` origin-${entity.origin}` : "")
-    + (projectMatch(entity) ? "" : " project-ghost");
+    + (nodeMatches(entity) ? "" : " project-ghost");
   const tierTag = renderTierTag(entity);
   div.innerHTML = `<span class="badge ${entity.derived_state}">${entity.derived_state}</span> <strong>${escapeHtml(entity.entity_id)}</strong> ${tierTag}${projectBadge(entity)}`;
   const key = `plan:${entity.entity_id}`;
@@ -409,7 +494,7 @@ function treeNode(entity, p, children, subtreeMatches) {
     const childWrap = document.createElement("div");
     childWrap.className = "tree-children";
     for (const c of ch.sort((a, b) => a.entity_id.localeCompare(b.entity_id))) {
-      childWrap.appendChild(treeNode(c, p, children, subtreeMatches));
+      childWrap.appendChild(treeNode(c, p, children, subtreeMatches, nodeMatches));
     }
     div.appendChild(childWrap);
   }
@@ -467,22 +552,9 @@ function renderFlow(projection, events, content) {
   sub.appendChild(parentToggles);
 
   // Lifecycle filter (T3-flow-view-filtering D1): All / Open / Closed.
-  const lcWrap = document.createElement("span");
-  lcWrap.className = "lifecycle-filter";
-  lcWrap.appendChild(document.createTextNode("show:"));
-  for (const [val, label, title] of [
-    ["all", "All", "Show every entity"],
-    ["open", "Open", "Hide closed entities — keep live / dormant / orphaned"],
-    ["closed", "Closed", "Show only closed entities"],
-  ]) {
-    const b = document.createElement("button");
-    b.textContent = label;
-    b.title = title;
-    if (F.lifecycle === val) b.classList.add("active");
-    b.addEventListener("click", () => { F.lifecycle = val; rerenderFlow(); });
-    lcWrap.appendChild(b);
-  }
-  sub.appendChild(lcWrap);
+  // Shared chip component (T3-html-view-interactivity) — same state and
+  // rendering as the board/tree filter bars.
+  sub.appendChild(lifecycleChips(rerenderFlow));
 
   // Provenance filter (T3-historical-projection-ui, 0.4.0 origin): All /
   // Captured / Backfilled. Same component pattern as the lifecycle filter —
@@ -672,6 +744,12 @@ function computeFlowVisibility(projection, filters, aggregate, show) {
   // filter is shared across board/tree/flow by design.
   if (state.projectFilter !== "all") {
     candidate = new Set([...candidate].filter(k => projectMatch(entities[k])));
+  }
+
+  // 2.8. Text search (T3-html-view-interactivity) — removes rows entirely.
+  // Same shared-view-independent-state pattern as the project filter.
+  if ((state.searchQuery || "").trim()) {
+    candidate = new Set([...candidate].filter(k => searchMatch(entities[k])));
   }
 
   // 2.5 parent-band visibility — hide a whole parent tier (its rows + arcs)
