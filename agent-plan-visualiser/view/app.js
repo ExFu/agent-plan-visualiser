@@ -139,11 +139,12 @@ async function main() {
   } catch (e) {
     document.getElementById("content").innerHTML =
       `<p>Failed to load data: ${escapeHtml(e.message)}</p>
-       <p>If you're opening this from <code>file://</code>, your browser may block fetch.
-       Serve from the repo root with <code>python3 -m http.server 8765</code> and open
-       <code>http://localhost:8765/agent-plan-visualiser/view/index.html</code> instead.</p>
-       <p>Also confirm the pipeline has run:
-       <code>python3 agent-plan-visualiser/scripts/projection-emit.py</code>.</p>`;
+       <p>Most likely the derived projection has not been emitted for this repo yet.
+       From the repo root run <code>./apv refresh</code>, then reload — or restart
+       <code>./apv</code>: serve refreshes the projection on start.</p>
+       <p>If you're opening this from <code>file://</code>, your browser may block fetch —
+       serve it with <code>./apv</code> instead (dogfood checkout without the launcher:
+       <code>python3 agent-plan-visualiser/scripts/serve.py</code>).</p>`;
     return;
   }
 

@@ -30,7 +30,12 @@ check() { # check <desc> <test-expr...>
 }
 
 SANDBOX="$(mktemp -d /tmp/apv-view-sandbox.XXXXXX)" || exit 2
-cleanup() { [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null; rm -rf "$SANDBOX"; }
+SERVER2_PID=""
+cleanup() {
+  [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null
+  [ -n "$SERVER2_PID" ] && kill "$SERVER2_PID" 2>/dev/null
+  rm -rf "$SANDBOX"
+}
 trap cleanup EXIT
 unset APV_DATA_DIR APV_GATE_CHECK APV_SKIP_GATE
 
@@ -96,6 +101,18 @@ check "open-question badge wired"       grep -q 'question-badge' "$APP"
 check "css ghost styles present"        grep -q '.node.ghost' "$CSS"
 check "css origin badge present"        grep -q '.badge.origin-badge' "$CSS"
 check "js syntax valid"                 node --check "$APP"
+
+echo "== apv launcher: refresh rebuilds, serve refreshes on start"
+rm -f .apv/projection.json
+check "refresh rebuilds the projection"  sh -c "\"$PLUGIN_HOME/bin/apv\" refresh >/dev/null 2>&1 && [ -f .apv/projection.json ]"
+rm -f .apv/projection.json
+PORT2=8798
+"$PLUGIN_HOME/bin/apv" --port "$PORT2" >/dev/null 2>&1 &
+SERVER2_PID=$!
+for i in $(seq 1 30); do curl -sf "http://127.0.0.1:$PORT2/api/clean-check" >/dev/null 2>&1 && break; sleep 0.2; done
+check "serve emitted the projection"     [ -f .apv/projection.json ]
+check "fresh projection served"          sh -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT2/data/projection.json)\" = '200' ]"
+kill "$SERVER2_PID" 2>/dev/null; SERVER2_PID=""
 
 echo "== grep audit: no dogfood literals in view/ outside legacy fallbacks"
 # Dot-anchored deliberately: the hardcodes were data-dir paths
