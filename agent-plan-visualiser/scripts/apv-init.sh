@@ -141,6 +141,17 @@ data_dir = "$DATA_DIR"
 # the tracked project sits in a sub-folder of the repo (monorepo case) —
 # the data dir stays at the repo root; only the plan corpus moves.
 # planning_dir = "planning"
+
+# Multiple sub-projects in one repo (T3-multi-project): register each
+# project's planning root. Commits and the event log stay repo-wide (one
+# record); entities derive project membership from which root owns their
+# plan file (explicit attributes.project overrides). The [storage] root
+# above is the implicit project "main"; unmatched entities show as
+# "unassigned". Uncomment and adapt:
+# [projects.website]
+# planning_dir = "site/planning"
+# [projects.plugin]
+# planning_dir = "plugin/planning"
 TOML
   report created ".apv-config.toml" "default gate lists; data_dir = \"$DATA_DIR\""
 fi

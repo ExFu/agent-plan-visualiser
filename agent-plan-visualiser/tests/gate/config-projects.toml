@@ -1,0 +1,14 @@
+# Multi-project gate fixture config (T3-multi-project): the drift check
+# resolves planning roots from the committed registry when no --planning-dir
+# is passed. Root scan order: registered projects first, implicit main
+# ([storage] planning_dir) last.
+[gate]
+blocking = ["schema", "referential", "sealed-tail", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision"]
+warn = ["drift", "orphans", "stalled", "long-blockers"]
+
+[storage]
+data_dir = "fixture-drift"
+planning_dir = "fixture-drift-planning"
+
+[projects.rootb]
+planning_dir = "fixture-drift-planning-b"

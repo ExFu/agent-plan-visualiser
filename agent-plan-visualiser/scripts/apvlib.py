@@ -22,8 +22,9 @@ def _parse_toml_minimal(text: str, source: str) -> dict:
     """Restricted TOML reader for interpreters without tomllib (< 3.11,
     e.g. stock macOS python3 at 3.9).
 
-    Covers exactly the shapes `.apv-config.toml` uses — `[section]` tables,
-    bare keys, double-quoted strings, booleans, integers, and single-line
+    Covers exactly the shapes `.apv-config.toml` uses — `[section]` and
+    dotted `[section.sub]` tables (the `[projects.<name>]` registry), bare
+    keys, double-quoted strings, booleans, integers, and single-line
     arrays of double-quoted strings (all valid JSON, so values delegate to
     json.loads) — and raises ValueError on anything else. A half-understood
     config must fail loud, never silently degrade to defaults: the committed
@@ -37,9 +38,12 @@ def _parse_toml_minimal(text: str, source: str) -> dict:
             continue
         if line.startswith("[") and line.endswith("]"):
             name = line[1:-1].strip()
-            if not _BARE_KEY.match(name):
+            segments = [s.strip() for s in name.split(".")]
+            if not all(_BARE_KEY.match(s) for s in segments):
                 raise ValueError(f"{source} line {n}: unsupported table {line!r}")
-            table = out.setdefault(name, {})
+            table = out
+            for seg in segments:
+                table = table.setdefault(seg, {})
             continue
         key, eq, value = (p.strip() for p in line.partition("="))
         if not eq or not _BARE_KEY.match(key):
@@ -184,3 +188,48 @@ def apv_planning_dir(repo_root: Path, config_path=None) -> Path:
         p = Path(cfg_dir)
         return p if p.is_absolute() else repo_root / p
     return repo_root / "planning"
+
+
+def apv_projects(repo_root: Path, config_path=None) -> dict:
+    """Parse the `[projects.<name>]` registry (T3-multi-project).
+
+    Returns an ordered `{name: {"planning_dir": Path}}` — empty when no
+    registry is configured (single-project mode; behaviour identical to
+    pre-registry APV). Sub-projects share the repo's ONE event log; the
+    registry only declares planning roots for membership derivation.
+    Fail-loud like apv_config: a project without planning_dir, two projects
+    sharing a planning_dir, or the reserved name `unassigned` all raise.
+    """
+    raw = apv_config(repo_root, config_path).get("projects") or {}
+    projects, seen_dirs = {}, {}
+    for name, tbl in raw.items():
+        if name == "unassigned":
+            raise ValueError("[projects.unassigned] is reserved (the no-membership bucket)")
+        if not isinstance(tbl, dict) or not tbl.get("planning_dir"):
+            raise ValueError(f"[projects.{name}] must declare planning_dir")
+        p = Path(tbl["planning_dir"])
+        root = p if p.is_absolute() else repo_root / p
+        key = str(root)
+        if key in seen_dirs:
+            raise ValueError(
+                f"[projects.{name}] planning_dir duplicates [projects.{seen_dirs[key]}]"
+            )
+        seen_dirs[key] = name
+        projects[name] = {"planning_dir": root}
+    return projects
+
+
+def apv_planning_roots(repo_root: Path, config_path=None) -> list:
+    """Ordered [(project_name, planning_root_path)] for membership derivation.
+
+    Registered projects first (declaration order), then the implicit `main`
+    project = apv_planning_dir(...) — unless a registered project already
+    claims that exact dir (a named project over the storage dir RENAMES the
+    default project). Single-project mode: [("main", <planning>)].
+    """
+    projects = apv_projects(repo_root, config_path)
+    main_dir = apv_planning_dir(repo_root, config_path)
+    roots = [(name, cfg["planning_dir"]) for name, cfg in projects.items()]
+    if not any(str(root) == str(main_dir) for _, root in roots):
+        roots.append(("main", main_dir))
+    return roots

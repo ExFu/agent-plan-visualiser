@@ -57,6 +57,23 @@ lives in a sub-folder pins e.g. `planning_dir = "plugin/planning"` while
 the data dir stays at the repo root (captures are commit-anchored, and
 commits are repo-level).
 
+**Multiple sub-projects, one repo** (T3-multi-project): register each
+project's planning root as `[projects.<name>] planning_dir = "..."`. The
+log stays ONE per repo — sub-projects are a dimension of the data, never a
+partition of the record. Entity → project membership derives at projection
+time: explicit `attributes.project` on any of the entity's events
+(latest-recorded wins; the escape hatch for planless entities — inbox
+items, blockers) → else whichever registered root owns
+`<root>/<entity_id>.md` → else the `[storage]` root as the implicit
+project `main` → else `unassigned` (a deliberately visible triage bucket).
+The view gains a project filter (all three views) and badges; summary.md a
+`## By project` rollup; the gate's drift check walks every root and WARNs
+on a plan id present in two roots (entity ids are repo-global). No
+`[projects]` tables → single-project behaviour, unchanged. Note:
+membership annotations on **closed** entities are not possible append-only
+(`entity.extended` on a closed entity trips the resurrection blocker) —
+closed unmatched entities stay `unassigned`, honestly.
+
 Inside it: `events.jsonl` (canonical, append-only — all integrity
 discipline applies here) plus derived, rebuildable artefacts
 (`cache.sqlite`, `projection.json`, `summary.md`) — never emit events about

@@ -53,6 +53,10 @@ is available, the session didn't load the plugin (usually a checkout without
 - **Scripts** — the pipeline (`repack-validate.sh`), the boundary gate
   (`gate-check.sh`), audits, timelines, the view server, the bundle
   builder.
+- **Multi-project monorepos** — register sub-project planning roots
+  (`[projects.<name>] planning_dir = "..."` in `.apv-config.toml`): one
+  shared event log, per-entity project membership derived at projection
+  time, project filter + badges in the view, per-project summary rollup.
 - **Schemas** — the versioned event + plan-frontmatter ontology.
 - **Cheatsheet & worked examples** — the operations agents actually run,
   including a CI gate-adapter template.

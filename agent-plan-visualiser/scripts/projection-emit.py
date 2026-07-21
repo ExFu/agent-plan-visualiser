@@ -152,6 +152,8 @@ def main():
             # Provenance (0.4.0): 'captured' | 'backfilled' | 'mixed' — the
             # historical-projection UI keys its rendering on this.
             "origin": row["origin"],
+            # Membership (T3-multi-project): registry name | 'main' | 'unassigned'.
+            "project": row["project"],
         }
 
     relationships = []
@@ -242,6 +244,22 @@ def main():
     milestone_progress = compute_milestone_progress(entities, relationships)
     attention = compute_attention(conn, entities, milestone_progress)
 
+    # Multi-project meta (T3-multi-project): emitted ONLY when a registry is
+    # configured, so single-project projections stay byte-identical. The
+    # registry read is policy resolution via apvlib (like every pipeline
+    # script); the cache remains the sole data source — observed extras
+    # (explicit-attribute names, 'unassigned') come from the entities table.
+    projects_meta = None
+    if apvlib.apv_projects(REPO_ROOT):
+        names = list(apvlib.apv_projects(REPO_ROOT))
+        for name, _root in apvlib.apv_planning_roots(REPO_ROOT):
+            if name not in names:
+                names.append(name)
+        for row in conn.execute("SELECT DISTINCT project FROM entities ORDER BY project"):
+            if row["project"] not in names:
+                names.append(row["project"])
+        projects_meta = names
+
     projection = {
         "generated_at": datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "schema_version": SCHEMA_VERSION,
@@ -255,6 +273,8 @@ def main():
         "latest_summary_by_entity": latest_summary_by_entity,
         "summaries": summaries,
     }
+    if projects_meta:
+        projection["projects"] = projects_meta
 
     tmp = OUT.with_suffix(".tmp")
     with open(tmp, "w") as f:

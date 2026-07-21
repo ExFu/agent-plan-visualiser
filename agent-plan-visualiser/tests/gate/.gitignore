@@ -1,2 +1,4 @@
 # Fixture caches are derived artifacts (rebuilt by run-gate-tests.sh).
 fixture-*/cache.sqlite
+# Created and removed by the multi-project case at run time.
+fixture-drift-planning-b/

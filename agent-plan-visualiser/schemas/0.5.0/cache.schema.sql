@@ -1,6 +1,9 @@
 -- agent-plan-visualiser cache schema v0.5.0
--- (no DDL change from v0.4.0 — the 0.5.0 epoch adds the verification.deferred
---  event type only; see schemas/0.5.0/events.schema.json.)
+-- (no DDL change from v0.4.0 at the epoch cut — the 0.5.0 epoch adds the
+--  verification.deferred event type only; see schemas/0.5.0/events.schema.json.
+--  Diff WITHIN 0.5.0, T3-multi-project: entities.project — the multi-project
+--  membership fold. No event type added, so no new epoch; the cache is
+--  dropped and rebuilt every run, so the column self-deploys.)
 -- Derived from events.jsonl; fully regenerable.
 --
 -- Diff from v0.1.0:
@@ -48,9 +51,11 @@ CREATE TABLE IF NOT EXISTS entities (
   last_event_id         TEXT NOT NULL,
   event_type_sequence   TEXT NOT NULL,
   origin                TEXT NOT NULL DEFAULT 'captured',  -- 'captured' | 'backfilled' | 'mixed'
+  project               TEXT NOT NULL DEFAULT 'main',      -- registry name | 'main' | 'unassigned'
   PRIMARY KEY (entity_type, entity_id)
 );
 CREATE INDEX IF NOT EXISTS idx_entities_state ON entities(derived_state);
+CREATE INDEX IF NOT EXISTS idx_entities_project ON entities(project);
 
 CREATE TABLE IF NOT EXISTS relationships (
   from_entity_type      TEXT NOT NULL,

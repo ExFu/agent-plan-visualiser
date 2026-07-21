@@ -91,6 +91,23 @@ def main():
                 lines.append(f"  - `{e['entity_id']}`")
             lines.append("")
 
+    # Multi-project rollup (T3-multi-project): only when a registry is
+    # configured (the projection carries top-level `projects` then) — a
+    # single-project summary stays byte-identical. Tolerates older
+    # projections without per-entity `project` (reads as main).
+    if p.get("projects"):
+        by_project = defaultdict(list)
+        for e in live:
+            by_project[e.get("project", "main")].append(e)
+        lines.append("### By project")
+        lines.append("")
+        for name in p["projects"]:
+            members = by_project.get(name, [])
+            lines.append(f"- **{name}** ({len(members)} live)")
+            for e in sorted(members, key=lambda x: x["entity_id"]):
+                lines.append(f"  - `{e['entity_id']}`")
+            lines.append("")
+
     # Awaiting operator — the attention queues (ceremonies + deferrals).
     # Tolerate an older projection.json without the block.
     attention = p.get("attention") or {}

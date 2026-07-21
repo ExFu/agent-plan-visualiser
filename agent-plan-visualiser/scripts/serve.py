@@ -33,7 +33,17 @@ import apvlib
 # enclosing repo, falling back to the vendored/dogfood layout). Toolchain
 # content (the view itself, schemas) resolves against this script's home.
 REPO_ROOT = apvlib.repo_root()
-PLANNING_DIR = apvlib.apv_planning_dir(REPO_ROOT)
+# Route order for /planning/* (T3-multi-project): the [storage] root FIRST —
+# preserving every pre-registry URL — then registered roots in declaration
+# order; first hit wins. Membership derivation orders the other way round;
+# deliberate (routing wants URL stability, membership wants registry
+# priority). Duplicate plan ids across roots are a gate drift WARN, not a
+# routing case: entity ids are repo-global in the one-log model.
+_MAIN_PLANNING = apvlib.apv_planning_dir(REPO_ROOT)
+PLANNING_ROOTS = [_MAIN_PLANNING] + [
+    root for _n, root in apvlib.apv_planning_roots(REPO_ROOT)
+    if str(root) != str(_MAIN_PLANNING)
+]
 TOOLCHAIN = Path(__file__).resolve().parents[1]
 VIEW_DIR = TOOLCHAIN / "view"
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
@@ -203,7 +213,17 @@ class APTHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/data/"):
             return self._serve_file(DATA_DIR, self.path[len("/data/"):])
         if self.path.startswith("/planning/"):
-            return self._serve_file(PLANNING_DIR, self.path[len("/planning/"):])
+            rel = self.path[len("/planning/"):]
+            import urllib.parse
+            clean = urllib.parse.unquote(rel.split("?", 1)[0])
+            for root in PLANNING_ROOTS:
+                base = root.resolve()
+                target = (base / clean).resolve()
+                # Same traversal guard _serve_file applies; probe quietly and
+                # let only the final fallback emit the 404.
+                if (base == target or base in target.parents) and target.is_file():
+                    return self._serve_file(root, rel)
+            return self._serve_file(PLANNING_ROOTS[0], rel)
         return super().do_GET()
 
     def do_POST(self):
@@ -552,6 +572,7 @@ def run(port=8765, host="127.0.0.1"):
     print(f"serve.py listening on http://{host}:{port}")
     print(f"  view:   http://{host}:{port}/view/index.html (from {VIEW_DIR})")
     print(f"  data:   /data/* -> {DATA_DIR}")
+    print(f"  plans:  /planning/* -> " + ", ".join(str(r) for r in PLANNING_ROOTS))
     print(f"  static: serving from {REPO_ROOT}")
     print(f"  endpoints:")
     print(f"    GET  /api/clean-check")

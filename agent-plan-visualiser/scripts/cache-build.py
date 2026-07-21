@@ -17,6 +17,8 @@ import apvlib
 REPO_ROOT = apvlib.repo_root()
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
 PLANNING_DIR = apvlib.apv_planning_dir(REPO_ROOT)
+PLANNING_ROOTS = apvlib.apv_planning_roots(REPO_ROOT)
+HAS_REGISTRY = bool(apvlib.apv_projects(REPO_ROOT))
 EVENTS = DATA_DIR / "events.jsonl"
 CACHE = DATA_DIR / "cache.sqlite"
 # Toolchain content resolves against THIS script's home, never the target
@@ -154,6 +156,31 @@ def main():
         """Resolve an entity id through the rename map (identity migration)."""
         return id_remap.get(eid, eid) if eid is not None else eid
 
+    # Pre-scan explicit project membership (T3-multi-project). Record order,
+    # latest-recorded wins: a membership annotation is a knowledge correction,
+    # same doctrine as the rename/reattach pre-scans (latest-KNOWLEDGE-wins,
+    # not latest-event-time-wins).
+    project_attr = {}          # (entity_type, resolved_entity_id) -> project name
+    for ev in events:
+        attrs = ev.get("attributes", {})
+        if ev.get("entity_type") and ev.get("entity_id") and attrs.get("project"):
+            project_attr[(ev["entity_type"], rid(ev["entity_id"]))] = attrs["project"]
+
+    def project_of(et, eid):
+        """Membership fold (T3-multi-project): explicit `attributes.project`
+        (accepted even if unregistered — the registry governs roots, not the
+        namespace) -> plan-file ownership across the registered roots
+        (registry order, implicit main last) -> 'main' when no registry is
+        configured, else 'unassigned' (the visible triage bucket)."""
+        explicit = project_attr.get((et, eid))
+        if explicit:
+            return explicit
+        if et == "plan":
+            for name, root in PLANNING_ROOTS:
+                if (root / f"{eid}.md").exists():
+                    return name
+        return "unassigned" if HAS_REGISTRY else "main"
+
     # Build commit-boundaries lookup for positional rollup.
     # Each entry: (line_no_of_commit_recorded, commit.recorded event_id, attributes dict)
     commit_boundaries = [
@@ -259,8 +286,11 @@ def main():
         for (et, eid), e in entities.items():
             if et != "plan" or e["attrs"]:
                 continue
-            plan_path = PLANNING_DIR / f"{eid}.md"
-            if not plan_path.exists():
+            plan_path = next(
+                (r / f"{eid}.md" for _, r in PLANNING_ROOTS if (r / f"{eid}.md").exists()),
+                None,
+            )
+            if plan_path is None:
                 continue
             content = plan_path.read_text()
             m = _re.match(r"^---\n(.*?)\n---\n", content, _re.DOTALL)
@@ -281,13 +311,14 @@ def main():
         origin = "mixed" if len(origins) > 1 else next(iter(origins))
         conn.execute(
             """INSERT INTO entities (entity_type, entity_id, derived_state, attributes,
-                last_event_id, event_type_sequence, origin) VALUES (?,?,?,?,?,?,?)""",
+                last_event_id, event_type_sequence, origin, project) VALUES (?,?,?,?,?,?,?,?)""",
             (
                 et, eid, e["state"],
                 json.dumps(e["attrs"], separators=(",", ":")),
                 e["last_event_id"],
                 json.dumps(e["sequence"], separators=(",", ":")),
                 origin,
+                project_of(et, eid),
             ),
         )
 

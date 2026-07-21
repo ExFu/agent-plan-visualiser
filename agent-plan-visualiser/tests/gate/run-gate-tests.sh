@@ -58,6 +58,23 @@ check "exit 0"                                  [ "$CODE" -eq 0 ]
 check_absent "no BLOCK lines"                   '^BLOCK'
 check "WARN [drift] names the stale seed"       grep -q "^WARN \[drift\].*'FIX-T2-OLD'.*FIX-T2-NEW" <<<"$OUT"
 
+# --- Case 2b: multi-project roots — registry-resolved drift + duplicate ---
+# No --planning-dir: the composite resolves roots from config-projects.toml
+# ([projects.rootb] + [storage] as implicit main). Root B carries a copy of
+# FIX-D3.md: the drift WARN must still fire (found via the registry) and the
+# duplicate plan id must WARN, not block.
+echo "== drift across registered roots (config-resolved, no --planning-dir)"
+mkdir -p fixture-drift-planning-b
+cp fixture-drift-planning/FIX-D3.md fixture-drift-planning-b/FIX-D3.md
+OUT="$(python3 "$GATE" --repo-root . --data-dir fixture-drift --config config-projects.toml 2>&1)"
+CODE=$?
+rm -rf fixture-drift-planning-b
+check "exit 0 (warn-only)"                      [ "$CODE" -eq 0 ]
+check_absent "no BLOCK lines"                   '^BLOCK'
+check "drift found via registry root"           grep -q "^WARN \[drift\].*'FIX-T2-OLD'.*FIX-T2-NEW" <<<"$OUT"
+check "duplicate plan id warned"                grep -q "^WARN \[drift\].*duplicate plan id" <<<"$OUT"
+check "duplicate names both roots"              grep -q "'rootb' and 'main'" <<<"$OUT"
+
 # --- Case 3: config flip, blocking -> warn (§4.4) ------------------------
 # sealed-tail demoted: same corrupt log now reports it as WARN; still exit 1
 # on the three remaining blockers.

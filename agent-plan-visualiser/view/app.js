@@ -35,6 +35,10 @@ const state = {
   projection: null,
   events: null,
   currentView: "board",
+  // Project filter (T3-multi-project) — deliberately view-INDEPENDENT (not
+  // in flowFilters, which is flow-scoped/band-keyed): one control applies
+  // to board, tree, and flow alike.
+  projectFilter: "all",
   // Flow view — T3 (leaf) rows are grouped into bands by `flowAggregate`,
   // INDEPENDENT of which parent bands are shown. "none" = one flat T3 band.
   flowAggregate: "milestone", // "milestone" | "t2" | "none"
@@ -159,6 +163,7 @@ async function main() {
   document.getElementById("btn-board").addEventListener("click", () => switchView("board"));
   document.getElementById("btn-tree").addEventListener("click", () => switchView("tree"));
   document.getElementById("btn-flow").addEventListener("click", () => switchView("flow"));
+  renderProjectChip();
 
   // Esc clears flow-view isolation (T3-flow-view-filtering D2).
   document.addEventListener("keydown", (e) => {
@@ -171,9 +176,51 @@ async function main() {
   switchView("flow");
 }
 
+// ---------------------------------------------------------------------------
+// Project filter (T3-multi-project) — ONE view-independent control applying
+// to board, tree, and flow alike. Rendered into the main toolbar only when
+// the projection carries a `projects` registry, so single-project UIs stay
+// pixel-identical. Same shared button system as the lifecycle/provenance
+// chips — no per-view clones, no location-specific styling.
+function projectMatch(e) {
+  // Absent field (older projections) reads as main — the mirror of
+  // absent-origin-reads-as-captured.
+  return state.projectFilter === "all" || (e.project || "main") === state.projectFilter;
+}
+
+function projectBadge(e) {
+  if (!Array.isArray(state.projection?.projects) || !e.project || e.project === "main") return "";
+  return ` <span class="badge project-badge" title="Project: ${escapeHtml(e.project)}">${escapeHtml(e.project)}</span>`;
+}
+
+function renderProjectChip() {
+  const projects = state.projection?.projects;
+  if (!Array.isArray(projects) || !projects.length) return;
+  const wrap = document.createElement("span");
+  wrap.className = "lifecycle-filter project-filter";
+  wrap.appendChild(Object.assign(document.createElement("span"),
+    { className: "lifecycle-label", textContent: "Project:" }));
+  for (const val of ["all", ...projects]) {
+    const b = document.createElement("button");
+    b.textContent = val === "all" ? "All" : val;
+    if (state.projectFilter === val) b.classList.add("active");
+    b.addEventListener("click", () => {
+      state.projectFilter = val;
+      for (const btn of wrap.querySelectorAll("button")) btn.classList.remove("active");
+      b.classList.add("active");
+      switchView(state.currentView);
+    });
+    wrap.appendChild(b);
+  }
+  const toolbar = document.querySelector(".toolbar");
+  toolbar.insertBefore(wrap, toolbar.querySelector(".toolbar-spacer"));
+}
+
 function switchView(view) {
   state.currentView = view;
-  document.querySelectorAll(".toolbar button").forEach(b => b.classList.remove("active"));
+  // Direct children only: the project chip's buttons live inside the chip
+  // span and manage their own active state.
+  document.querySelectorAll(".toolbar > button").forEach(b => b.classList.remove("active"));
   document.getElementById(`btn-${view}`).classList.add("active");
   const content = document.getElementById("content");
   content.innerHTML = "";
@@ -190,7 +237,8 @@ function switchView(view) {
 function renderBoard(p, content) {
   const states = ["live", "dormant", "orphaned", "unknown", "closed"];
   for (const stateName of states) {
-    const entries = Object.values(p.entities).filter(e => e.derived_state === stateName);
+    const entries = Object.values(p.entities)
+      .filter(e => e.derived_state === stateName && projectMatch(e));
     if (!entries.length) continue;
     const sec = document.createElement("section");
     sec.className = "section";
@@ -223,7 +271,7 @@ function card(e) {
           : ""
       }
       <span>${e.entity_type}</span>
-      ${tierTag}
+      ${tierTag}${projectBadge(e)}
     </div>
     <div class="sequence">${e.event_type_sequence.join(" → ")}</div>
   `;
@@ -257,30 +305,39 @@ function renderTree(p, content) {
     if (a.tier === 1) return true;
     return false;
   });
+  // Project filter (T3-multi-project): keep subtrees containing a match;
+  // non-matching ANCESTORS of a match stay visible, ghosted, so the
+  // hierarchy remains navigable.
+  const subtreeMatches = (e) => {
+    if (projectMatch(e)) return true;
+    const ch = (children[`plan:${e.entity_id}`] || []).map(k => p.entities[k]).filter(Boolean);
+    return ch.some(subtreeMatches);
+  };
   const sec = document.createElement("section");
   sec.className = "section";
   sec.innerHTML = "<h2>Plan hierarchy</h2>";
   const wrap = document.createElement("div");
-  for (const root of roots.sort((a, b) => a.entity_id.localeCompare(b.entity_id))) {
-    wrap.appendChild(treeNode(root, p, children));
+  for (const root of roots.filter(subtreeMatches).sort((a, b) => a.entity_id.localeCompare(b.entity_id))) {
+    wrap.appendChild(treeNode(root, p, children, subtreeMatches));
   }
   sec.appendChild(wrap);
   content.appendChild(sec);
 }
 
-function treeNode(entity, p, children) {
+function treeNode(entity, p, children, subtreeMatches) {
   const div = document.createElement("div");
   div.className = "tree-node"
-    + (entity.origin && entity.origin !== "captured" ? ` origin-${entity.origin}` : "");
+    + (entity.origin && entity.origin !== "captured" ? ` origin-${entity.origin}` : "")
+    + (projectMatch(entity) ? "" : " project-ghost");
   const tierTag = renderTierTag(entity);
-  div.innerHTML = `<span class="badge ${entity.derived_state}">${entity.derived_state}</span> <strong>${escapeHtml(entity.entity_id)}</strong> ${tierTag}`;
+  div.innerHTML = `<span class="badge ${entity.derived_state}">${entity.derived_state}</span> <strong>${escapeHtml(entity.entity_id)}</strong> ${tierTag}${projectBadge(entity)}`;
   const key = `plan:${entity.entity_id}`;
-  const ch = (children[key] || []).map(k => p.entities[k]).filter(Boolean);
+  const ch = (children[key] || []).map(k => p.entities[k]).filter(Boolean).filter(subtreeMatches);
   if (ch.length) {
     const childWrap = document.createElement("div");
     childWrap.className = "tree-children";
     for (const c of ch.sort((a, b) => a.entity_id.localeCompare(b.entity_id))) {
-      childWrap.appendChild(treeNode(c, p, children));
+      childWrap.appendChild(treeNode(c, p, children, subtreeMatches));
     }
     div.appendChild(childWrap);
   }
@@ -535,6 +592,14 @@ function computeFlowVisibility(projection, filters, aggregate, show) {
     candidate = new Set([...candidate].filter(k => (entities[k].origin || "captured") !== "backfilled"));
   } else if (filters.provenance === "backfilled") {
     candidate = new Set([...candidate].filter(k => ["backfilled", "mixed"].includes(entities[k].origin)));
+  }
+
+  // 2.7. Project filter (T3-multi-project) — removes rows entirely, like
+  // lifecycle/provenance. The one deliberate read of view-independent state
+  // (state.projectFilter, via projectMatch) in this otherwise-pure fn: the
+  // filter is shared across board/tree/flow by design.
+  if (state.projectFilter !== "all") {
+    candidate = new Set([...candidate].filter(k => projectMatch(entities[k])));
   }
 
   // 2.5 parent-band visibility — hide a whole parent tier (its rows + arcs)
@@ -1356,6 +1421,12 @@ function renderFlowGutter(layout, gutter) {
       name.className = "grow-label" + (isIsolatedRoot ? " is-isolated-root" : "");
       name.textContent = entity.entity_id;
       row.appendChild(name);
+      if (Array.isArray(state.projection.projects) && entity.project && entity.project !== "main") {
+        const pb = document.createElement("span");
+        pb.className = "badge project-badge";
+        pb.textContent = entity.project;
+        row.appendChild(pb);
+      }
 
       row.title = entity.entity_id + " (click to open)";
       row.addEventListener("click", () => showPlanMarkdown(entity));

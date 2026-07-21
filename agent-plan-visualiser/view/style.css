@@ -1363,6 +1363,22 @@ button:disabled {
   color: #8a7a52;
   border: 1px dashed #b8a878;
 }
+/* Project membership (T3-multi-project) — same shared badge system. */
+.badge.project-badge {
+  background: transparent;
+  color: #4a7a9a;
+  border: 1px solid #8ab0c8;
+}
+/* Tree: non-matching ancestors kept as ghosted context under a project
+   filter. Direct-child selectors only — descendants keep full opacity. */
+.tree-node.project-ghost > .badge,
+.tree-node.project-ghost > strong,
+.tree-node.project-ghost > span { opacity: 0.45; }
+.flow-gutter-row .badge.project-badge {
+  font-size: 0.62rem;
+  padding: 0 4px;
+  margin-left: 4px;
+}
 .badge.question-badge {
   background: transparent;
   color: #7e57c2;

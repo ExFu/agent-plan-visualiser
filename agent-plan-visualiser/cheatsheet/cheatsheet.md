@@ -7,7 +7,10 @@ dogfood case; from any checkout, the newest
 dir (`APV_DATA_DIR` → `.apv-config.toml` `[storage] data_dir` → `.apv/`).
 Run everything from the repo root. Skills are plugin-namespaced
 (`agent-plan-visualiser:apv-capture` etc.); when a session lacks them, the
-sources are at `$APV/skills/<name>/SKILL.md`.
+sources are at `$APV/skills/<name>/SKILL.md`. Monorepos may register
+sub-projects (`[projects.<name>] planning_dir = "..."` in
+`.apv-config.toml`) — one shared log, per-entity `project` membership,
+filterable in the view.
 
 ## Status read (what's the project state?)
 

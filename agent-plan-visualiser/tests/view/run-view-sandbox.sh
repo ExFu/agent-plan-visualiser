@@ -31,9 +31,11 @@ check() { # check <desc> <test-expr...>
 
 SANDBOX="$(mktemp -d /tmp/apv-view-sandbox.XXXXXX)" || exit 2
 SERVER2_PID=""
+SERVER3_PID=""
 cleanup() {
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null
   [ -n "$SERVER2_PID" ] && kill "$SERVER2_PID" 2>/dev/null
+  [ -n "$SERVER3_PID" ] && kill "$SERVER3_PID" 2>/dev/null
   rm -rf "$SANDBOX"
 }
 trap cleanup EXIT
@@ -68,6 +70,15 @@ check "cache builds (no env, no config)"  run_py cache-build.py
 check "projection emits"                  run_py projection-emit.py
 check "summary emits"                     run_py summary-emit.py
 check "data landed in .apv"               [ -f .apv/projection.json ]
+# The zero-migration contract (T3-multi-project), pinned: without a
+# [projects] registry there is NO projects meta and every entity is main.
+check "single-project contract holds"     python3 -c "
+import json
+p = json.load(open('.apv/projection.json'))
+assert 'projects' not in p, 'projects key must be absent without a registry'
+assert p['entities']['plan:VIEW-A']['project'] == 'main'
+print('single-project contract ok')
+"
 
 # --- serve.py ------------------------------------------------------------------
 echo "== serve.py: toolchain view + adopter data, traversal blocked"
@@ -121,6 +132,62 @@ check "serve emitted the projection"     [ -f .apv/projection.json ]
 check "fresh projection served"          sh -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT2/data/projection.json)\" = '200' ]"
 check "sub-folder plan served"           sh -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT2/planning/VIEW-A.md)\" = '200' ]"
 kill "$SERVER2_PID" 2>/dev/null; SERVER2_PID=""
+
+# --- multi-project (T3-multi-project): registry, membership fold, surfaces ---
+echo "== multi-project: registry roots, membership fold, shared filter"
+mkdir -p site/planning
+printf -- "---\nid: VIEW-W\nplan_kind: thematic\ntier: 3\nstatus: draft\n---\n\n# VIEW-W\n\nwebsite plan\n" > site/planning/VIEW-W.md
+cat >> .apv/events.jsonl <<JSON
+{"event_id": "$(uu)", "type": "entity.created", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "VIEW-W", "attributes": {"summary": "website-side plan"}}
+{"event_id": "$(uu)", "type": "entity.created", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "inbox-item", "entity_id": "2026-07-21.site-idea", "attributes": {"project": "website", "summary": "explicitly annotated to website"}}
+{"event_id": "$(uu)", "type": "entity.created", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "inbox-item", "entity_id": "2026-07-21.stray-idea", "attributes": {"summary": "no membership anywhere"}}
+{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-07-21", "message_first_line": "multi-project fixtures"}}
+JSON
+cat > .apv-config.toml <<'TOML'
+[storage]
+planning_dir = "plugin/planning"
+[projects.website]
+planning_dir = "site/planning"
+[projects.plugcore]
+planning_dir = "plugin/planning"
+TOML
+check "cache rebuilds with registry"      run_py cache-build.py
+check "projection re-emits"               run_py projection-emit.py
+check "summary re-emits"                  run_py summary-emit.py
+check "membership fold correct"           python3 -c "
+import json
+p = json.load(open('.apv/projection.json'))
+assert p['entities']['plan:VIEW-A']['project'] == 'plugcore', p['entities']['plan:VIEW-A']['project']
+assert p['entities']['plan:VIEW-W']['project'] == 'website'
+assert p['entities']['inbox-item:2026-07-21.site-idea']['project'] == 'website'
+assert p['entities']['inbox-item:2026-07-21.stray-idea']['project'] == 'unassigned'
+assert 'website' in p['projects'] and 'plugcore' in p['projects'] and 'unassigned' in p['projects']
+print('membership ok')
+"
+check "summary has By project rollup"     grep -q "### By project" .apv/summary.md
+check "minimal parser reads registry"     python3 -c "
+import sys, pathlib
+sys.path.insert(0, '$PLUGIN_HOME/scripts')
+import apvlib
+apvlib.tomllib = None
+projs = apvlib.apv_projects(pathlib.Path('.').resolve())
+assert list(projs) == ['website', 'plugcore'], list(projs)
+print('minimal parser ok')
+"
+check "shared project-filter state wired" grep -q "projectFilter" "$APP"
+check "project chip component present"    grep -q "renderProjectChip" "$APP"
+check "board/tree apply projectMatch"     grep -q "projectMatch(e)" "$APP"
+check "flow visibility applies filter"    grep -q "2.7. Project filter" "$APP"
+check "project badge wired"               grep -q "project-badge" "$APP"
+check "css project badge present"         grep -q ".badge.project-badge" "$CSS"
+
+PORT3=8797
+"$PLUGIN_HOME/bin/apv" --port "$PORT3" >/dev/null 2>&1 &
+SERVER3_PID=$!
+for i in $(seq 1 30); do curl -sf "http://127.0.0.1:$PORT3/api/clean-check" >/dev/null 2>&1 && break; sleep 0.2; done
+check "storage-root plan served"          sh -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT3/planning/VIEW-A.md)\" = '200' ]"
+check "registered-root plan served"       sh -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT3/planning/VIEW-W.md)\" = '200' ]"
+kill "$SERVER3_PID" 2>/dev/null; SERVER3_PID=""
 
 echo "== grep audit: no dogfood literals in view/ outside legacy fallbacks"
 # Dot-anchored deliberately: the hardcodes were data-dir paths

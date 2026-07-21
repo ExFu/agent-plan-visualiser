@@ -142,10 +142,13 @@ class Ctx:
     """Shared per-run context: parsed events, rename remap, seal lookup,
     birth registry, and a lazily built cache connection for warn checks."""
 
-    def __init__(self, repo_root, data_dir, planning_dir):
+    def __init__(self, repo_root, data_dir, planning_dir, planning_roots=None):
         self.repo_root = repo_root
         self.data_dir = data_dir
         self.planning_dir = planning_dir
+        # Ordered [(project_name, root_path)]; single-root contexts (the
+        # --planning-dir flag, fixtures) collapse to one 'main' root.
+        self.planning_roots = planning_roots or [("main", planning_dir)]
         self.events_path = data_dir / "events.jsonl"
         self._cache_conn = None
 
@@ -482,25 +485,38 @@ def check_drift(ctx):
         "WHERE relationship_type='spawns' AND source='event' AND to_entity_type='plan'"
     ):
         parents.setdefault(cid, set()).add(fid)
-    for md in sorted(ctx.planning_dir.glob("*.md")):
-        pid = md.stem
-        if states.get(pid) not in ("live", "draft", "dormant"):
-            continue  # closed plans' stale frontmatter is archaeology, not drift
-        fm = parse_frontmatter(md)
-        for field in ("t2_parent", "milestone"):
-            declared = fm.get(field)
-            if not declared:
-                continue
-            event_parents = {
-                p for p in parents.get(pid, ())
-                if is_milestone_id(p) == (field == "milestone")
-            }
-            if event_parents and declared not in event_parents:
+    # Multi-project (T3-multi-project): every registered planning root is
+    # checked; a plan id present in TWO roots is itself a defect (entity ids
+    # are repo-global in the one-log model) and surfaces here as drift.
+    seen_ids = {}
+    for root_name, root_dir in ctx.planning_roots:
+        for md in sorted(root_dir.glob("*.md")):
+            pid = md.stem
+            if pid in seen_ids:
                 instances.append(
-                    f"plan '{pid}' frontmatter {field}: '{declared}' but "
-                    f"event-sourced parent is {sorted(event_parents)} — file is "
-                    f"stale (events are SSOT)"
+                    f"plan '{pid}' present in planning roots "
+                    f"'{seen_ids[pid]}' and '{root_name}' — duplicate plan id "
+                    f"(entity ids are repo-global)"
                 )
+                continue
+            seen_ids[pid] = root_name
+            if states.get(pid) not in ("live", "draft", "dormant"):
+                continue  # closed plans' stale frontmatter is archaeology, not drift
+            fm = parse_frontmatter(md)
+            for field in ("t2_parent", "milestone"):
+                declared = fm.get(field)
+                if not declared:
+                    continue
+                event_parents = {
+                    p for p in parents.get(pid, ())
+                    if is_milestone_id(p) == (field == "milestone")
+                }
+                if event_parents and declared not in event_parents:
+                    instances.append(
+                        f"plan '{pid}' frontmatter {field}: '{declared}' but "
+                        f"event-sourced parent is {sorted(event_parents)} — file is "
+                        f"stale (events are SSOT)"
+                    )
     return instances
 
 
@@ -734,11 +750,20 @@ def main():
 
     data_dir = args.data_dir or apvlib.apv_data_dir(repo_root, args.config)
     planning_dir = args.planning_dir or apvlib.apv_planning_dir(repo_root, args.config)
+    # Multi-project roots for the drift check: an explicit --planning-dir
+    # collapses the registry to that single root (fixture behaviour
+    # unchanged); otherwise the committed registry + implicit main resolve.
+    if args.planning_dir:
+        planning_roots = [("main", args.planning_dir)]
+    else:
+        planning_roots = [
+            (n, p.resolve()) for n, p in apvlib.apv_planning_roots(repo_root, args.config)
+        ]
     if not (data_dir / "events.jsonl").exists():
         print(f"error: no events.jsonl in {data_dir}", file=sys.stderr)
         return 2
 
-    ctx = Ctx(repo_root, data_dir, planning_dir)
+    ctx = Ctx(repo_root, data_dir, planning_dir, planning_roots)
 
     n_block = n_warn = 0
     for cid in blocking_ids:
