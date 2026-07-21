@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T12:11:01Z
+# Project state — generated 2026-07-21T12:32:29Z
 
-**Total events:** 542  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 53  ·  **Orphaned:** 0
+**Total events:** 545  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 53  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -15,7 +15,7 @@
   - `T2-ontology` (9 events): entity.extended → entity.extended → entity.extended
   - `T2-packaging` (7 events): entity.extended → entity.progressed → entity.extended
   - `T2-projection` (16 events): entity.extended → entity.progressed → verification.tested
-  - `T2-storage` (7 events): entity.progressed → entity.progressed → entity.progressed
+  - `T2-storage` (9 events): entity.progressed → entity.progressed → verification.tested
 
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
@@ -38,7 +38,7 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 94 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 95 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
