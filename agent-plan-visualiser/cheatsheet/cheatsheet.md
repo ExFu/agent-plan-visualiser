@@ -10,7 +10,9 @@ Run everything from the repo root. Skills are plugin-namespaced
 sources are at `$APV/skills/<name>/SKILL.md`. Monorepos may register
 sub-projects (`[projects.<name>] planning_dir = "..."` in
 `.apv-config.toml`) — one shared log, per-entity `project` membership,
-filterable in the view.
+filterable in the view. Assigning/moving entities between sub-projects
+(retrospectively, incl. closed entities):
+`worked-examples/assign-entity-to-project.md`.
 
 ## Status read (what's the project state?)
 

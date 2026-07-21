@@ -1,0 +1,982 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-plan-tracker/schemas/0.6.0/events.schema.json",
+  "title": "agent-plan-visualiser event",
+  "type": "object",
+  "required": [
+    "event_id",
+    "type",
+    "actor",
+    "confidence",
+    "schema_version",
+    "attributes"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "type": {
+      "type": "string"
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "blocker",
+        "hitl-question",
+        "implicit-work",
+        "inbox-item"
+      ]
+    },
+    "entity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "explicit",
+        "derived"
+      ]
+    },
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "0.1.0",
+        "0.2.0",
+        "0.3.0",
+        "0.4.0",
+        "0.5.0",
+        "0.6.0"
+      ]
+    },
+    "attributes": {
+      "type": "object"
+    },
+    "origin": {
+      "type": "string",
+      "enum": [
+        "captured",
+        "backfilled"
+      ],
+      "description": "Provenance: contemporaneous capture (absent/captured) vs retrospective backfill. See T2-ontology \u00a73.12."
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/entity_created"
+    },
+    {
+      "$ref": "#/$defs/entity_extended"
+    },
+    {
+      "$ref": "#/$defs/entity_accepted"
+    },
+    {
+      "$ref": "#/$defs/entity_renamed"
+    },
+    {
+      "$ref": "#/$defs/entity_progressed"
+    },
+    {
+      "$ref": "#/$defs/entity_completed"
+    },
+    {
+      "$ref": "#/$defs/entity_parked"
+    },
+    {
+      "$ref": "#/$defs/entity_cancelled"
+    },
+    {
+      "$ref": "#/$defs/entity_superseded"
+    },
+    {
+      "$ref": "#/$defs/entity_reopened"
+    },
+    {
+      "$ref": "#/$defs/decision"
+    },
+    {
+      "$ref": "#/$defs/blocker_raised"
+    },
+    {
+      "$ref": "#/$defs/blocker_progressed"
+    },
+    {
+      "$ref": "#/$defs/blocker_closed"
+    },
+    {
+      "$ref": "#/$defs/verification_claimed"
+    },
+    {
+      "$ref": "#/$defs/verification_tested"
+    },
+    {
+      "$ref": "#/$defs/verification_skipped"
+    },
+    {
+      "$ref": "#/$defs/verification_deferred"
+    },
+    {
+      "$ref": "#/$defs/verification_failed"
+    },
+    {
+      "$ref": "#/$defs/relationship_spawns"
+    },
+    {
+      "$ref": "#/$defs/relationship_depends_on"
+    },
+    {
+      "$ref": "#/$defs/relationship_addendum_to"
+    },
+    {
+      "$ref": "#/$defs/relationship_alongside"
+    },
+    {
+      "$ref": "#/$defs/relationship_reattached"
+    },
+    {
+      "$ref": "#/$defs/commit_recorded"
+    },
+    {
+      "$ref": "#/$defs/analysis_live_summary"
+    },
+    {
+      "$ref": "#/$defs/analysis_invalidated"
+    },
+    {
+      "$ref": "#/$defs/project_assigned"
+    }
+  ],
+  "$defs": {
+    "entity_event_base": {
+      "type": "object",
+      "required": [
+        "entity_type",
+        "entity_id"
+      ]
+    },
+    "entity_created": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.created"
+            }
+          }
+        }
+      ]
+    },
+    "entity_extended": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.extended"
+            }
+          }
+        }
+      ]
+    },
+    "entity_accepted": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.accepted"
+            }
+          }
+        }
+      ]
+    },
+    "entity_renamed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.renamed"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "from_name",
+                "to_name"
+              ],
+              "properties": {
+                "from_name": {
+                  "type": "string"
+                },
+                "to_name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "entity_progressed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.progressed"
+            }
+          }
+        }
+      ]
+    },
+    "entity_completed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.completed"
+            }
+          }
+        }
+      ]
+    },
+    "entity_parked": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.parked"
+            }
+          }
+        }
+      ]
+    },
+    "entity_cancelled": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.cancelled"
+            }
+          }
+        }
+      ]
+    },
+    "entity_superseded": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.superseded"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "entity_ids"
+              ],
+              "properties": {
+                "entity_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "entity_reopened": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "entity.reopened"
+            }
+          }
+        }
+      ]
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "decision"
+        },
+        "attributes": {
+          "type": "object",
+          "required": [
+            "text",
+            "event_ids"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "event_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          }
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "blocker_raised": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "blocker.raised"
+            }
+          }
+        }
+      ]
+    },
+    "blocker_progressed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "blocker.progressed"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "note"
+              ],
+              "properties": {
+                "note": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "blocker_closed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "blocker.closed"
+            }
+          }
+        }
+      ]
+    },
+    "verification_claimed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "verification.claimed"
+            }
+          }
+        }
+      ]
+    },
+    "verification_tested": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "verification.tested"
+            }
+          }
+        }
+      ]
+    },
+    "verification_skipped": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "verification.skipped"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "verification_failed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "verification.failed"
+            }
+          }
+        }
+      ]
+    },
+    "relationship_spawns": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "relationship.spawns"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "from_entity_type",
+                "from_entity_id"
+              ],
+              "properties": {
+                "from_entity_type": {
+                  "type": "string"
+                },
+                "from_entity_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "relationship_depends_on": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "relationship.depends-on"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "from_entity_type",
+                "from_entity_id"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "relationship_addendum_to": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "relationship.addendum-to"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "from_entity_type",
+                "from_entity_id"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "relationship_alongside": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "relationship.alongside"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "from_entity_type",
+                "from_entity_id"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "relationship_reattached": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "relationship.reattached"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "from_parent",
+                "to_parent"
+              ],
+              "properties": {
+                "from_parent": {
+                  "type": "string"
+                },
+                "to_parent": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "commit_recorded": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "commit.recorded"
+        },
+        "attributes": {
+          "type": "object",
+          "required": [
+            "author",
+            "date",
+            "message_first_line"
+          ],
+          "properties": {
+            "author": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "message_first_line": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "analysis_live_summary": {
+      "type": "object",
+      "required": [
+        "entity_type",
+        "entity_id"
+      ],
+      "properties": {
+        "type": {
+          "const": "analysis.live-summary"
+        },
+        "entity_type": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "inbox-item"
+          ]
+        },
+        "attributes": {
+          "type": "object",
+          "required": [
+            "model",
+            "source",
+            "structured",
+            "freeform_path"
+          ],
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "derived"
+              ]
+            },
+            "origin_summary_event_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "supersedes_summary_event_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "structured": {
+              "type": "object",
+              "required": [
+                "outstanding",
+                "blocked",
+                "recently_changed",
+                "next_move"
+              ],
+              "properties": {
+                "outstanding": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "blocked": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "recently_changed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "next_move": {
+                  "type": "string"
+                }
+              }
+            },
+            "freeform_path": {
+              "type": "string",
+              "pattern": "^\\.agent-plan-tracker/summaries/.+\\.md$"
+            },
+            "context_event_id_range": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "estimated_input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "estimated_output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "actual_input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "actual_output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "prompt_cache_hit_ratio": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "analysis_invalidated": {
+      "type": "object",
+      "required": [
+        "entity_type",
+        "entity_id"
+      ],
+      "properties": {
+        "type": {
+          "const": "analysis.invalidated"
+        },
+        "entity_type": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "inbox-item"
+          ]
+        },
+        "attributes": {
+          "type": "object",
+          "required": [
+            "target_event_id",
+            "reason"
+          ],
+          "properties": {
+            "target_event_id": {
+              "type": "string"
+            },
+            "cascades_to_event_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "verification_deferred": {
+      "description": "Operator-directed deferral of a verification leg: like verification.skipped, but records the intent to come back. Stays 'open' until a later verification.* event on the same entity resolves it (tested/claimed/failed close it; a fresh deferred renews it). Introduced at 0.5.0 (T3-verification-deferred).",
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "verification.deferred"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "project_assigned": {
+      "description": "Sub-project membership assertion (T3-retrospective-project-annotation): places the focal entity in a project, retrospectively legal on OPEN or CLOSED entities \u2014 state-neutral like entity.renamed (absent from STATE_FROM_EVENT; never resurrects). Feeds the attributes.project membership pre-scan; latest-recorded wins; once recorded, authoritative over planning-root derivation. Fulcrum: requires a paired same-block decision. Introduced at 0.6.0.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/entity_event_base"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "project.assigned"
+            },
+            "attributes": {
+              "type": "object",
+              "required": [
+                "project"
+              ],
+              "properties": {
+                "project": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "from_project": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "origin": {
+            "const": "backfilled"
+          }
+        },
+        "required": [
+          "origin"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "required": [
+              "backfill_run"
+            ],
+            "properties": {
+              "backfill_run": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": {
+              "origin": {
+                "const": "backfilled"
+              }
+            },
+            "required": [
+              "origin"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "commit.recorded"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "required": [
+              "commit_ref"
+            ],
+            "properties": {
+              "commit_ref": {
+                "type": "string",
+                "minLength": 7
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": {
+              "type": {
+                "const": "commit.recorded"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "not": {
+              "properties": {
+                "origin": {
+                  "const": "backfilled"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            }
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "not": {
+              "required": [
+                "commit_ref"
+              ]
+            }
+          }
+        },
+        "description": "Captured seals are written pre-commit \u2014 no hash exists; commit_ref is the backfilled exception only."
+      }
+    }
+  ]
+}

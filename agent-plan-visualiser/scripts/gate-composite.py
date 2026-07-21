@@ -75,6 +75,11 @@ LIFECYCLE_TYPES = set(STATE_FROM_EVENT) | {"entity.renamed"}
 FULCRUM_TYPES = {  # mirror audit-fulcrum-without-decision.sql
     "entity.renamed", "entity.parked", "entity.cancelled",
     "entity.superseded", "entity.reopened",
+    # project.assigned (0.6.0): a retrospective membership assertion is a
+    # re-organisation ruling — same class as rename/reattach. One decision
+    # may cover a bulk assignment (event_ids containment). State-neutral:
+    # intentionally absent from STATE_FROM_EVENT and LIFECYCLE_TYPES.
+    "project.assigned",
 }
 RELATIONSHIP_FROM_TYPES = {
     "relationship.spawns", "relationship.depends-on",
@@ -296,6 +301,11 @@ def check_referential(ctx):
     all_event_ids = {ev["event_id"] for ev in ctx.events}
     existing = set()
     for ev in ctx.events:
+        # project.assigned events don't establish existence — an annotation's
+        # own target must be known from some other event, else the check
+        # would vacuously satisfy itself (a typo'd id would slip through).
+        if ev["type"] == "project.assigned":
+            continue
         if ev.get("entity_type") and ev.get("entity_id"):
             existing.add((ev["entity_type"], ctx.rid(ev["entity_id"])))
     for ev in ctx.events:
@@ -316,6 +326,17 @@ def check_referential(ctx):
             if fid and (ftype, fid) not in existing:
                 instances.append(
                     f"{t} {loc}: from-entity {ftype} '{fid}' names no known entity"
+                )
+        elif t == "project.assigned":
+            # Existence-in-record is the bar, NOT created-first (deliberately
+            # not in LIFECYCLE_TYPES): the annotation must target a known
+            # entity, but legacy pre-0.3.0 entities without an entity.created
+            # remain annotatable. The project NAME is not validated — the
+            # registry governs roots, not the namespace (see cache-build).
+            key = (ev.get("entity_type"), ctx.rid(ev.get("entity_id")))
+            if key[0] and key[1] and key not in existing:
+                instances.append(
+                    f"{t} {loc}: {key[0]} '{key[1]}' names no known entity"
                 )
         elif t in LIFECYCLE_TYPES and t != "entity.created":
             if parse_version(ev.get("schema_version")) < EPOCH:

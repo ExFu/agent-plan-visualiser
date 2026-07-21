@@ -23,7 +23,7 @@ EVENTS = DATA_DIR / "events.jsonl"
 CACHE = DATA_DIR / "cache.sqlite"
 # Toolchain content resolves against THIS script's home, never the target
 # repo — on a plugin install the schemas live in the plugin cache.
-SCHEMA_DDL = Path(__file__).resolve().parents[1] / "schemas/0.5.0/cache.schema.sql"
+SCHEMA_DDL = Path(__file__).resolve().parents[1] / "schemas/0.6.0/cache.schema.sql"
 
 STATE_FROM_EVENT = {
     "entity.created": "draft",
@@ -33,6 +33,9 @@ STATE_FROM_EVENT = {
     # migration, not a lifecycle transition), so renaming a closed entity must
     # NOT flip it back to live. See the rename pre-scan in main() and
     # T2-ontology §3.10/§3.11.
+    # project.assigned (0.6.0) is likewise intentionally ABSENT: a sub-project
+    # membership assertion is annotation, not lifecycle — retrospectively
+    # legal on closed entities. It feeds the project pre-scan below.
     "entity.progressed": "live",
     "entity.completed": "closed",
     "entity.parked": "dormant",

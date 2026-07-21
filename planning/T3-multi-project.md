@@ -72,3 +72,16 @@ written.**
   all exercised in the view + gate sandboxes.
 - Single-project projections byte-identical, pinned by test.
 - All seven suites green; gate green on the branch and the main move.
+
+## Addendum (2026-07-21) — closed-entity assignment unlocked
+
+`project.assigned` (schema epoch 0.6.0,
+[T3-retrospective-project-annotation](T3-retrospective-project-annotation.md))
+supersedes the Migration section's closed-entity carve-out above: membership
+annotation is now a **state-neutral fulcrum event**, retrospectively legal
+on closed entities — the resurrection concern that forced "listed but never
+annotated" no longer applies. When `migrate-projects.py` is built it emits
+`project.assigned` events uniformly for ALL unassigned entities, open or
+closed, instead of `entity.extended`. Everything else in the Migration
+section (dry-run default, `--apply`/`--emit-events` split,
+spec-to-operator-first) stands.
