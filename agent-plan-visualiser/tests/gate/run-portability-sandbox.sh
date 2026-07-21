@@ -3,8 +3,10 @@
 # vendored toolchain, the toolchain at a simulated plugin root. Capture-guard,
 # gate-check, pre-push and ref-update flows must all resolve and run — via
 # the installer-baked APV_HOME, never via env overrides or repo-relative
-# luck. Also exercises the `.apv/` default data dir (no config file at all)
-# and gate-check's git-toplevel repo-root default.
+# luck. Also exercises the `.apv/` default data dir (no config file at all),
+# gate-check's git-toplevel repo-root default, and the installers' 0.5.12
+# idempotency contract: same copy no-ops, an outdated apv hook (header
+# fingerprint) refreshes in place, a foreign hook refuses untouched.
 # Exits 0 when every case passes; 1 on the first failure.
 set -uo pipefail
 cd "$(dirname "$0")" || exit 2
@@ -70,6 +72,23 @@ stamp() { date +%s > .apv/.last-capture; }
 echo "== installers: plugin-home source, APV_HOME baked into gate hooks"
 run bash "$PLUGIN_HOME/scripts/install-hook.sh"
 check "capture-guard installed"         grep -q "installed" <<<"$OUT"
+run bash "$PLUGIN_HOME/scripts/install-hook.sh"
+check "capture-guard re-run is a no-op" grep -q "already installed" <<<"$OUT"
+# 0.5.12 (aa1f109): an outdated apv capture-guard — header fingerprint, stale
+# body — is OURS to refresh in place, same contract as the gate installer.
+printf '%s\n' '#!/bin/sh' '# capture-guard.sh — agent-plan-visualiser pre-commit hook (obsolete vintage).' 'exit 0' > .git/hooks/pre-commit
+run bash "$PLUGIN_HOME/scripts/install-hook.sh"
+check "outdated capture-guard refreshes" [ "$CODE" -eq 0 ]
+check "reports the capture-guard refresh" grep -q "refreshed" <<<"$OUT"
+check "refreshed copy matches source"   cmp -s "$PLUGIN_HOME/hooks/capture-guard.sh" .git/hooks/pre-commit
+# ...while a genuinely FOREIGN pre-commit (no apv fingerprint) still refuses.
+mv .git/hooks/pre-commit "$SANDBOX/pre-commit.stash"
+printf '%s\n' '#!/bin/sh' '# a foreign pre-commit, none of our business' 'exit 0' > .git/hooks/pre-commit
+run bash "$PLUGIN_HOME/scripts/install-hook.sh"
+check "foreign pre-commit refuses"      [ "$CODE" -eq 1 ]
+check "capture-guard names the refusal" grep -q "refusing to overwrite" <<<"$OUT"
+check "foreign pre-commit untouched"    grep -q "none of our business" .git/hooks/pre-commit
+mv -f "$SANDBOX/pre-commit.stash" .git/hooks/pre-commit
 run bash "$PLUGIN_HOME/scripts/install-gate.sh" --home="$PLUGIN_HOME"
 check "pre-push installed"              [ "$CODE" -eq 0 ]
 run bash "$PLUGIN_HOME/scripts/install-gate.sh" --at=ref-update --home="$PLUGIN_HOME"
@@ -78,9 +97,22 @@ check "pre-push carries baked home"     grep -q "APV_HOME=\"$PLUGIN_HOME\"" .git
 check "ref-update carries baked home"   grep -q "APV_HOME=\"$PLUGIN_HOME\"" .git/hooks/reference-transaction
 run bash "$PLUGIN_HOME/scripts/install-gate.sh" --home="$PLUGIN_HOME"
 check "same-home re-run is a no-op"     grep -q "already installed" <<<"$OUT"
+# 0.5.12 (aa1f109): an apv gate hook baking a stale home is OURS to refresh —
+# a different-home re-run replaces the copy in place instead of refusing.
 run bash "$PLUGIN_HOME/scripts/install-gate.sh" --home="$SANDBOX"
-check "different home refuses"          [ "$CODE" -eq 1 ]
-check "names the refusal"               grep -q "refusing to overwrite" <<<"$OUT"
+check "different-home re-run refreshes" [ "$CODE" -eq 0 ]
+check "reports the gate refresh"        grep -q "refreshed" <<<"$OUT"
+check "refresh bakes the NEW home"      grep -q "APV_HOME=\"$SANDBOX\"" .git/hooks/pre-push
+run bash "$PLUGIN_HOME/scripts/install-gate.sh" --home="$PLUGIN_HOME"
+check "re-bake restores the plugin home" grep -q "APV_HOME=\"$PLUGIN_HOME\"" .git/hooks/pre-push
+# Never-clobber still protects FOREIGN hooks: no apv fingerprint -> refuse.
+mv .git/hooks/pre-push "$SANDBOX/pre-push.stash"
+printf '%s\n' '#!/bin/sh' '# a foreign pre-push, none of our business' 'exit 0' > .git/hooks/pre-push
+run bash "$PLUGIN_HOME/scripts/install-gate.sh" --home="$PLUGIN_HOME"
+check "foreign pre-push refuses"        [ "$CODE" -eq 1 ]
+check "gate names the refusal"          grep -q "refusing to overwrite" <<<"$OUT"
+check "foreign pre-push untouched"      grep -q "none of our business" .git/hooks/pre-push
+mv -f "$SANDBOX/pre-push.stash" .git/hooks/pre-push
 
 # --- Case 2: the guard finds .apv/ by default (no config, no env) ---------
 echo "== capture-guard: default .apv data dir, no config anywhere"
