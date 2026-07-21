@@ -137,6 +137,10 @@ warn = ["drift", "orphans", "stalled", "long-blockers"]
 [storage]
 # APV_DATA_DIR env var overrides this; default is .apv/ when neither is set.
 data_dir = "$DATA_DIR"
+# Where the plan documents live, relative to the repo root. Uncomment when
+# the tracked project sits in a sub-folder of the repo (monorepo case) —
+# the data dir stays at the repo root; only the plan corpus moves.
+# planning_dir = "planning"
 TOML
   report created ".apv-config.toml" "default gate lists; data_dir = \"$DATA_DIR\""
 fi

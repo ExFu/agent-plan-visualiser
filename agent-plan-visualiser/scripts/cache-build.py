@@ -16,6 +16,7 @@ import apvlib
 
 REPO_ROOT = apvlib.repo_root()
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
+PLANNING_DIR = apvlib.apv_planning_dir(REPO_ROOT)
 EVENTS = DATA_DIR / "events.jsonl"
 CACHE = DATA_DIR / "cache.sqlite"
 # Toolchain content resolves against THIS script's home, never the target
@@ -258,7 +259,7 @@ def main():
         for (et, eid), e in entities.items():
             if et != "plan" or e["attrs"]:
                 continue
-            plan_path = REPO_ROOT / "planning" / f"{eid}.md"
+            plan_path = PLANNING_DIR / f"{eid}.md"
             if not plan_path.exists():
                 continue
             content = plan_path.read_text()

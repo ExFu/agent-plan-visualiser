@@ -50,7 +50,12 @@ the file and follow it. `/apv-init` checks the enablement is committed.
 ## 3. Where things live
 
 Data dir resolution, everywhere in the toolchain: `APV_DATA_DIR` env var →
-committed `.apv-config.toml` `[storage] data_dir` → default `.apv/`.
+committed `.apv-config.toml` `[storage] data_dir` → default `.apv/`. The
+plans directory resolves the same way (`APV_PLANNING_DIR` → `[storage]
+planning_dir` → default `planning/`) — a monorepo whose tracked project
+lives in a sub-folder pins e.g. `planning_dir = "plugin/planning"` while
+the data dir stays at the repo root (captures are commit-anchored, and
+commits are repo-level).
 
 Inside it: `events.jsonl` (canonical, append-only — all integrity
 discipline applies here) plus derived, rebuildable artefacts

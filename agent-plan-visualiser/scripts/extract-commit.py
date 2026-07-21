@@ -141,8 +141,14 @@ def build_bundle(repo_root: Path, data_dir: Path, msg_text: str) -> str:
         tail = "\n".join(lines[-LOG_TAIL_LINES:])
 
     frontmatters = []
+    # The plans dir is configurable ([storage] planning_dir); staged names
+    # are repo-relative, so match against the resolved repo-relative prefix.
+    try:
+        planning_prefix = str(apvlib.apv_planning_dir(repo_root).relative_to(repo_root))
+    except ValueError:
+        planning_prefix = None  # plans outside the repo can't be staged paths
     for name in staged_names.splitlines():
-        if re.match(r"^planning/[^/]+\.md$", name):
+        if planning_prefix and re.match(rf"^{re.escape(planning_prefix)}/[^/]+\.md$", name):
             try:
                 content = git(["show", f":0:{name}"], repo_root)
             except RuntimeError:

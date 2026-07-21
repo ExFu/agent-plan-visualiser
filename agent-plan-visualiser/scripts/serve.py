@@ -33,6 +33,7 @@ import apvlib
 # enclosing repo, falling back to the vendored/dogfood layout). Toolchain
 # content (the view itself, schemas) resolves against this script's home.
 REPO_ROOT = apvlib.repo_root()
+PLANNING_DIR = apvlib.apv_planning_dir(REPO_ROOT)
 TOOLCHAIN = Path(__file__).resolve().parents[1]
 VIEW_DIR = TOOLCHAIN / "view"
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
@@ -202,7 +203,7 @@ class APTHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/data/"):
             return self._serve_file(DATA_DIR, self.path[len("/data/"):])
         if self.path.startswith("/planning/"):
-            return self._serve_file(REPO_ROOT / "planning", self.path[len("/planning/"):])
+            return self._serve_file(PLANNING_DIR, self.path[len("/planning/"):])
         return super().do_GET()
 
     def do_POST(self):

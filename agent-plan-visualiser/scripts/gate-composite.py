@@ -710,7 +710,8 @@ def main():
     ap.add_argument("--data-dir", type=Path, default=None,
                     help="data dir override (default: apvlib resolution — env, config, default)")
     ap.add_argument("--planning-dir", type=Path, default=None,
-                    help="plans dir for the drift check (default: <repo-root>/planning)")
+                    help="plans dir for the drift check (default: apvlib resolution — "
+                         "env, config [storage] planning_dir, <repo-root>/planning)")
     args = ap.parse_args()
 
     # Resolve every path to absolute up front: data_dir is re-exported as
@@ -732,7 +733,7 @@ def main():
     blocking_ids, warn_ids = resolve_check_lists(cfg)
 
     data_dir = args.data_dir or apvlib.apv_data_dir(repo_root, args.config)
-    planning_dir = args.planning_dir or (repo_root / "planning")
+    planning_dir = args.planning_dir or apvlib.apv_planning_dir(repo_root, args.config)
     if not (data_dir / "events.jsonl").exists():
         print(f"error: no events.jsonl in {data_dir}", file=sys.stderr)
         return 2

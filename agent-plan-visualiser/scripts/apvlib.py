@@ -163,3 +163,24 @@ def apv_data_dir(repo_root: Path, config_path=None) -> Path:
         p = Path(cfg_dir)
         return p if p.is_absolute() else repo_root / p
     return repo_root / ".apv"
+
+
+def apv_planning_dir(repo_root: Path, config_path=None) -> Path:
+    """Resolve the plans directory (the T1/T2/T3/M/L plan documents).
+
+    Precedence mirrors apv_data_dir: APV_PLANNING_DIR env var (absolute, or
+    relative to repo_root), else `.apv-config.toml` `[storage] planning_dir`,
+    else the default `planning/` at the repo root. A monorepo whose tracked
+    project lives in a sub-folder pins e.g. `planning_dir = "plugin/planning"`
+    — the data dir stays at the repo root (captures are commit-anchored and
+    commits are repo-level), only the plan corpus moves.
+    """
+    override = os.environ.get("APV_PLANNING_DIR")
+    if override:
+        p = Path(override)
+        return p if p.is_absolute() else repo_root / p
+    cfg_dir = (apv_config(repo_root, config_path).get("storage") or {}).get("planning_dir")
+    if cfg_dir:
+        p = Path(cfg_dir)
+        return p if p.is_absolute() else repo_root / p
+    return repo_root / "planning"
