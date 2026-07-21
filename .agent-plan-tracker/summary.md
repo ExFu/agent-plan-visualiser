@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T15:19:44Z
+# Project state — generated 2026-07-21T16:27:53Z
 
-**Total events:** 581  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 58  ·  **Orphaned:** 0
+**Total events:** 588  ·  **Draft:** 15  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 59  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -41,7 +41,8 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 103 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 0 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 105 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -61,7 +62,9 @@
   - `2026-05-23.verification-overhaul-candidate-model` (59d untriaged)
   - `2026-06-10.view-hardcodes-dogfood-data-dir` (41d untriaged)
   - `2026-07-07.dist-sandbox-test-reference-stale` (14d untriaged)
+  - `2026-07-21.methodology-name-pending`
 - **plan**
+  - `KT0-knowledge-substrate`
   - `T2-ingest`
 
 ## Blocked
@@ -102,4 +105,4 @@ _No flapping closures._
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 
 ---
-_82 entities · 111 relationships · 28 decisions._
+_85 entities · 112 relationships · 28 decisions._
