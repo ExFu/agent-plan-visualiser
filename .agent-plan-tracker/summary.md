@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T14:16:33Z
+# Project state — generated 2026-07-21T15:35:45Z
 
-**Total events:** 551  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 53  ·  **Orphaned:** 0
+**Total events:** 560  ·  **Draft:** 13  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 53  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -21,11 +21,14 @@
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
 
+- **T2-ontology**
+  - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
+
 - **T2-packaging**
   - `T3-distribution` (38 events): verification.tested → entity.progressed → verification.tested
 
 - **T2-storage**
-  - `T3-multi-project` (5 events): entity.accepted → entity.progressed → verification.tested
+  - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
 
 ### By milestone
 
@@ -37,11 +40,12 @@
 
 - **M4-fresh-install**
   - `T3-distribution`
+  - `T3-retrospective-project-annotation`
 
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 96 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 97 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -96,9 +100,9 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 4/5 T3 complete (80%); 1 live
+- **M4-fresh-install**: 4/6 T3 complete (66%); 2 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 
 ---
-_77 entities · 104 relationships · 27 decisions._
+_78 entities · 107 relationships · 28 decisions._
