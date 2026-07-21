@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T15:02:01Z
+# Project state — generated 2026-07-21T15:03:36Z
 
-**Total events:** 564  ·  **Draft:** 17  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 54  ·  **Orphaned:** 0
+**Total events:** 569  ·  **Draft:** 13  ·  **Live:** 15  ·  **Dormant:** 0  ·  **Closed:** 54  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,9 +20,15 @@
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
+  - `M6-dashboard` (3 events): entity.created → relationship.spawns → entity.accepted
 
 - **T2-packaging**
   - `T3-distribution` (38 events): verification.tested → entity.progressed → verification.tested
+
+- **T2-projection**
+  - `T3-html-view-interactivity` (3 events): entity.created → relationship.spawns → entity.accepted
+  - `T3-view-attention-panel` (3 events): entity.created → relationship.spawns → entity.accepted
+  - `T3-view-defect-fixes` (3 events): entity.created → relationship.spawns → entity.accepted
 
 - **T2-storage**
   - `T3-multi-project` (5 events): entity.accepted → entity.progressed → verification.tested
@@ -35,17 +41,21 @@
 - **(self: M5-backfill)**
   - `M5-backfill`
 
+- **(self: M6-dashboard)**
+  - `M6-dashboard`
+
 - **M4-fresh-install**
   - `T3-distribution`
+
+- **M6-dashboard**
+  - `T3-html-view-interactivity`
+  - `T3-view-attention-panel`
+  - `T3-view-defect-fixes`
 
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `M6-dashboard` (authored 2026-07-21, 0 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 98 commit(s) ago)
-- `T3-html-view-interactivity` (authored 2026-07-21, 0 commit(s) ago)
-- `T3-view-attention-panel` (authored 2026-07-21, 0 commit(s) ago)
-- `T3-view-defect-fixes` (authored 2026-07-21, 0 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 99 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -66,11 +76,7 @@
   - `2026-06-10.view-hardcodes-dogfood-data-dir` (41d untriaged)
   - `2026-07-07.dist-sandbox-test-reference-stale` (14d untriaged)
 - **plan**
-  - `M6-dashboard`
   - `T2-ingest`
-  - `T3-html-view-interactivity`
-  - `T3-view-attention-panel`
-  - `T3-view-defect-fixes`
 
 ## Blocked
 
@@ -107,7 +113,7 @@ _No flapping closures._
 - **M4-fresh-install**: 4/5 T3 complete (80%); 1 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
-- **M6-dashboard**: 0/3 T3 complete (0%); 0 live
+- **M6-dashboard**: 0/3 T3 complete (0%); 3 live
 
 ---
 _82 entities · 111 relationships · 28 decisions._
