@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T15:16:50Z
+# Project state — generated 2026-07-21T15:19:44Z
 
-**Total events:** 578  ·  **Draft:** 13  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 57  ·  **Orphaned:** 0
+**Total events:** 581  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 58  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,7 +20,6 @@
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
-  - `M6-dashboard` (3 events): entity.created → relationship.spawns → entity.accepted
 
 - **T2-packaging**
   - `T3-distribution` (38 events): verification.tested → entity.progressed → verification.tested
@@ -36,20 +35,16 @@
 - **(self: M5-backfill)**
   - `M5-backfill`
 
-- **(self: M6-dashboard)**
-  - `M6-dashboard`
-
 - **M4-fresh-install**
   - `T3-distribution`
 
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 102 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 103 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
-- `M6-dashboard`
 
 ## Draft
 
