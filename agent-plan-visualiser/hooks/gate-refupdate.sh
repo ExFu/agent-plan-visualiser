@@ -46,7 +46,16 @@ resolve_gate_check() {
     # Hooks run from the top of the working tree (the vendored layout).
     GATE_CHECK="agent-plan-visualiser/scripts/gate-check.sh"
   else
-    GATE_CHECK="$(command -v gate-check.sh || true)"
+    # Plugin-cache installs are not baked (a pinned cache path would freeze
+    # the repo at the installing version — old versions stay on disk); the
+    # newest installed version resolves at run time, launcher-style.
+    newest="$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1)"
+    newest="${newest%/}"
+    if [ -n "$newest" ] && [ -f "$newest/scripts/gate-check.sh" ]; then
+      GATE_CHECK="$newest/scripts/gate-check.sh"
+    else
+      GATE_CHECK="$(command -v gate-check.sh || true)"
+    fi
   fi
   [ -n "$GATE_CHECK" ]
 }

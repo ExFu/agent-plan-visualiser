@@ -165,11 +165,22 @@ check "cache init exits 0"              [ "$CODE" -eq 0 ]
 check "enablement key written"          grep -q '"agent-plan-visualiser@apv": true' .claude/settings.json
 check "untracked warned loudly"         grep -q "UNTRACKED" <<<"$OUT"
 check "next-steps says commit it"       grep -q "COMMIT .claude/settings.json" <<<"$OUT"
+check "gate hooks NOT baked to cache"   grep -q 'APV_HOME=""' .git/hooks/pre-push
 git add .claude/settings.json
 run env CLAUDE_CONFIG_DIR="$SANDBOX/cc" bash "$CACHE_HOME/scripts/apv-init.sh"
 check "re-run exits 0"                  [ "$CODE" -eq 0 ]
 check "tracked reported once staged"    grep -q "worktree checkouts and clones will load" <<<"$OUT"
 check_absent "no UNTRACKED once staged" "UNTRACKED"
+
+# End-to-end: a commit on main moves the ref, the reference-transaction
+# gate fires, and — with no baked home — resolves gate-check by newest-cache
+# discovery under CLAUDE_CONFIG_DIR. Green log, so the commit must land.
+append_ev   00c1 entity.created  CACHE-A "cache-install plan, born draft"
+append_ev   00c2 entity.accepted CACHE-A "operator acceptance"
+append_seal 00c3 "cache: adopt tracking"
+git add -A && stamp
+run env CLAUDE_CONFIG_DIR="$SANDBOX/cc" git commit -m "cache: adopt tracking"
+check "commit lands via cache-discovered gate" [ "$CODE" -eq 0 ]
 
 echo "== cache install, user scope: nothing to persist"
 CC2="$SANDBOX/cc2"
@@ -185,6 +196,19 @@ echo "== non-cache home: enablement component silent"
 cd "$SANDBOX/fresh" || exit 2
 run bash "$INIT"
 check_absent "no enablement chatter"    "enabledPlugins"
+
+# --- Case 7: outdated apv hooks refresh, foreign hooks still refuse -----------
+echo "== hook refresh: our own outdated hooks are replaced, not refused"
+cd "$SANDBOX/fresh" || exit 2
+printf '# vintage-marker: simulated older apv release\n' >> .git/hooks/pre-commit
+printf '# vintage-marker: simulated older apv release\n' >> .git/hooks/pre-push
+run bash "$INIT"
+check "refresh run exits 0"             [ "$CODE" -eq 0 ]
+check "hooks reported updated"          grep -q "updated.*outdated apv hook refreshed" <<<"$OUT"
+check_absent "no refusal on our hooks"  "REFUSED"
+check "pre-commit vintage replaced"     bash -c '! grep -q "vintage-marker" .git/hooks/pre-commit'
+check "pre-push vintage replaced"       bash -c '! grep -q "vintage-marker" .git/hooks/pre-push'
+check "pre-push home re-baked"          grep -q "APV_HOME=\"$PLUGIN_HOME\"" .git/hooks/pre-push
 
 echo
 if [ "$FAIL" -eq 0 ]; then

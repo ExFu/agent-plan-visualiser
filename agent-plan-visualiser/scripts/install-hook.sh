@@ -35,6 +35,17 @@ if cmp -s "$SRC" "$DEST"; then
   exit 0
 fi
 
+# An apv capture-guard of a different vintage (older release) is OURS to
+# refresh — the never-clobber contract protects FOREIGN hooks, not our own
+# outdated copies. Recognition: the header fingerprint every shipped
+# generation carries on its first lines.
+if head -n 3 "$DEST" | grep -q "capture-guard.sh — agent-plan-visualiser"; then
+  cp "$SRC" "$DEST"
+  chmod +x "$DEST"
+  echo "install-hook: refreshed apv capture-guard at $DEST (outdated copy replaced)"
+  exit 0
+fi
+
 echo "install-hook: $DEST already exists and differs from $SRC — refusing to overwrite." >&2
 echo "install-hook: inspect the existing hook and merge or remove it manually, then re-run." >&2
 exit 1

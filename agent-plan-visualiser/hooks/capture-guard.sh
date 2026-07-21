@@ -56,7 +56,7 @@ skill_hint() {
     [ -d "$pinned/skills" ] && home="$pinned"
   fi
   if [ -z "$home" ]; then
-    newest="$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/agent-plan-visualiser/*/ 2>/dev/null | sort | tail -n 1)"
+    newest="$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1)"
     newest="${newest%/}"
     if [ -n "$newest" ] && [ -d "$newest/skills" ]; then home="$newest"; fi
   fi

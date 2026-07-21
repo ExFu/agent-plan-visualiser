@@ -371,6 +371,8 @@ run_installer() { # run_installer <component> <cmd...>
   if [ "$code" -eq 0 ]; then
     if printf '%s' "$out" | grep -q "already installed"; then
       report ok "$component"
+    elif printf '%s' "$out" | grep -q "refreshed"; then
+      report updated "$component" "outdated apv hook refreshed"
     else
       report created "$component"
     fi
@@ -387,19 +389,29 @@ if [ "$AT" = "manual" ]; then
   echo "    | (capture discipline is unenforced without the pre-commit guard)"
 else
   run_installer "pre-commit (capture-guard)" bash "$TOOLCHAIN_HOME/scripts/install-hook.sh"
+  # Bake the toolchain home only for external NON-cache homes (a dev
+  # checkout, an unzipped bundle). Plugin-cache paths are version-pinned —
+  # baking one freezes the repo's hooks at the installing version (the
+  # launcher's never-pin ruling, applied to hooks); the hooks' own chain
+  # resolves the newest cache install at run time instead.
   GATE_HOME_ARGS=()
-  [ "$VENDORED" -eq 0 ] && GATE_HOME_ARGS=(--home="$TOOLCHAIN_HOME")
+  case "$TOOLCHAIN_HOME" in
+    */plugins/cache/*) : ;;
+    *) [ "$VENDORED" -eq 0 ] && GATE_HOME_ARGS=(--home="$TOOLCHAIN_HOME") ;;
+  esac
+  # ${arr[@]+...} expansion: bash 3.2 (macOS /bin/bash) treats an empty
+  # array's "${arr[@]}" as unbound under set -u; the + form is safe there.
   if [ "$AT" = "all" ] || [ "$AT" = "pre-push" ]; then
-    run_installer "pre-push (gate)" bash "$TOOLCHAIN_HOME/scripts/install-gate.sh" --at=pre-push "${GATE_HOME_ARGS[@]}"
+    run_installer "pre-push (gate)" bash "$TOOLCHAIN_HOME/scripts/install-gate.sh" --at=pre-push ${GATE_HOME_ARGS[@]+"${GATE_HOME_ARGS[@]}"}
   fi
   if [ "$AT" = "all" ] || [ "$AT" = "ref-update" ]; then
-    run_installer "reference-transaction (gate)" bash "$TOOLCHAIN_HOME/scripts/install-gate.sh" --at=ref-update "${GATE_HOME_ARGS[@]}"
+    run_installer "reference-transaction (gate)" bash "$TOOLCHAIN_HOME/scripts/install-gate.sh" --at=ref-update ${GATE_HOME_ARGS[@]+"${GATE_HOME_ARGS[@]}"}
   fi
   # Autonomous capture is opt-in (T3-autonomous-extractor §2.2): the
   # commit-msg extractor produces captures for non-session committers;
   # the pre-commit guard detects it and defers.
   if [ "$WITH_EXTRACTOR" -eq 1 ]; then
-    run_installer "commit-msg (apv-extract)" bash "$TOOLCHAIN_HOME/scripts/install-extractor.sh" "${GATE_HOME_ARGS[@]}"
+    run_installer "commit-msg (apv-extract)" bash "$TOOLCHAIN_HOME/scripts/install-extractor.sh" ${GATE_HOME_ARGS[@]+"${GATE_HOME_ARGS[@]}"}
   fi
 fi
 

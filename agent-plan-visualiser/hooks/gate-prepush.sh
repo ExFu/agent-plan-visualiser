@@ -42,6 +42,15 @@ resolve_gate_check() {
     echo "agent-plan-visualiser/scripts/gate-check.sh"
     return 0
   fi
+  # Plugin-cache installs are not baked (a pinned cache path would freeze
+  # the repo at the installing version — old versions stay on disk); the
+  # newest installed version resolves at run time, launcher-style.
+  newest="$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1)"
+  newest="${newest%/}"
+  if [ -n "$newest" ] && [ -f "$newest/scripts/gate-check.sh" ]; then
+    echo "$newest/scripts/gate-check.sh"
+    return 0
+  fi
   command -v gate-check.sh 2>/dev/null && return 0
   return 1
 }

@@ -60,6 +60,12 @@ install_one() { # install_one <src-basename> <hook-name>
   elif cmp -s "$RENDERED" "$DEST"; then
     chmod +x "$DEST"
     echo "install-extractor: already installed at $DEST — nothing to do"
+  elif head -n 3 "$DEST" | grep -q "$1 — agent-plan-visualiser"; then
+    # Our own hook of a different vintage — refresh, never refuse (the
+    # never-clobber contract protects FOREIGN hooks, not outdated apv ones).
+    cp "$RENDERED" "$DEST"
+    chmod +x "$DEST"
+    echo "install-extractor: refreshed apv $1 at $DEST (outdated copy replaced)"
   else
     echo "install-extractor: $DEST already exists and differs from the $1 this installer would write — refusing to overwrite." >&2
     echo "install-extractor: inspect the existing hook and merge or remove it manually, then re-run." >&2

@@ -103,6 +103,18 @@ if cmp -s "$RENDERED" "$DEST"; then
   exit 0
 fi
 
+# An apv gate hook of a different vintage (older release, or a stale baked
+# home from a superseded plugin version) is OURS to refresh — the
+# never-clobber contract protects FOREIGN hooks, not our own outdated
+# copies. Recognition: the header fingerprint every shipped generation
+# carries on its first lines.
+if head -n 3 "$DEST" | grep -q "$LABEL.sh — agent-plan-visualiser"; then
+  cp "$RENDERED" "$DEST"
+  chmod +x "$DEST"
+  echo "install-gate: refreshed apv $LABEL at $DEST (outdated copy replaced)"
+  exit 0
+fi
+
 echo "install-gate: $DEST already exists and differs from the $LABEL this installer would write — refusing to overwrite." >&2
 echo "install-gate: inspect the existing hook and merge or remove it manually, then re-run." >&2
 exit 1
