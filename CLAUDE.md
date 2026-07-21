@@ -8,17 +8,27 @@ The premise: git commit history is the only artefact in a planning-driven projec
 
 The plugin is project-agnostic. Any planning-driven project that uses git + writes plans can adopt it.
 
+**This file is time-independent by rule** (operator ruling 2026-07-21): static truths, conventions, instructions, and pointers to where stateful information lives — never transient planning state. If a statement here can become false as work advances, it doesn't belong here.
+
 ## Session-start orientation
 
-Read `planning/T1-top-level.md` first. It captures the validated design so far, plus the open design questions queued.
+Read `planning/T1-top-level.md` first — the design source of truth: the validated design plus the open design questions queued.
 
-**M1 is complete.** The hand-rolled end-to-end pipeline works and is dogfooded against this project: JSON-Schema validation, `cache-build.py` (events.jsonl → SQLite), `projection-emit.py`, `summary-emit.py`, the vanilla-JS HTML flow view, and the SQL audit catalogue all run green via `repack-validate.sh`. Two sub/sequence milestones also shipped on top of M1: **M6-analyser** (browser-direct "what's outstanding?" analyser, all five phases A–E — this drove the ontology's first evolution to schema `0.2.0` with the `analysis.*` events) and **M1.2-relationship-ssot** (milestone/theme membership is now event-sourced — `relationship.reattached` is the move primitive, frontmatter is only a creation-time seed).
+Current project state is never recorded in this file. Read it from the event-log projections:
 
-**M2 is complete** (2026-06-09): event capture is now skill-driven. After each logical unit of work and **before committing**, the in-session agent follows `agent-plan-visualiser/skills/apv-capture/SKILL.md` (`/apv-capture`) to append a sealed event block — schema `0.3.0`, draft gate (no `entity.progressed`/`entity.completed` against draft entities; acceptance is operator-only), `commit.recorded` seal matching the commit's first line. The **capture-guard pre-commit hook is installed and live** (`agent-plan-visualiser/hooks/capture-guard.sh`, installer `agent-plan-visualiser/scripts/install-hook.sh`): commits with staged files newer than `.agent-plan-tracker/.last-capture` are rejected; `git commit --no-verify` is the sanctioned escape hatch for capture-free trivia. The data dir is configurable via `APV_DATA_DIR`.
+- `.agent-plan-tracker/summary.md` — human digest: live work, awaiting-operator queues, draft/blocked/orphaned lists, milestone progress.
+- `.agent-plan-tracker/projection.json` — machine-readable state, and the browser view over it: `agent-plan-visualiser/bin/apv serve`.
+- Regenerate all derived views from the log with `agent-plan-visualiser/bin/apv` (cache → projection → summary).
+- Milestone history lives in the event log and `planning/M*.md`.
 
-**M3 is complete** (2026-06-10): main is gated. `agent-plan-visualiser/scripts/gate-check.sh` is the single boundary contract — the integrity composite (`gate-composite.py`: blocking = corruption of the record; warn = dashboard signal, merges freely) plus the seal↔commit correspondence check, policy lists in the committed `.apv-config.toml`. It fires through **three adapters**: `/apv-merge` skill-procedural (primary — `agent-plan-visualiser/skills/apv-merge/SKILL.md`: branch-side reconciliation, main's log is the prefix, contradictions go to the operator, rulings become reconciliation events sealed by the merge commit), **pre-push** (gates pushes of main), and the **reference-transaction local gate** (operator ruling 2026-06-10: gates every local move of main including fast-forward merges; `APV_SKIP_GATE=1` is its hatch). All three hooks are installed live in this repo alongside the capture-guard. M3's acceptance test was self-referential: the branch delivering it landed on main via the skill, gate green. Blocking checks are epoch-gated (0.3.0 discipline judged from 0.3.0 onward) and append-only-repairable (a later `entity.reopened` heals an earlier resurrection violation).
+## Standing discipline
 
-The T1 plan remains in active authoring as the design source of truth. **M4 (fresh-install packaging) is in build; the install wave is built** (2026-07-03) — planned and accepted 2026-06-10 (`planning/M4-fresh-install.md`, five T3s). Built: `T3-toolchain-portability` (APV rename + toolchain-home resolution, installers bake `--home=`), `T3-project-init-flow` (`/apv-init` — seeds `.apv/`, writes config, installs the three hooks, CLAUDE.md offer-only, idempotent report-and-repair), `T3-session-orientation` (SessionStart one-liner via `hooks/hooks.json` + the `using-agent-plan-visualiser` skill + cheatsheet), and `T3-distribution`'s local-install path (`scripts/build-bundle.sh` → marketplace-wrapped bundle installable via `/plugin marketplace add`; CI gate template; README quickstart; the cold-agent loop passes from the artefact alone — `tests/dist/run-dist-sandbox.sh`). Still open in-wave: the exfu.ai upload + Cowork verification (operator legs — `T3-distribution` stays live) and the autonomous `claude -p` extractor (`T3-autonomous-extractor`, draft, awaiting operator acceptance). M5 (backfill) after.
+Static operational law; mechanics live in the named skills and scripts.
+
+- **Capture before commit.** After each logical unit of work and before committing, follow `/apv-capture` (`agent-plan-visualiser/skills/apv-capture/SKILL.md`) to append a sealed event block ending in a `commit.recorded` seal that matches the commit's first line. The capture-guard pre-commit hook rejects commits whose staged files are newer than the data dir's `.last-capture`; `git commit --no-verify` is the sanctioned escape hatch for capture-free trivia.
+- **Draft gate.** No implementation work may be recorded against `draft` entities; acceptance (`entity.accepted`) is operator-only, never self-issued.
+- **Main is gated.** `agent-plan-visualiser/scripts/gate-check.sh` — the integrity composite plus the seal↔commit correspondence check, policy lists in the committed `.apv-config.toml` — fires through three adapters: `/apv-merge` (primary, skill-procedural — `agent-plan-visualiser/skills/apv-merge/SKILL.md`), pre-push, and the reference-transaction local gate (`APV_SKIP_GATE=1` is its hatch).
+- **Data dir resolution.** `APV_DATA_DIR` env var → `.apv-config.toml [storage] data_dir` → default `.apv/`. This repo pins `.agent-plan-tracker/`.
 
 ## Conventions
 
@@ -28,9 +38,9 @@ This project uses the planning methodology it captures (dogfooding).
   - `T1-top-level.md` — main-spine Tier-1 intent + scope + themes + design.
   - `T2-<slug>.md` — main-spine Tier-2 thematic chunks (e.g., `T2-ontology.md`, `T2-storage.md`).
   - `T3-<slug>.md` — main-spine Tier-3 execution plans (e.g., `T3-events-jsonl-schema.md`).
-  - `M<n>-<slug>.md` — milestone plans on the orthogonal sequence axis (e.g., `M1-bootstrap.md`, `M2-auto-extract.md`).
+  - `M<n>-<slug>.md` — milestone plans on the orthogonal sequence axis (e.g., `M1-bootstrap.md`); `M<n>.<m>-<slug>.md` — sub-milestones.
   - `XT<n>-<slug>.md` — crosscut workstream plans (X prefix).
   - `<L>T<n>-<slug>.md` — side-quest workstream plans (any capital letter L other than X — e.g., `PT2-client-editor.md`).
 - **`.agent-plan-tracker/`** holds the event log (`events.jsonl`), cache, projection, snapshots — the tracking spine for this project itself (we dogfood). Pre-rename name kept deliberately, pinned via `.apv-config.toml`; fresh installs use `.apv/`.
-- **`skills/`**, **`cheatsheet/`**, **`bin/`**, **`philosophies/`**, **`hooks/`**, **`view/`**, **`commands/`** (later) — packaged plugin content as the design crystallises into implementation.
+- **`agent-plan-visualiser/`** is the packaged plugin: `skills/`, `commands/`, `hooks/`, `scripts/`, `bin/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`, `tests/`.
 - **No `product/`** until there's actual product code. Design + bootstrap first; implementation follows.

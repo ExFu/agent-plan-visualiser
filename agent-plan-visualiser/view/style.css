@@ -1409,3 +1409,78 @@ button:disabled {
 .flow-gutter-row.origin-backfilled { opacity: 0.55; font-style: italic; }
 .flow-gutter-row.origin-backfilled:hover { opacity: 0.85; }
 .flow-gutter-row.origin-mixed { font-style: italic; }
+
+/* ===== Operator attention panel (T3-view-attention-panel) =====
+   Mirrors summary.md's "Awaiting operator" + "Milestone progress" sections.
+   Collapsible; open by default whenever a queue is non-empty. */
+.attention-panel { margin-bottom: 1rem; }
+.attention-details {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pill-decision);
+  border-radius: 4px;
+  background: var(--card-bg);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+}
+.attention-details summary { cursor: pointer; font-weight: 600; }
+.att-count {
+  display: inline-block;
+  background: var(--pill-fulcrum);
+  color: #fff;
+  border-radius: 9px;
+  padding: 0 0.45rem;
+  font-size: 0.75rem;
+  margin-left: 0.3rem;
+}
+.att-body { padding: 0.5rem 0 0.2rem; }
+.att-section { margin-bottom: 0.45rem; }
+.att-label { font-weight: 600; margin-right: 0.5rem; }
+.att-age { color: #666; font-size: 0.78rem; }
+.att-link { text-decoration: none; }
+.att-link code { font-family: var(--mono); font-size: 0.8rem; }
+.att-link:hover code { text-decoration: underline; }
+.att-milestones { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.mp-pill {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.05rem 0.5rem;
+  background: var(--bg);
+}
+.mp-pill.mp-done { border-color: var(--pill-completed); }
+.mp-pill.mp-live { border-color: var(--color-live); background: #e3f2fd; }
+.mp-count { font-size: 0.75rem; color: #666; }
+
+/* Decision text revealed on event rows (fulcrum click-through,
+   T2-projection §3.2) — rendered by renderEventLi from decisions.explains_arcs. */
+.decision-note {
+  margin-top: 0.3rem;
+  padding: 0.4rem 0.6rem;
+  background: #fffde7;
+  border-left: 3px solid var(--pill-decision);
+  border-radius: 0 4px 4px 0;
+  font-size: 0.8rem;
+}
+.decision-note-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  color: #8d6e00;
+  margin-right: 0.4rem;
+}
+
+/* ===== Shared entity search (T3-html-view-interactivity) ===== */
+.entity-search {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--fg);
+  width: 11rem;
+  margin-right: 0.5rem;
+}
+.entity-search:focus { outline: 2px solid var(--btn-primary); outline-offset: -1px; }
