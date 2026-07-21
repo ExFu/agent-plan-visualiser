@@ -27,5 +27,11 @@ fi
 # status are the analyser's job, on demand).
 [ -f "$DATA_DIR/events.jsonl" ] || exit 0
 
-echo "apv: this project is tracked by agent-plan-visualiser — the append-only event log at $DATA_DIR/events.jsonl is the source of truth for planning state. Run /apv-capture after each logical unit of work, immediately before every commit (the pre-commit guard rejects uncaptured commits); land branches on main via /apv-merge. For how the tracking works, see the using-agent-plan-visualiser skill."
+# Skills ship plugin-namespaced; say so, and when the plugin root is known
+# (hooks receive CLAUDE_PLUGIN_ROOT) give the literal source path too, so
+# even a session whose skill listing is truncated — or a subagent — can
+# read the SKILL.md directly instead of concluding the skill is missing.
+SKILL_HINT="the skills are plugin-namespaced (agent-plan-visualiser:apv-capture etc.)"
+[ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && SKILL_HINT="$SKILL_HINT, sources at $CLAUDE_PLUGIN_ROOT/skills/<name>/SKILL.md"
+echo "apv: this project is tracked by agent-plan-visualiser — the append-only event log at $DATA_DIR/events.jsonl is the source of truth for planning state. Run /apv-capture after each logical unit of work, immediately before every commit (the pre-commit guard rejects uncaptured commits); land branches on main via /apv-merge; $SKILL_HINT. For how the tracking works, see the using-agent-plan-visualiser skill."
 exit 0

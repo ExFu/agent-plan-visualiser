@@ -2,8 +2,12 @@
 
 Conventions: `$APV` = the toolchain home (`${CLAUDE_PLUGIN_ROOT}` on a
 plugin install; the vendored `agent-plan-visualiser/` dir in this repo's
-dogfood case). `$DATA` = the data dir (`APV_DATA_DIR` → `.apv-config.toml`
-`[storage] data_dir` → `.apv/`). Run everything from the repo root.
+dogfood case; from any checkout, the newest
+`~/.claude/plugins/cache/*/agent-plan-visualiser/*/`). `$DATA` = the data
+dir (`APV_DATA_DIR` → `.apv-config.toml` `[storage] data_dir` → `.apv/`).
+Run everything from the repo root. Skills are plugin-namespaced
+(`agent-plan-visualiser:apv-capture` etc.); when a session lacks them, the
+sources are at `$APV/skills/<name>/SKILL.md`.
 
 ## Status read (what's the project state?)
 

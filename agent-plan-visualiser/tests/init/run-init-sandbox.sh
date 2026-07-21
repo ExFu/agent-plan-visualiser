@@ -96,6 +96,7 @@ git add -A
 run git commit -m "adopt tracking"
 check "uncaptured commit refused"       [ "$CODE" -ne 0 ]
 check "guard names the missing capture" grep -qi "capture" <<<"$OUT"
+check "refusal points at skill source"  grep -q "skills/apv-capture/SKILL.md" <<<"$OUT"
 append_ev   0001 entity.created  INIT-A "fresh-repo plan, born draft"
 append_seal 0002 "adopt tracking"
 git add -A && stamp
@@ -152,6 +153,38 @@ check "accepted run exits 0"            [ "$CODE" -eq 0 ]
 check "block appended"                  grep -qF "<!-- apv:orientation -->" CLAUDE.md
 run bash "$INIT" --accept-claude-md
 check "second accept is a no-op"        [ "$(grep -cF 'apv:orientation' CLAUDE.md)" -eq 1 ]
+
+# --- Case 6: plugin-cache install -> enablement persistence -------------------
+echo "== cache install: enablement written to .claude/settings.json, tracked-ness checked"
+CACHE_HOME="$SANDBOX/cc/plugins/cache/apv/agent-plan-visualiser/9.9.9"
+mkdir -p "$(dirname "$CACHE_HOME")"
+cp -R "$WT_ROOT/agent-plan-visualiser" "$CACHE_HOME"
+new_repo cachey
+run env CLAUDE_CONFIG_DIR="$SANDBOX/cc" bash "$CACHE_HOME/scripts/apv-init.sh"
+check "cache init exits 0"              [ "$CODE" -eq 0 ]
+check "enablement key written"          grep -q '"agent-plan-visualiser@apv": true' .claude/settings.json
+check "untracked warned loudly"         grep -q "UNTRACKED" <<<"$OUT"
+check "next-steps says commit it"       grep -q "COMMIT .claude/settings.json" <<<"$OUT"
+git add .claude/settings.json
+run env CLAUDE_CONFIG_DIR="$SANDBOX/cc" bash "$CACHE_HOME/scripts/apv-init.sh"
+check "re-run exits 0"                  [ "$CODE" -eq 0 ]
+check "tracked reported once staged"    grep -q "worktree checkouts and clones will load" <<<"$OUT"
+check_absent "no UNTRACKED once staged" "UNTRACKED"
+
+echo "== cache install, user scope: nothing to persist"
+CC2="$SANDBOX/cc2"
+mkdir -p "$CC2/plugins"
+printf '{"version":2,"plugins":{"agent-plan-visualiser@apv":[{"scope":"user"}]}}\n' > "$CC2/plugins/installed_plugins.json"
+new_repo userscoped
+run env CLAUDE_CONFIG_DIR="$CC2" bash "$CACHE_HOME/scripts/apv-init.sh"
+check "user-scope init exits 0"         [ "$CODE" -eq 0 ]
+check "user-scope reported"             grep -q "user-scope" <<<"$OUT"
+check "no settings file written"        [ ! -e .claude/settings.json ]
+
+echo "== non-cache home: enablement component silent"
+cd "$SANDBOX/fresh" || exit 2
+run bash "$INIT"
+check_absent "no enablement chatter"    "enabledPlugins"
 
 echo
 if [ "$FAIL" -eq 0 ]; then

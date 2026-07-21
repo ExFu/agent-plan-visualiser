@@ -38,6 +38,15 @@ abandoned work nor misses open threads.
   operator, rulings recorded as reconciliation events sealed by the merge
   commit. The pre-push and reference-transaction git hooks backstop it.
 
+On a plugin install these skills are namespaced
+`agent-plan-visualiser:<name>` in the session's skill list. If neither the
+plain nor the namespaced form is available, the session did not load the
+plugin (typical in a worktree checkout without a committed
+`.claude/settings.json`) — the sources stay readable at
+`${CLAUDE_PLUGIN_ROOT}/skills/<name>/SKILL.md`, or from any checkout at the
+newest `~/.claude/plugins/cache/*/agent-plan-visualiser/*/skills/`; read
+the file and follow it. `/apv-init` checks the enablement is committed.
+
 ## 3. Where things live
 
 Data dir resolution, everywhere in the toolchain: `APV_DATA_DIR` env var →

@@ -104,6 +104,7 @@ stamp() { date +%s > .apv/.last-capture; }
 git add -A
 run git commit -m "adopt tracking"
 check "uncaptured commit refused"       [ "$CODE" -ne 0 ]
+check "refusal points at skill source"  grep -q "skills/apv-capture/SKILL.md" <<<"$OUT"
 append_ev   0001 entity.created  COLD-A "cold-agent plan, born draft"
 append_ev   0002 entity.accepted COLD-A "operator acceptance"
 append_seal 0003 "adopt tracking"

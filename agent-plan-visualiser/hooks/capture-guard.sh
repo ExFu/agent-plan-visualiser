@@ -38,11 +38,42 @@ else
   [ -n "$DATA_DIR" ] || DATA_DIR=".apv"
 fi
 
+# On refusal, point at the capture skill's SOURCE, not just its name: this
+# hook fires via the shared .git/hooks in every worktree checkout, including
+# sessions where the plugin never loaded (no committed .claude/settings.json
+# in the checkout) and /apv-capture is therefore not an available skill.
+# Resolution mirrors the ./apv launcher: APV_HOME -> vendored ->
+# <data-dir>/.toolchain-home (non-cache pins only) -> newest plugin cache.
+# Failure paths only — the green path stays dependency-free and fast.
+skill_hint() {
+  home=""
+  if [ -n "${APV_HOME:-}" ] && [ -d "${APV_HOME:-}/skills" ]; then
+    home="$APV_HOME"
+  elif [ -d "agent-plan-visualiser/skills" ]; then
+    home="agent-plan-visualiser"
+  elif [ -f "$DATA_DIR/.toolchain-home" ]; then
+    pinned="$(head -n 1 "$DATA_DIR/.toolchain-home" 2>/dev/null)"
+    [ -d "$pinned/skills" ] && home="$pinned"
+  fi
+  if [ -z "$home" ]; then
+    newest="$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/agent-plan-visualiser/*/ 2>/dev/null | sort | tail -n 1)"
+    newest="${newest%/}"
+    if [ -n "$newest" ] && [ -d "$newest/skills" ]; then home="$newest"; fi
+  fi
+  if [ -n "$home" ]; then
+    echo "apv: if /apv-capture (or agent-plan-visualiser:apv-capture) is not an available" >&2
+    echo "apv: skill in this session, read and follow: $home/skills/apv-capture/SKILL.md" >&2
+  else
+    echo "apv: (apv-capture ships with the agent-plan-visualiser plugin)" >&2
+  fi
+}
+
 # Missing file, empty, or non-numeric content all mean "no usable capture".
 capture_ts=$(cat "$DATA_DIR/.last-capture" 2>/dev/null)
 case "$capture_ts" in
   ''|*[!0-9]*)
     echo "apv: no capture recorded. Run /apv-capture first." >&2
+    skill_hint
     exit 1
     ;;
 esac
@@ -80,6 +111,7 @@ git diff --cached --name-only -z | tr '\0' '\n' | while IFS= read -r file; do
 
   if [ "$file_ts" -gt "$capture_ts" ]; then
     echo "apv: '$file' modified after last capture. Run /apv-capture first." >&2
+    skill_hint
     exit 1
   fi
 done || exit 1

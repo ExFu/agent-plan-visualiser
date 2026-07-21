@@ -18,13 +18,24 @@ bash agent-plan-visualiser/scripts/build-bundle.sh        # -> dist/apv-marketpl
 # 2. Attach a project (fresh or existing repo — attaches from now):
 /apv-init          # seeds .apv/, writes config, installs the git hooks
 
-# 3. Work normally; before each commit:
+# 3. Commit the plugin enablement with your first tracked commit:
+git add .claude/settings.json
+# Without this, worktree checkouts and fresh clones run the git hooks but
+# load none of the apv skills/commands. /apv-init checks and warns.
+
+# 4. Work normally; before each commit:
 /apv-capture       # appends the sealed event block; the guard enforces this
 ```
 
 Land branches on main via `/apv-merge`; the pre-push and
 reference-transaction hooks keep an untrustworthy log off main either way.
 `git commit --no-verify` is the sanctioned hatch for capture-free trivia.
+
+Skills install plugin-namespaced — in a session's skill list they appear as
+`agent-plan-visualiser:apv-capture` etc. If neither that nor `/apv-capture`
+is available, the session didn't load the plugin (usually a checkout without
+`.claude/settings.json`); the skill sources remain readable at the newest
+`~/.claude/plugins/cache/*/agent-plan-visualiser/*/skills/`.
 
 ## What's in the box
 

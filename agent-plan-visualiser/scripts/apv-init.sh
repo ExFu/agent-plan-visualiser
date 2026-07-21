@@ -403,6 +403,79 @@ else
   fi
 fi
 
+# --- 5b. plugin enablement persistence ---------------------------------------
+# A project-scope plugin install is enabled by `enabledPlugins` in
+# `.claude/settings.json` at the SESSION's project root. Worktree checkouts
+# and fresh clones only carry that file when it is COMMITTED — otherwise the
+# plugin (skills, commands, session orientation) silently fails to load
+# there while the git hooks, shared via .git/hooks, still fire: agents get
+# refused by the capture-guard with no /apv-capture skill to run. Field
+# report 2026-07-21. So: ensure the enablement key exists in the shared
+# settings file and warn loudly when that file is not git-tracked.
+# User-scope installs load in every session and need none of this; vendored
+# toolchains do not go through the plugin loader at all.
+NEEDS_SETTINGS_COMMIT=0
+case "$TOOLCHAIN_HOME" in
+  */plugins/cache/*)
+    # Cache layout is .../plugins/cache/<marketplace>/<plugin>/<version>.
+    PLUGIN_ID="$(basename "$(dirname "$TOOLCHAIN_HOME")")@$(basename "$(dirname "$(dirname "$TOOLCHAIN_HOME")")")"
+    INSTALLED_JSON="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json"
+    USER_SCOPE=0
+    if [ -f "$INSTALLED_JSON" ] && python3 - "$INSTALLED_JSON" "$PLUGIN_ID" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(1)
+entries = d.get("plugins", {}).get(sys.argv[2], [])
+sys.exit(0 if any(e.get("scope") == "user" for e in entries) else 1)
+PY
+    then USER_SCOPE=1; fi
+    if [ "$USER_SCOPE" -eq 1 ]; then
+      report ok "plugin enablement" "$PLUGIN_ID is user-scope — loads in every session, worktrees included"
+    else
+      SETTINGS=".claude/settings.json"
+      WROTE="$(python3 - "$SETTINGS" "$PLUGIN_ID" <<'PY'
+import json, os, sys
+path, pid = sys.argv[1], sys.argv[2]
+data = {}
+if os.path.exists(path):
+    try:
+        data = json.load(open(path))
+    except Exception:
+        print("invalid"); sys.exit(0)
+ep = data.setdefault("enabledPlugins", {})
+if ep.get(pid) is True:
+    print("ok"); sys.exit(0)
+ep[pid] = True
+os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+print("written")
+PY
+)"
+      case "$WROTE" in
+        invalid)
+          report REFUSED "$SETTINGS" "exists but is not valid JSON — fix it by hand, then re-run"
+          FAIL=1 ;;
+        ok)
+          report ok "$SETTINGS" "enabledPlugins carries $PLUGIN_ID" ;;
+        written)
+          report created "$SETTINGS" "enabledPlugins[\"$PLUGIN_ID\"] = true" ;;
+      esac
+      if [ "$WROTE" != "invalid" ]; then
+        if git ls-files --error-unmatch "$SETTINGS" >/dev/null 2>&1; then
+          report ok "$SETTINGS (tracked)" "worktree checkouts and clones will load the plugin"
+        else
+          report ACTION "$SETTINGS" "UNTRACKED — commit it, or worktree checkouts and clones will NOT load the plugin (no skills, no commands) while the git hooks still fire"
+          NEEDS_SETTINGS_COMMIT=1
+        fi
+      fi
+    fi
+    ;;
+esac
+
 # --- 6. CLAUDE.md orientation offer ------------------------------------------
 # Ruled (M4 §7 Q4, 2026-06-10): offer only; init is the offer's ONLY
 # trigger; writing requires explicit user acceptance (--accept-claude-md).
@@ -419,6 +492,13 @@ plans and status prose are secondary. After each logical unit of work and
 the pre-commit guard rejects uncaptured commits (\`git commit --no-verify\`
 is the sanctioned hatch for capture-free trivia). Land branches on main via
 /apv-merge; the gate hooks refuse a main that fails the integrity check.
+
+Skills are plugin-namespaced: /apv-capture may be listed as
+\`agent-plan-visualiser:apv-capture\`. If NEITHER form is available, this
+session did not load the plugin (typical in worktree checkouts that lack
+\`.claude/settings.json\`) — read the skill source directly and follow it:
+the newest \`~/.claude/plugins/cache/*/agent-plan-visualiser/*/skills/apv-capture/SKILL.md\`
+(same pattern for apv-merge and using-agent-plan-visualiser).
 BLOCK
 }
 if [ -f CLAUDE.md ] && grep -qF "$APV_MD_MARKER" CLAUDE.md; then
@@ -440,6 +520,10 @@ fi
 echo
 if [ "$FAIL" -eq 0 ]; then
   echo "apv-init: attached. Next steps:"
+  if [ "$NEEDS_SETTINGS_COMMIT" -eq 1 ]; then
+    echo "  - COMMIT .claude/settings.json (plugin enablement): without it, worktree"
+    echo "    checkouts and clones run the git hooks but load none of the apv skills."
+  fi
   echo "  - Work normally; run /apv-capture after each logical unit of work,"
   echo "    immediately before committing. The guard catches you if you forget."
   echo "  - Land branches on main via /apv-merge; the gate keeps main trustworthy."
