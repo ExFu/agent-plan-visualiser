@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T14:16:33Z
+# Project state — generated 2026-07-21T14:59:38Z
 
-**Total events:** 551  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 53  ·  **Orphaned:** 0
+**Total events:** 555  ·  **Draft:** 13  ·  **Live:** 11  ·  **Dormant:** 0  ·  **Closed:** 54  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -41,7 +41,7 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 96 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 97 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -101,4 +101,4 @@ _No flapping closures._
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 
 ---
-_77 entities · 104 relationships · 27 decisions._
+_78 entities · 104 relationships · 28 decisions._
