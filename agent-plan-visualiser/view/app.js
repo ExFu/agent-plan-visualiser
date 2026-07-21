@@ -164,6 +164,8 @@ async function main() {
   document.getElementById("btn-tree").addEventListener("click", () => switchView("tree"));
   document.getElementById("btn-flow").addEventListener("click", () => switchView("flow"));
   renderProjectChip();
+  buildDecisionIndex();
+  renderAttentionPanel();
 
   // Esc clears flow-view isolation (T3-flow-view-filtering D2).
   document.addEventListener("keydown", (e) => {
@@ -174,6 +176,76 @@ async function main() {
   });
 
   switchView("flow");
+}
+
+// ---------------------------------------------------------------------------
+// Operator attention panel (T3-view-attention-panel) — renders the
+// projection's `attention` + `milestone_progress` blocks, mirroring
+// summary.md's "Awaiting operator" / "Milestone progress" sections. The
+// emitter already computes everything; this is view-side only. The decision
+// index feeds renderEventLi so fulcrum events reveal their paired decision
+// text (T2-projection §3.2's click-through).
+// ---------------------------------------------------------------------------
+
+function buildDecisionIndex() {
+  state.decisionsByArc = new Map();
+  for (const d of state.projection.decisions || []) {
+    for (const arc of d.explains_arcs || []) {
+      if (!state.decisionsByArc.has(arc)) state.decisionsByArc.set(arc, []);
+      state.decisionsByArc.get(arc).push(d);
+    }
+  }
+}
+
+function attentionEntityLink(entityId) {
+  return `<a href="#" class="att-link" data-eid="${escapeHtml(entityId)}"><code>${escapeHtml(entityId)}</code></a>`;
+}
+
+function renderAttentionPanel() {
+  const host = document.getElementById("attention-panel");
+  if (!host || !state.projection) return;
+  const att = state.projection.attention || {};
+  const acc = att.pending_acceptance || [];
+  const clo = att.pending_closure || [];
+  const def = att.deferred_verifications || [];
+  const untriaged = Object.values(state.projection.entities || {})
+    .filter(e => e.entity_type === "inbox-item" && e.derived_state === "draft").length;
+  const mp = state.projection.milestone_progress || {};
+  const queueCount = acc.length + clo.length + def.length;
+  if (!queueCount && !untriaged && !Object.keys(mp).length) { host.hidden = true; return; }
+
+  const rows = [];
+  if (acc.length) rows.push(`<div class="att-section"><span class="att-label">Acceptance pending</span>${
+    acc.map(a => `${attentionEntityLink(a.entity_id)} <span class="att-age">(${a.commits_since} commit${a.commits_since === 1 ? "" : "s"} ago)</span>`).join(" · ")}</div>`);
+  if (clo.length) rows.push(`<div class="att-section"><span class="att-label">Closure pending</span>${
+    clo.map(id => attentionEntityLink(id)).join(" · ")}</div>`);
+  if (def.length) rows.push(`<div class="att-section"><span class="att-label">Deferred verifications</span>${
+    def.map(d => `${attentionEntityLink(d.entity_id)}${d.reason ? ` <span class="att-age">(${escapeHtml(d.reason)})</span>` : ""}`).join(" · ")}</div>`);
+  if (untriaged) rows.push(`<div class="att-section"><span class="att-label">Inbox</span><span class="att-age">${untriaged} untriaged item${untriaged === 1 ? "" : "s"}</span></div>`);
+
+  const pills = Object.entries(mp)
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    .map(([mid, m]) => {
+      const done = m.completed_t3_count, total = m.scheduled_t3_count;
+      const cls = m.live_t3_count ? "mp-live" : (total > 0 && done === total ? "mp-done" : "");
+      return `<span class="mp-pill ${cls}" title="${escapeHtml(mid)}: ${done}/${total} scheduled T3s complete, ${m.live_t3_count} live">${attentionEntityLink(mid)}<span class="mp-count">${done}/${total}</span></span>`;
+    }).join("");
+
+  host.innerHTML = `<details class="attention-details"${queueCount ? " open" : ""}>
+    <summary>Awaiting operator${queueCount ? ` <span class="att-count">${queueCount}</span>` : ""}</summary>
+    <div class="att-body">
+      ${rows.join("") || '<div class="att-section"><span class="att-age">Nothing awaiting the operator.</span></div>'}
+      <div class="att-section att-milestones"><span class="att-label">Milestones</span>${pills}</div>
+    </div>
+  </details>`;
+  host.hidden = false;
+  host.querySelectorAll(".att-link").forEach(a => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    const entity = (state.projection.entities || {})[`plan:${a.dataset.eid}`];
+    if (!entity) return;
+    if (state.currentView !== "flow") switchView("flow");
+    showPlanMarkdown(entity);
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -1650,10 +1722,16 @@ function renderEventLi(ev) {
   const kind = eventTypeKind(ev.type);
   const summary = ev.attributes?.summary || ev.attributes?.note || ev.attributes?.text || ev.attributes?.title || "(no summary)";
   const isLong = summary.length > 220;
+  // Paired decision text (decisions.explains_arcs → this event) — the
+  // fulcrum click-through: a fulcrum's node detail shows its rationale here.
+  const decisions = (state.decisionsByArc && state.decisionsByArc.get(ev.event_id)) || [];
+  const decisionHtml = decisions.map(d =>
+    `<div class="decision-note"><span class="decision-note-label">decision</span>${escapeHtml(d.text)}</div>`
+  ).join("");
   if (!isLong) {
-    return `<li><span class="event-pill event-pill-${kind}">${escapeHtml(ev.type)}</span><div class="event-summary">${escapeHtml(summary)}</div></li>`;
+    return `<li><span class="event-pill event-pill-${kind}">${escapeHtml(ev.type)}</span><div class="event-summary">${escapeHtml(summary)}</div>${decisionHtml}</li>`;
   }
-  return `<li><span class="event-pill event-pill-${kind}">${escapeHtml(ev.type)}</span><div class="event-summary expandable">${escapeHtml(summary)}</div><a href="#" class="read-more-toggle">read more</a></li>`;
+  return `<li><span class="event-pill event-pill-${kind}">${escapeHtml(ev.type)}</span><div class="event-summary expandable">${escapeHtml(summary)}</div><a href="#" class="read-more-toggle">read more</a>${decisionHtml}</li>`;
 }
 
 function attachReadMoreToggles(root) {
