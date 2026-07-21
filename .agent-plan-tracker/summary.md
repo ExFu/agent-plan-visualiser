@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-10T17:45:23Z
+# Project state — generated 2026-07-21T11:15:54Z
 
-**Total events:** 533  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 53  ·  **Orphaned:** 0
+**Total events:** 536  ·  **Draft:** 13  ·  **Live:** 10  ·  **Dormant:** 0  ·  **Closed:** 53  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -22,7 +22,7 @@
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
 
 - **T2-packaging**
-  - `T3-distribution` (32 events): entity.progressed → entity.progressed → verification.tested
+  - `T3-distribution` (34 events): verification.tested → entity.progressed → verification.tested
 
 ### By milestone
 
@@ -38,7 +38,7 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `T2-ingest` (authored 2026-05-23, 91 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 92 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -46,18 +46,18 @@
 ## Draft
 
 - **inbox-item**
-  - `2026-05-23.autopilot-misuse-meta-observation` (48d untriaged)
-  - `2026-05-23.cheatsheet-initial-content` (48d untriaged)
-  - `2026-05-23.cowork-vs-code-altitude-guidance` (48d untriaged)
-  - `2026-05-23.extraction-prompt-template-skeleton` (48d untriaged)
-  - `2026-05-23.html-view-visual-style` (48d untriaged)
-  - `2026-05-23.mapping-note-agent-design` (48d untriaged)
-  - `2026-05-23.plugin-naming-alternatives` (48d untriaged)
-  - `2026-05-23.side-quest-formalisation` (48d untriaged)
-  - `2026-05-23.snapshot-trigger-config` (48d untriaged)
-  - `2026-05-23.verification-overhaul-candidate-model` (48d untriaged)
-  - `2026-06-10.view-hardcodes-dogfood-data-dir` (30d untriaged)
-  - `2026-07-07.dist-sandbox-test-reference-stale` (3d untriaged)
+  - `2026-05-23.autopilot-misuse-meta-observation` (59d untriaged)
+  - `2026-05-23.cheatsheet-initial-content` (59d untriaged)
+  - `2026-05-23.cowork-vs-code-altitude-guidance` (59d untriaged)
+  - `2026-05-23.extraction-prompt-template-skeleton` (59d untriaged)
+  - `2026-05-23.html-view-visual-style` (59d untriaged)
+  - `2026-05-23.mapping-note-agent-design` (59d untriaged)
+  - `2026-05-23.plugin-naming-alternatives` (59d untriaged)
+  - `2026-05-23.side-quest-formalisation` (59d untriaged)
+  - `2026-05-23.snapshot-trigger-config` (59d untriaged)
+  - `2026-05-23.verification-overhaul-candidate-model` (59d untriaged)
+  - `2026-06-10.view-hardcodes-dogfood-data-dir` (41d untriaged)
+  - `2026-07-07.dist-sandbox-test-reference-stale` (14d untriaged)
 - **plan**
   - `T2-ingest`
 
