@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-21T16:29:13Z
+# Project state — generated 2026-07-22T11:22:56Z
 
-**Total events:** 599  ·  **Draft:** 15  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 59  ·  **Orphaned:** 0
+**Total events:** 603  ·  **Draft:** 16  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 59  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -45,8 +45,9 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 1 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 108 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 2 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 109 commit(s) ago)
+- `T3-project-attribution` (authored 2026-07-22, 0 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -54,22 +55,23 @@
 ## Draft
 
 - **inbox-item**
-  - `2026-05-23.autopilot-misuse-meta-observation` (59d untriaged)
-  - `2026-05-23.cheatsheet-initial-content` (59d untriaged)
-  - `2026-05-23.cowork-vs-code-altitude-guidance` (59d untriaged)
-  - `2026-05-23.extraction-prompt-template-skeleton` (59d untriaged)
-  - `2026-05-23.html-view-visual-style` (59d untriaged)
-  - `2026-05-23.mapping-note-agent-design` (59d untriaged)
-  - `2026-05-23.plugin-naming-alternatives` (59d untriaged)
-  - `2026-05-23.side-quest-formalisation` (59d untriaged)
-  - `2026-05-23.snapshot-trigger-config` (59d untriaged)
-  - `2026-05-23.verification-overhaul-candidate-model` (59d untriaged)
-  - `2026-06-10.view-hardcodes-dogfood-data-dir` (41d untriaged)
-  - `2026-07-07.dist-sandbox-test-reference-stale` (14d untriaged)
-  - `2026-07-21.methodology-name-pending`
+  - `2026-05-23.autopilot-misuse-meta-observation` (60d untriaged)
+  - `2026-05-23.cheatsheet-initial-content` (60d untriaged)
+  - `2026-05-23.cowork-vs-code-altitude-guidance` (60d untriaged)
+  - `2026-05-23.extraction-prompt-template-skeleton` (60d untriaged)
+  - `2026-05-23.html-view-visual-style` (60d untriaged)
+  - `2026-05-23.mapping-note-agent-design` (60d untriaged)
+  - `2026-05-23.plugin-naming-alternatives` (60d untriaged)
+  - `2026-05-23.side-quest-formalisation` (60d untriaged)
+  - `2026-05-23.snapshot-trigger-config` (60d untriaged)
+  - `2026-05-23.verification-overhaul-candidate-model` (60d untriaged)
+  - `2026-06-10.view-hardcodes-dogfood-data-dir` (42d untriaged)
+  - `2026-07-07.dist-sandbox-test-reference-stale` (15d untriaged)
+  - `2026-07-21.methodology-name-pending` (1d untriaged)
 - **plan**
   - `KT0-knowledge-substrate`
   - `T2-ingest`
+  - `T3-project-attribution`
 
 ## Blocked
 
@@ -103,10 +105,10 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 4/6 T3 complete (66%); 2 live
+- **M4-fresh-install**: 4/7 T3 complete (57%); 2 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 
 ---
-_86 entities · 115 relationships · 29 decisions._
+_87 entities · 118 relationships · 29 decisions._
