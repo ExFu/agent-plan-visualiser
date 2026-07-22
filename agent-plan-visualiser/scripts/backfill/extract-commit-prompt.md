@@ -46,10 +46,12 @@ with a parent.
 **Meta (1)**: `commit.recorded` — exactly one, LAST. Attributes `author`,
 `date`, `message_first_line` (the historical commit's, exactly) — the
 orchestrator adds `commit_ref`.
-**Never emit**: `entity.accepted`, `analysis.*`.
+**Never emit**: `entity.accepted`, `analysis.*`, `project.assigned`
+(operator-ruled fulcrum — same class as `entity.accepted`).
 
-**Entity types**: `plan` (id = frontmatter `id`; filename `<id>.md`),
-`blocker`, `hitl-question` (`<parent-plan-id>.q<n>`), `implicit-work`
+**Entity types**: `plan` (id = frontmatter `id`; filename `<id>.md`, under
+any registered planning root), `blocker`, `hitl-question`
+(`<parent-plan-id>.q<n>`), `implicit-work`
 (`impl.<short-hash>.<message-slug>` — you HAVE the hash in backfill),
 `inbox-item` (`<YYYY-MM-DD>.<title-slug>`).
 
@@ -99,6 +101,19 @@ rationale: treat its entries as citable sources.
   Do not force plan attribution that the diff doesn't support.
 - Prefer fewer, higher-confidence events. `confidence`: "explicit" only
   when the message/artefact states it; otherwise "derived".
+- **Project membership is not yours to assert.** The bundle's
+  "Sub-project ownership" section (present only in multi-project repos)
+  shows which named sub-projects' carve-outs the commit touched — the
+  orchestrator stamps `attributes.project` in code from those facts. One
+  named sub-project listed ⇒ your planless creations are stamped
+  automatically. TWO OR MORE listed ⇒ SPLIT the planless work: one
+  `implicit-work` entity per named sub-project
+  (`impl.<short-hash>.<slug>.<project>`), each stamped
+  `attributes.project` with a name from that section — never a name it
+  doesn't list. Never put `attributes.project` on any other event, and
+  never emit `project.assigned`. A file moved between planning roots is
+  just a diff — do not express it as `relationship.reattached` or
+  `entity.extended`.
 
 ## Output
 

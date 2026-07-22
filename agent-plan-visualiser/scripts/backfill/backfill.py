@@ -68,7 +68,8 @@ SCHEMA_PATH = SCRIPTS.parent / "schemas/0.4.0/events.schema.json"
 # viable. Surfaced by the exfu rehearsal staging: release commits with
 # bundled artefacts produce ~300k-char diffs.
 DIFF_CAP = 120_000
-FORBIDDEN_TYPES = {"entity.accepted", "analysis.live-summary", "analysis.invalidated"}
+FORBIDDEN_TYPES = {"entity.accepted", "analysis.live-summary", "analysis.invalidated",
+                   "project.assigned"}
 UUID4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 # Mirror of gate-composite's blocking referential classes — keep in sync.
 LIFECYCLE_TYPES = {
@@ -143,12 +144,27 @@ def list_commits(project_path: Path, until: str | None, limit: int) -> list[str]
 
 def looks_non_native(project_path: Path) -> bool:
     """Heuristic for the mapping-note warning: a native project has
-    planning/<id>.md files matching the tier/milestone id convention."""
-    planning = project_path / "planning"
-    if not planning.is_dir():
-        return True
+    <planning-root>/<id>.md files matching the tier/milestone id convention
+    under ANY registered planning root ([storage] planning_dir + the
+    [projects] registry)."""
     pat = re.compile(r"^([A-Z]*T\d|M\d)")
-    return not any(pat.match(p.stem) for p in planning.glob("*.md"))
+    for _name, root in apvlib.apv_planning_roots(project_path):
+        if root.is_dir() and any(pat.match(p.stem) for p in root.glob("*.md")):
+            return False
+    return True
+
+
+def planning_root_prefixes(project_path: Path) -> list:
+    """Repo-relative prefixes of every registered planning root (registry +
+    implicit main) — the bundle's plan-file filter. Roots outside the repo
+    can't appear in git listings and are skipped."""
+    prefixes = []
+    for _name, root in apvlib.apv_planning_roots(project_path):
+        try:
+            prefixes.append(str(root.relative_to(project_path)).replace("\\", "/"))
+        except ValueError:
+            continue
+    return prefixes
 
 
 # --------------------------- bundle ----------------------------------------
@@ -165,7 +181,11 @@ def commit_meta(project_path: Path, commit_ref: str):
 
 
 def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
-                 mapping_note: str | None, known_created: set) -> str:
+                 mapping_note: str | None, known_created: set,
+                 root_prefixes: list) -> tuple:
+    """Returns (bundle_text, touched_paths). root_prefixes: repo-relative
+    planning-root prefixes (planning_root_prefixes) — plan files may live
+    under any registered root, not just `planning/`."""
     meta = commit_meta(project_path, commit_ref)
     body = git(["show", "-s", "--format=%b", commit_ref], project_path)
     diff = git(["show", "--format=", commit_ref], project_path)
@@ -178,10 +198,12 @@ def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
     name_status = git(["show", "--name-status", "--format=", commit_ref], project_path).strip()
 
     planning_files = []
+    touched = []
     for line in name_status.splitlines():
         parts = line.split("\t")
         for f in parts[1:]:
-            if f.startswith("planning/") and f.endswith(".md"):
+            touched.append(f)
+            if any(f.startswith(px + "/") for px in root_prefixes) and f.endswith(".md"):
                 try:
                     planning_files.append((parts[0], f, git(["show", f"{commit_ref}:{f}"], project_path)))
                 except RuntimeError:
@@ -223,7 +245,21 @@ def build_bundle(project_path: Path, commit_ref: str, events_path: Path,
         bundle += "_(none — nothing exists yet; every entity you reference needs entity.created)_\n"
     bundle += "\n### Prior log (earlier events — ids and house style)\n\n"
     bundle += f"```jsonl\n{prior}\n```\n" if prior else "_(empty — first mined commit)_\n"
-    return bundle
+    # Sub-project ownership (T3-project-attribution): computed facts for the
+    # model — used only to split mixed-ownership planless work; the stamps
+    # themselves are enforced in code, never trusted.
+    if apvlib.apv_owned_prefixes(project_path):
+        owners = apvlib.named_owners(project_path, touched)
+        bundle += "\n### Sub-project ownership (computed — stamps are enforced in code)\n\n"
+        if owners:
+            for name in owners:
+                mine = [p for p in touched
+                        if apvlib.named_owner_of(project_path, p) == name]
+                bundle += f"- `{name}` owns: " + ", ".join(mine) + "\n"
+            bundle += "- every other touched path is default-project territory\n"
+        else:
+            bundle += "- no touched path falls in a named sub-project's carve-out\n"
+    return bundle, touched
 
 
 # --------------------------- extraction ------------------------------------
@@ -324,10 +360,20 @@ class AmbiguityHalt(Exception):
 
 
 def enforce(events: list[dict], meta: dict, run_id: str, actor: str,
-            seen_ids: set, known_created: set, known_existing: set) -> list[dict]:
+            seen_ids: set, known_created: set, known_existing: set,
+            plan_owners=None, named=None) -> list[dict]:
     """Write-side rules in code (mirrors extract-commit.py's stance): the
     orchestrator, not the model, guarantees the block's provenance and seal.
-    Returns the block to append; raises on violation."""
+    Returns the block to append; raises on violation.
+
+    plan_owners / named (T3-project-attribution): deterministic attribution
+    from the historical commit's touched paths — plan creations stamped
+    from named planning roots, planless creations stamped when exactly one
+    named sub-project owns touched paths (validated against the owner set
+    when the model split mixed-ownership work), everything else stripped;
+    non-created events never carry attributes.project."""
+    plan_owners = plan_owners or {}
+    named = named or []
     if len(events) == 1 and events[0].get("type") == "ambiguity.halt":
         a = events[0].get("attributes") or {}
         raise AmbiguityHalt(a.get("reason", "extractor declared ambiguity"),
@@ -356,6 +402,26 @@ def enforce(events: list[dict], meta: dict, run_id: str, actor: str,
         e["actor"] = actor
         e["attributes"] = dict(e.get("attributes") or {})
         e["attributes"]["backfill_run"] = run_id
+        # Deterministic attribution (T3-project-attribution rulings 3-5) —
+        # the model's word on membership is never trusted.
+        if e.get("entity_id"):
+            a = e["attributes"]
+            if t != "entity.created":
+                a.pop("project", None)
+            elif e.get("entity_type") == "plan":
+                owner = plan_owners.get(e["entity_id"])
+                if owner:
+                    a["project"] = owner
+                else:
+                    a.pop("project", None)
+            else:
+                if len(named) == 1:
+                    a["project"] = named[0]
+                elif len(named) > 1:
+                    if a.get("project") not in named:
+                        a.pop("project", None)
+                else:
+                    a.pop("project", None)
 
     seal = events[-1]
     seal["attributes"]["commit_ref"] = meta["sha"]
@@ -578,6 +644,7 @@ def main():
 
     # Extractor sessions run here, not in the project — see invoke_extractor.
     extract_cwd = tempfile.mkdtemp(prefix="apv-extract-")
+    root_prefixes = planning_root_prefixes(project_path)
 
     chunk_first = None
     chunk_count = 0
@@ -587,8 +654,8 @@ def main():
             log(f"  [{i}/{len(commits)}] {commit_ref[:8]}  SKIP (processed)", force=True)
             continue
         meta = commit_meta(project_path, commit_ref)
-        bundle = build_bundle(project_path, commit_ref, events_path, mapping_note,
-                              known_created)
+        bundle, touched = build_bundle(project_path, commit_ref, events_path,
+                                       mapping_note, known_created, root_prefixes)
 
         if args.dry_run:
             print(f"\n{'=' * 80}\n=== DRY-RUN bundle {commit_ref[:8]} ({len(bundle)} chars) ===\n")
@@ -606,7 +673,9 @@ def main():
             events = parse_events(raw)
             actor = args.actor_override or slugify(meta["author"])
             events = enforce(events, meta, run_id, actor, seen_ids,
-                             known_created, known_existing)
+                             known_created, known_existing,
+                             plan_owners=apvlib.plan_owner_map(project_path, touched),
+                             named=apvlib.named_owners(project_path, touched))
             schema_validate(events)
         except AmbiguityHalt as h:
             p = write_needs_review(

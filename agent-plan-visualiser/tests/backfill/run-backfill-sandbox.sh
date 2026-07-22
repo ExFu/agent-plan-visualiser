@@ -380,6 +380,89 @@ check "repeat failure halts"            [ "$CODE" -ne 0 ]
 check "exit code in diagnosis"          grep -q "exit 1" <<<"$OUT"
 unset FLAKY_MARKER
 
+# --- Case 8: sub-project attribution (T3-project-attribution) --------------------
+# Multi-root repo: the bundle sees plans under EVERY registered planning
+# root (the hardcoded-planning/ regression), and attribution is stamped in
+# code from the registry's carve-outs — plan creations under named roots
+# stamped, default-root plans stripped of bogus model stamps, single-owner
+# planless work stamped, mixed-ownership splits validated against the
+# computed owner set, rogue stamps stripped.
+echo "== attribution: multi-root bundles + code-side stamping"
+export APV_CLAUDE_BIN="$FAKE"
+git init -q -b main "$SANDBOX/multi"
+cd "$SANDBOX/multi" || exit 2
+git config user.email m@example.invalid && git config user.name "Multi"
+cat > .apv-config.toml <<'TOML'
+[projects.site]
+planning_dir = "site/planning"
+dirs = ["site/"]
+
+[projects.widget]
+planning_dir = "widget/planning"
+dirs = ["widget/"]
+TOML
+# The main root's plan deliberately breaks the id convention while the SITE
+# root's follows it: the pre-fix looks_non_native (hardcoded planning/)
+# would false-warn here; the multi-root scan must not.
+mkdir -p planning site/planning widget
+printf -- '---\nid: MAIN-1\n---\n# MAIN-1\n' > planning/MAIN-1.md
+printf -- '---\nid: T2-site-shell\n---\n# T2-site-shell\n' > site/planning/T2-site-shell.md
+git add -A && git commit -qm "hist: plans in two roots"
+SHA_MA="$(git rev-parse HEAD)"
+echo s > site/x.txt && git add -A && git commit -qm "hist: site-only work"
+SHA_MB="$(git rev-parse HEAD)"
+echo s2 > site/y.txt && echo w > widget/z.js && git add -A && git commit -qm "hist: cross-project work"
+SHA_MC="$(git rev-parse HEAD)"
+
+cat > "$FAKE_DIR/${SHA_MA:0:8}.json" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "plan", "entity_id": "MAIN-1", "attributes": {"summary": "Main-root plan.", "project": "evil"}},
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "plan", "entity_id": "T2-site-shell", "attributes": {"summary": "Site sub-project plan."}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "m", "confidence": "derived", "schema_version": "0.4.0", "attributes": {"author": "m", "date": "2025-01-01", "message_first_line": "x"}}
+]
+JSON
+cat > "$FAKE_DIR/${SHA_MB:0:8}.json" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_MB:0:7}.site-only-work", "attributes": {"summary": "Site-only work."}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_MB:0:7}.site-only-work", "attributes": {"summary": "Self-contained."}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "m", "confidence": "derived", "schema_version": "0.4.0", "attributes": {"author": "m", "date": "2025-01-02", "message_first_line": "x"}}
+]
+JSON
+cat > "$FAKE_DIR/${SHA_MC:0:8}.json" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_MC:0:7}.cross.site", "attributes": {"summary": "Site half.", "project": "site"}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_MC:0:7}.cross.site", "attributes": {"summary": "Landed."}},
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_MC:0:7}.cross.widget", "attributes": {"summary": "Widget half.", "project": "widget"}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_MC:0:7}.cross.widget", "attributes": {"summary": "Landed."}},
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_MC:0:7}.cross.rogue", "attributes": {"summary": "Rogue claim.", "project": "nope"}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "derived", "schema_version": "0.4.0", "entity_type": "implicit-work", "entity_id": "impl.${SHA_MC:0:7}.cross.rogue", "attributes": {"summary": "Landed."}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "m", "confidence": "derived", "schema_version": "0.4.0", "attributes": {"author": "m", "date": "2025-01-03", "message_first_line": "x"}}
+]
+JSON
+mkdir -p .apv
+cat >> .apv/events.jsonl <<JSON
+{"event_id": "$(uu)", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "$(date +%Y-%m-%d)", "message_first_line": "adopt tracking"}}
+JSON
+git add -A && git commit -qm "adopt tracking"
+
+run python3 "$BF" --project-path "$PWD" --run-id bf-multi --dry-run
+printf '%s' "$OUT" > "$SANDBOX/multi-dryrun.out"
+check "site-root plan in bundle"        grep -q "site/planning/T2-site-shell.md" <<<"$OUT"
+check "main-root plan in bundle"        grep -q "planning/MAIN-1.md" <<<"$OUT"
+check "ownership section computed"      grep -q '`site` owns' <<<"$OUT"
+check "no false non-native warning"     sh -c "! grep -q 'WARNING: no retrospective-mapping.md' '$SANDBOX/multi-dryrun.out'"
+
+run python3 "$BF" --project-path "$PWD" --run-id bf-multi --chunk-size 0
+check "walk exits 0"                    [ "$CODE" -eq 0 ]
+check "named-root plan stamped"         sh -c "grep '\"entity_id\": \"T2-site-shell\"' .apv/events.jsonl | grep -q '\"project\": \"site\"'"
+check "default-root bogus stamp stripped" sh -c "! grep '\"entity_id\": \"MAIN-1\"' .apv/events.jsonl | grep -q '\"project\"'"
+check "single-owner planless stamped"   sh -c "grep 'site-only-work' .apv/events.jsonl | head -1 | grep -q '\"project\": \"site\"'"
+check "split keeps site stamp"          sh -c "grep 'cross.site' .apv/events.jsonl | head -1 | grep -q '\"project\": \"site\"'"
+check "split keeps widget stamp"        sh -c "grep 'cross.widget' .apv/events.jsonl | head -1 | grep -q '\"project\": \"widget\"'"
+check "rogue stamp stripped"            sh -c "! grep 'cross.rogue' .apv/events.jsonl | head -1 | grep -q '\"project\"'"
+run bash "$PLUGIN/scripts/gate-check.sh" --repo-root "$PWD"
+check "gate green on the stamped log"   [ "$CODE" -eq 0 ]
+
 echo
 if [ "$FAIL" -eq 0 ]; then
   echo "backfill sandbox: ALL PASS"
