@@ -40,6 +40,88 @@ run_case() { # run_case <name> <data-dir> <config> -> sets OUT, CODE
   CODE=$?
 }
 
+# --- Case 0: apvlib registry parsing (T3-project-attribution) -------------
+# dirs carve-outs, default-project resolution, named_owners longest-prefix —
+# asserted on BOTH parser paths (tomllib and the minimal fallback), plus the
+# fail-loud negatives (duplicate dir, non-list dirs, absolute/escaping/empty
+# entries, cross-type prefix collision).
+echo "== apvlib config layer (dirs carve-outs, named owners)"
+if python3 - <<'PYEOF'
+import sys, tempfile
+from pathlib import Path
+sys.path.insert(0, "../../scripts")
+import apvlib
+
+fail = [0]
+def t(desc, cond):
+    print(("  ok: " if cond else "  FAIL: ") + desc)
+    if not cond: fail[0] = 1
+
+root = Path(tempfile.mkdtemp())
+cfg = root / "cfg.toml"
+cfg.write_text(
+    '[storage]\ndata_dir = ".apv"\n\n'
+    '[projects.website]\nplanning_dir = "site/planning"\ndirs = ["site/", "docs/site/"]\n\n'
+    '[projects.plugin]\nplanning_dir = "plugin/planning"\ndirs = ["plugin/"]\n'
+)
+
+for label in ("tomllib", "minimal"):
+    saved = apvlib.tomllib
+    if label == "minimal": apvlib.tomllib = None
+    try:
+        projects = apvlib.apv_projects(root, cfg)
+        t(f"{label}: dirs parsed", projects["website"]["dirs"] == ["site/", "docs/site/"]
+                                   and projects["plugin"]["dirs"] == ["plugin/"])
+        t(f"{label}: default is implicit main", apvlib.apv_default_project(root, cfg) == "main")
+        t(f"{label}: planning_dir implicitly owned",
+          ("website", "site/planning/") in apvlib.apv_owned_prefixes(root, cfg))
+        t(f"{label}: named_owners collects distinct owners",
+          apvlib.named_owners(root, ["site/a.js", "plugin/b.py", "README.md"], cfg) == ["website", "plugin"])
+        t(f"{label}: longest prefix wins on nesting",
+          apvlib.named_owners(root, ["docs/site/x.md"], cfg) == ["website"])
+        t(f"{label}: default territory unowned",
+          apvlib.named_owner_of(root, "README.md", cfg) is None)
+    finally:
+        apvlib.tomllib = saved
+
+renamed = root / "renamed.toml"
+renamed.write_text('[projects.core]\nplanning_dir = "planning"\ndirs = ["stuff/"]\n\n'
+                   '[projects.website]\nplanning_dir = "site/planning"\ndirs = ["site/"]\n')
+t("renamed default resolves", apvlib.apv_default_project(root, renamed) == "core")
+t("renamed default contributes no carve-outs",
+  {n for n, _ in apvlib.apv_owned_prefixes(root, renamed)} == {"website"})
+
+t("no registry: no owners, main default",
+  apvlib.named_owners(root, ["site/a.js"], root / "missing.toml") == []
+  and apvlib.apv_default_project(root, root / "missing.toml") == "main")
+
+bad = root / "bad.toml"
+negatives = [
+    ("duplicate dir across projects raises",
+     '[projects.a]\nplanning_dir = "pa"\ndirs = ["x/"]\n[projects.b]\nplanning_dir = "pb"\ndirs = ["x/"]\n'),
+    ("non-list dirs raises", '[projects.a]\nplanning_dir = "pa"\ndirs = "x/"\n'),
+    ("absolute dir raises", '[projects.a]\nplanning_dir = "pa"\ndirs = ["/abs"]\n'),
+    ("escaping dir raises", '[projects.a]\nplanning_dir = "pa"\ndirs = ["../up"]\n'),
+    ("empty dir entry raises", '[projects.a]\nplanning_dir = "pa"\ndirs = [""]\n'),
+]
+for desc, text in negatives:
+    bad.write_text(text)
+    try:
+        apvlib.apv_projects(root, bad); t(desc, False)
+    except ValueError:
+        t(desc, True)
+
+bad.write_text('[projects.a]\nplanning_dir = "pa"\ndirs = ["site/planning/"]\n\n'
+               '[projects.b]\nplanning_dir = "site/planning"\n')
+try:
+    apvlib.apv_owned_prefixes(root, bad); t("cross-type prefix collision raises", False)
+except ValueError:
+    t("cross-type prefix collision raises", True)
+
+sys.exit(fail[0])
+PYEOF
+then :; else FAIL=1; fi
+
 # --- Case 1: corrupted log, default config (§4.2) -----------------------
 # Four distinct corruptions, each named; schema + fulcrum stay clean.
 run_case "corrupt fixture / default config" fixture-corrupt config-default.toml

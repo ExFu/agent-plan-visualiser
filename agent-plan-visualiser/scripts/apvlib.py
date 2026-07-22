@@ -190,18 +190,40 @@ def apv_planning_dir(repo_root: Path, config_path=None) -> Path:
     return repo_root / "planning"
 
 
-def apv_projects(repo_root: Path, config_path=None) -> dict:
-    """Parse the `[projects.<name>]` registry (T3-multi-project).
+def _dir_prefix(entry, ctx: str) -> str:
+    """Normalise an owned-dir carve-out entry to a repo-relative directory
+    prefix with a trailing slash (the shape git's repo-relative paths match
+    against). Fail-loud on anything else — absolute paths and repo-escaping
+    entries can never match a git path, so accepting them would silently
+    disable the carve-out."""
+    if not isinstance(entry, str) or not entry.strip():
+        raise ValueError(f"{ctx}: dirs entries must be non-empty strings")
+    if entry.startswith("/"):
+        raise ValueError(f"{ctx}: dir {entry!r} must be repo-relative, not absolute")
+    s = entry.strip().replace("\\", "/")
+    while s.startswith("./"):
+        s = s[2:]
+    if not s.rstrip("/") or ".." in s.split("/"):
+        raise ValueError(f"{ctx}: dir {entry!r} is not a repo-relative directory")
+    return s.rstrip("/") + "/"
 
-    Returns an ordered `{name: {"planning_dir": Path}}` — empty when no
-    registry is configured (single-project mode; behaviour identical to
-    pre-registry APV). Sub-projects share the repo's ONE event log; the
-    registry only declares planning roots for membership derivation.
+
+def apv_projects(repo_root: Path, config_path=None) -> dict:
+    """Parse the `[projects.<name>]` registry (T3-multi-project +
+    T3-project-attribution).
+
+    Returns an ordered `{name: {"planning_dir": Path, "dirs": [prefix...]}}`
+    — empty when no registry is configured (single-project mode; behaviour
+    identical to pre-registry APV). Sub-projects share the repo's ONE event
+    log; the registry declares planning roots for membership derivation and
+    optional owned-dir carve-outs (`dirs`, repo-relative prefixes) for
+    creation-time attribution of planless work.
     Fail-loud like apv_config: a project without planning_dir, two projects
-    sharing a planning_dir, or the reserved name `unassigned` all raise.
+    sharing a planning_dir, an exact duplicate dir across projects, or the
+    reserved name `unassigned` all raise.
     """
     raw = apv_config(repo_root, config_path).get("projects") or {}
-    projects, seen_dirs = {}, {}
+    projects, seen_dirs, seen_prefixes = {}, {}, {}
     for name, tbl in raw.items():
         if name == "unassigned":
             raise ValueError("[projects.unassigned] is reserved (the no-membership bucket)")
@@ -215,7 +237,21 @@ def apv_projects(repo_root: Path, config_path=None) -> dict:
                 f"[projects.{name}] planning_dir duplicates [projects.{seen_dirs[key]}]"
             )
         seen_dirs[key] = name
-        projects[name] = {"planning_dir": root}
+        dirs_raw = tbl.get("dirs")
+        dirs = []
+        if dirs_raw is not None:
+            if not isinstance(dirs_raw, list):
+                raise ValueError(f"[projects.{name}] dirs must be an array of strings")
+            for entry in dirs_raw:
+                px = _dir_prefix(entry, f"[projects.{name}]")
+                if px in seen_prefixes and seen_prefixes[px] != name:
+                    raise ValueError(
+                        f"[projects.{name}] dir {px!r} duplicates [projects.{seen_prefixes[px]}]"
+                    )
+                seen_prefixes[px] = name
+                if px not in dirs:
+                    dirs.append(px)
+        projects[name] = {"planning_dir": root, "dirs": dirs}
     return projects
 
 
@@ -233,3 +269,74 @@ def apv_planning_roots(repo_root: Path, config_path=None) -> list:
     if not any(str(root) == str(main_dir) for _, root in roots):
         roots.append(("main", main_dir))
     return roots
+
+
+def apv_default_project(repo_root: Path, config_path=None) -> str:
+    """Name of the DEFAULT project: the registered project that claims the
+    [storage] planning dir (the rename rule in apv_planning_roots), else the
+    implicit `main`. Everything not explicitly carved out is its territory;
+    it is never stamped (T3-project-attribution ruling 3 — only named
+    sub-projects are)."""
+    projects = apv_projects(repo_root, config_path)
+    main_dir = apv_planning_dir(repo_root, config_path)
+    for name, cfg in projects.items():
+        if str(cfg["planning_dir"]) == str(main_dir):
+            return name
+    return "main"
+
+
+def apv_owned_prefixes(repo_root: Path, config_path=None) -> list:
+    """Ordered [(project_name, repo-relative dir prefix)] over the NAMED
+    sub-projects' carve-outs: each project's `dirs` plus its planning_dir
+    (implicitly owned). The default project contributes nothing — its
+    territory is everything unclaimed, and it is never stamped. [] without
+    a registry. An exact prefix claimed by two projects raises (a carve-out
+    with two owners cannot attribute deterministically)."""
+    projects = apv_projects(repo_root, config_path)
+    default = apv_default_project(repo_root, config_path)
+    out, seen = [], {}
+    for name, cfg in projects.items():
+        if name == default:
+            continue
+        prefixes = list(cfg["dirs"])
+        try:
+            rel = cfg["planning_dir"].relative_to(repo_root)
+            px = str(rel).replace("\\", "/").rstrip("/") + "/"
+            if px not in prefixes:
+                prefixes.append(px)
+        except ValueError:
+            pass  # planning root outside the repo: no git path can match it
+        for px in prefixes:
+            if px in seen and seen[px] != name:
+                raise ValueError(
+                    f"carve-out {px!r} claimed by both [projects.{seen[px]}] "
+                    f"and [projects.{name}]"
+                )
+            seen[px] = name
+            out.append((name, px))
+    return out
+
+
+def named_owners(repo_root: Path, paths, config_path=None) -> list:
+    """Distinct NAMED sub-projects owning the given repo-relative paths —
+    longest prefix wins per path (carve-outs may nest), first-touched order.
+    Paths under no carve-out contribute nothing (default territory). []
+    without a registry — single-project behaviour unchanged."""
+    prefixes = apv_owned_prefixes(repo_root, config_path)
+    owners = []
+    for path in paths:
+        p = str(path).replace("\\", "/").lstrip("/")
+        best, best_len = None, -1
+        for name, px in prefixes:
+            if p.startswith(px) and len(px) > best_len:
+                best, best_len = name, len(px)
+        if best is not None and best not in owners:
+            owners.append(best)
+    return owners
+
+
+def named_owner_of(repo_root: Path, path, config_path=None):
+    """The single named sub-project owning one repo-relative path, or None
+    (default territory, or no registry)."""
+    got = named_owners(repo_root, [path], config_path)
+    return got[0] if got else None
