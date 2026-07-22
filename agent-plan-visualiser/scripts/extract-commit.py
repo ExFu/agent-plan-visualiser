@@ -46,7 +46,8 @@ import apvlib  # noqa: E402
 
 DIFF_CAP = 80_000          # chars; beyond this we halt (no sub-agent recursion in the first cut)
 LOG_TAIL_LINES = 200
-FORBIDDEN_TYPES = {"entity.accepted", "analysis.live-summary", "analysis.invalidated"}
+FORBIDDEN_TYPES = {"entity.accepted", "analysis.live-summary", "analysis.invalidated",
+                   "project.assigned"}
 FULCRUM_TYPES = {"entity.renamed", "entity.parked", "entity.cancelled",
                  "entity.superseded", "entity.reopened"}
 IMPLEMENTATION_TYPES = {"entity.progressed", "entity.completed"}
@@ -125,7 +126,7 @@ def existing_event_ids(log_path: Path) -> set:
     return ids
 
 
-def build_bundle(repo_root: Path, data_dir: Path, msg_text: str) -> str:
+def build_bundle(repo_root: Path, data_dir: Path, msg_text: str) -> tuple:
     staged_names = git(["diff", "--cached", "--name-only"], repo_root).strip()
     diff = git(["diff", "--cached", "--unified=3"], repo_root)
     if len(diff) > DIFF_CAP:
@@ -160,13 +161,39 @@ def build_bundle(repo_root: Path, data_dir: Path, msg_text: str) -> str:
             if m:
                 frontmatters.append(f"--- {name} frontmatter ---\n{m.group(1)}")
 
+    # Sub-project ownership (T3-project-attribution): computed facts for the
+    # model — which NAMED sub-projects' carve-outs the staged paths touch.
+    # The model uses this only to split mixed-ownership planless work; the
+    # stamps themselves are enforced in code (enforce()), never trusted.
+    staged_paths = staged_names.splitlines()
+    ownership = ""
+    if apvlib.apv_owned_prefixes(repo_root):
+        owners = apvlib.named_owners(repo_root, staged_paths)
+        if owners:
+            per = []
+            for name in owners:
+                touched = [p for p in staged_paths
+                           if apvlib.named_owner_of(repo_root, p) == name]
+                per.append(f"- `{name}` owns: " + ", ".join(touched))
+            ownership = (
+                "\n## Sub-project ownership (computed — stamps are enforced in code)\n\n"
+                + "\n".join(per)
+                + "\n- every other staged path is default-project territory\n"
+            )
+        else:
+            ownership = (
+                "\n## Sub-project ownership (computed — stamps are enforced in code)\n\n"
+                "- no staged path falls in a named sub-project's carve-out\n"
+            )
+
     return (
         f"## Commit message\n\n{msg_text}\n\n"
         f"## Staged files\n\n{staged_names}\n\n"
         f"## Staged diff\n\n{diff}\n\n"
         f"## Event log tail (last {LOG_TAIL_LINES} lines; house style + current entity ids)\n\n{tail}\n\n"
         f"## Touched planning frontmatter\n\n" + ("\n\n".join(frontmatters) or "(none)") + "\n"
-    )
+        + ownership
+    ), staged_paths
 
 
 class AmbiguityHalt(Exception):
@@ -227,9 +254,23 @@ def parse_events(text: str) -> list:
     return events
 
 
-def enforce(events: list, msg_text: str, actor: str, data_dir: Path) -> list:
+def enforce(events: list, msg_text: str, actor: str, data_dir: Path,
+            plan_owners=None, named=None) -> list:
     """Write-side rules, in code. Returns the block to append (may rewrite
-    ground-truth fields); raises AmbiguityHalt / ValueError on violation."""
+    ground-truth fields); raises AmbiguityHalt / ValueError on violation.
+
+    plan_owners: {plan_id: named_sub_project} for staged plan files under
+    named planning roots; named: distinct named sub-projects owning staged
+    paths (T3-project-attribution). Attribution is deterministic — the
+    model's word on membership is never trusted: plan creations are stamped
+    (or stripped) from plan_owners; planless creations are stamped when
+    exactly one named owner exists, validated against the owner set when
+    the model split mixed-ownership work, stripped otherwise; and
+    `attributes.project` on any non-created event is stripped (bare
+    attributes would win the fold's pre-scan — membership moves are
+    project.assigned, operator-ruled, never a side effect)."""
+    plan_owners = plan_owners or {}
+    named = named or []
     if len(events) == 1 and events[0].get("type") == "ambiguity.halt":
         a = events[0].get("attributes") or {}
         raise AmbiguityHalt(a.get("reason", "extractor declared ambiguity"),
@@ -270,6 +311,25 @@ def enforce(events: list, msg_text: str, actor: str, data_dir: Path) -> list:
             decision_refs.update((e.get("attributes") or {}).get("event_ids") or [])
         if t in FULCRUM_TYPES:
             fulcrum_ids[e["event_id"]] = t
+        # Deterministic attribution (T3-project-attribution rulings 3-5).
+        if ent:
+            a = e["attributes"] = dict(e.get("attributes") or {})
+            if t != "entity.created":
+                a.pop("project", None)
+            elif e.get("entity_type") == "plan":
+                owner = plan_owners.get(ent)
+                if owner:
+                    a["project"] = owner
+                else:
+                    a.pop("project", None)
+            else:
+                if len(named) == 1:
+                    a["project"] = named[0]
+                elif len(named) > 1:
+                    if a.get("project") not in named:
+                        a.pop("project", None)
+                else:
+                    a.pop("project", None)
         if t == "entity.created" and ent:
             block_created.add((e.get("entity_type"), ent))
             states[ent] = "draft"
@@ -366,11 +426,13 @@ def main():
 
     raw = ""
     try:
-        bundle = build_bundle(repo_root, data_dir, msg_text)
+        bundle, staged_paths = build_bundle(repo_root, data_dir, msg_text)
         prompt = (SCRIPTS / "extract-live-prompt.md").read_text()
         raw = invoke_model(prompt, bundle)
         events = parse_events(raw)
-        events = enforce(events, msg_text, actor, data_dir)
+        events = enforce(events, msg_text, actor, data_dir,
+                         plan_owners=apvlib.plan_owner_map(repo_root, staged_paths),
+                         named=apvlib.named_owners(repo_root, staged_paths))
         schema_validate(events)
     except AmbiguityHalt as h:
         p = write_needs_review(data_dir, msg_text, h.reason, h.candidates, raw, h.question)

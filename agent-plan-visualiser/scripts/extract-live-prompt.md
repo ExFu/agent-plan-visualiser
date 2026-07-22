@@ -50,13 +50,16 @@ for T2s; the spawning plan for milestones).
 `author`, `date` (YYYY-MM-DD), `message_first_line` (the commit message's
 first line, exactly). No entity fields.
 
-**Never emit**: `entity.accepted`, `analysis.*` (tool-emitted only).
+**Never emit**: `entity.accepted`, `analysis.*` (tool-emitted only),
+`project.assigned` (operator-ruled fulcrum — same class as
+`entity.accepted`).
 
 ## Entity identification
 
-- **Plans**: files in `planning/` named `<id>.md`; read the frontmatter `id`
-  — never guess from the filename. New plan file ⇒ `entity.created` first
-  (attributes = frontmatter + summary), then its `relationship.spawns`.
+- **Plans**: direct children of a registered planning root (default
+  `planning/`), named `<id>.md`; read the frontmatter `id` — never guess
+  from the filename. New plan file ⇒ `entity.created` first (attributes =
+  frontmatter + summary), then its `relationship.spawns`.
 - **Existing entities**: the log tail shows current ids and their recent
   events — reuse ids exactly; never re-create an existing entity.
 - **Draft and closed entities**: do not emit `entity.progressed` /
@@ -71,6 +74,19 @@ first line, exactly). No entity fields.
   (the sanctioned same-block carve-out).
 - **Inbox items**: new file under the data dir's `inbox/` ⇒ `entity.created`
   (entity_type `inbox-item`, id `<YYYY-MM-DD>.<title-slug>`).
+- **Project membership (registry repos)**: attribution is location-derived
+  and ENFORCED IN CODE — plans by which planning root holds the file,
+  planless entities by the staged paths' carve-out owners. The bundle's
+  "Sub-project ownership" section shows the computed owners (section absent
+  = single-project repo; nothing to do). One named sub-project listed ⇒
+  your planless creations are stamped `attributes.project` automatically.
+  TWO OR MORE listed ⇒ SPLIT the planless work: one `implicit-work` entity
+  per named sub-project (id `impl.<slug>.<project>`), each stamped
+  `attributes.project` with a name from that section — never a name it
+  doesn't list. Never put `attributes.project` on any other event, and
+  never emit `project.assigned` — a file moved between planning roots is
+  just a diff, not a membership event (deliberate re-homes are the
+  operator's, via `project.assigned` in-session).
 
 ## Classification guide
 

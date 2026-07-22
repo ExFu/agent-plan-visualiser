@@ -340,3 +340,27 @@ def named_owner_of(repo_root: Path, path, config_path=None):
     (default territory, or no registry)."""
     got = named_owners(repo_root, [path], config_path)
     return got[0] if got else None
+
+
+def plan_owner_map(repo_root: Path, paths, config_path=None) -> dict:
+    """{plan_id: named_sub_project} for the given repo-relative paths that
+    are DIRECT children (`<root>/<id>.md`) of a NAMED sub-project's planning
+    root — the creation-time stamp source for plan entities (filename is
+    load-bearing: it must equal the frontmatter id). Default-root plans are
+    absent (never stamped); {} without a registry."""
+    import re as _re
+    default = apv_default_project(repo_root, config_path)
+    owners = {}
+    for name, root in apv_planning_roots(repo_root, config_path):
+        if name == default:
+            continue
+        try:
+            px = str(root.relative_to(repo_root)).replace("\\", "/")
+        except ValueError:
+            continue  # a root outside the repo can't hold repo paths
+        for p in paths:
+            m = _re.match(rf"^{_re.escape(px)}/([^/]+)\.md$",
+                          str(p).replace("\\", "/"))
+            if m:
+                owners[m.group(1)] = name
+    return owners

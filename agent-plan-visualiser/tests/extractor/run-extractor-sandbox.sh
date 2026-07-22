@@ -160,6 +160,102 @@ check "commit blocked"                  [ "$CODE" -ne 0 ]
 check "resurrection named"              grep -qi "resurrection" <<<"$OUT"
 git reset -q zombie.txt && rm zombie.txt
 
+# --- Case: sub-project attribution (T3-project-attribution) -------------------
+# Registry repos stamp creations IN CODE from the staged paths' carve-out
+# owners; the model's word on membership is never trusted (bogus stamps
+# overwritten/stripped), non-created events never carry attributes.project,
+# and mixed-ownership splits keep only stamps from the computed owner set.
+# (All earlier cases ran registry-less — they are the byte-identical no-op
+# regression for single-project repos.)
+echo "== attribution: registry stamps planless work in code; model stamps stripped"
+sleep 1
+cat >> .apv-config.toml <<'TOML'
+
+[projects.site]
+planning_dir = "site/planning"
+dirs = ["site/"]
+
+[projects.widget]
+planning_dir = "widget/planning"
+dirs = ["widget/"]
+TOML
+git add .apv-config.toml
+GOOD_CFG="$SANDBOX/good-cfg.json"
+cat > "$GOOD_CFG" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.adopt-registry", "attributes": {"summary": "Registry adopted."}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.adopt-registry", "attributes": {"summary": "Self-contained."}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "m", "date": "2026-07-22", "message_first_line": "x"}}
+]
+JSON
+export FAKE_RESPONSE="$GOOD_CFG"
+run git commit -m "adopt sub-project registry"
+check "registry commit passes"          [ "$CODE" -eq 0 ]
+check "no-carve-out creation unstamped" sh -c "! grep 'impl.adopt-registry' .apv/events.jsonl | head -1 | grep -q '\"project\"'"
+
+echo "== attribution: single named owner — stamped in code, bogus stamp overwritten"
+sleep 1
+mkdir -p site
+echo ".hero { color: red; }" > site/hero.css
+git add site/hero.css
+STAMP="$SANDBOX/stamp.json"
+cat > "$STAMP" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.site-hero", "attributes": {"summary": "Hero styles.", "project": "evil"}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.site-hero", "attributes": {"summary": "Landed.", "project": "evil"}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "m", "date": "2026-07-22", "message_first_line": "x"}}
+]
+JSON
+export FAKE_RESPONSE="$STAMP"
+run git commit -m "site hero styles"
+check "commit passes"                   [ "$CODE" -eq 0 ]
+check "creation stamped from carve-out" sh -c "grep 'impl.site-hero' .apv/events.jsonl | head -1 | grep -q '\"project\": \"site\"'"
+check "non-created stamp stripped"      sh -c "! grep 'impl.site-hero' .apv/events.jsonl | tail -1 | grep -q '\"project\"'"
+
+echo "== attribution: plan under a named root — creation stamped"
+sleep 1
+mkdir -p site/planning
+printf -- '---\nid: SITE-1\n---\n\n# SITE-1\n' > site/planning/SITE-1.md
+git add site/planning/SITE-1.md
+PLANNEW="$SANDBOX/plan-new.json"
+cat > "$PLANNEW" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "SITE-1", "attributes": {"summary": "Site sub-project plan."}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "m", "date": "2026-07-22", "message_first_line": "x"}}
+]
+JSON
+export FAKE_RESPONSE="$PLANNEW"
+run git commit -m "plan: SITE-1"
+check "commit passes"                   [ "$CODE" -eq 0 ]
+check "plan creation stamped site"      sh -c "grep '\"entity_id\": \"SITE-1\"' .apv/events.jsonl | head -1 | grep -q '\"project\": \"site\"'"
+
+echo "== attribution: mixed ownership — split entities keep set stamps, rogue stripped"
+sleep 1
+mkdir -p widget
+echo ".both {}" > site/both.css
+echo "wire();" > widget/both.js
+git add site/both.css widget/both.js
+SPLIT="$SANDBOX/split.json"
+cat > "$SPLIT" <<JSON
+[
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.both.site", "attributes": {"summary": "Site half.", "project": "site"}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.both.site", "attributes": {"summary": "Landed."}},
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.both.widget", "attributes": {"summary": "Widget half.", "project": "widget"}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.both.widget", "attributes": {"summary": "Landed."}},
+  {"event_id": "$(uu)", "type": "entity.created", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.both.rogue", "attributes": {"summary": "Rogue claim.", "project": "elsewhere"}},
+  {"event_id": "$(uu)", "type": "entity.completed", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "implicit-work", "entity_id": "impl.both.rogue", "attributes": {"summary": "Landed."}},
+  {"event_id": "$(uu)", "type": "commit.recorded", "actor": "model", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "m", "date": "2026-07-22", "message_first_line": "x"}}
+]
+JSON
+export FAKE_RESPONSE="$SPLIT"
+run git commit -m "cross-project change"
+check "commit passes"                   [ "$CODE" -eq 0 ]
+check "site split keeps stamp"          sh -c "grep 'impl.both.site' .apv/events.jsonl | head -1 | grep -q '\"project\": \"site\"'"
+check "widget split keeps stamp"        sh -c "grep 'impl.both.widget' .apv/events.jsonl | head -1 | grep -q '\"project\": \"widget\"'"
+check "rogue stamp stripped"            sh -c "! grep 'impl.both.rogue' .apv/events.jsonl | head -1 | grep -q '\"project\"'"
+run bash "$PLUGIN_HOME/scripts/gate-check.sh" --repo-root "$PWD"
+check "gate green on the stamped log"   [ "$CODE" -eq 0 ]
+
 # --- Case: headless isolation ---------------------------------------------------
 # Second real-run incident class (OMC, 2026-07): user-scope plugin hooks fire
 # inside `claude -p` and can kill/hijack the session. The live extractor must
