@@ -1412,17 +1412,65 @@ button:disabled {
 
 /* ===== Operator attention panel (T3-view-attention-panel) =====
    Mirrors summary.md's "Awaiting operator" + "Milestone progress" sections.
-   Collapsible; open by default whenever a queue is non-empty. */
-.attention-panel { margin-bottom: 1rem; }
-.attention-details {
+   A bottom-left FAB toggles a popover; the popover starts open, and the
+   pair renders only when there is something to show. Layering: above the
+   flow gutter (5) and tooltip (1000), below the modals (2000). */
+.fab {
+  position: relative;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pill-decision);
+  border-color: var(--pill-decision);
+  color: var(--fg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.fab:hover {
+  background: var(--color-dormant);
+  border-color: var(--color-dormant);
+}
+.fab-badge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  background: var(--pill-fulcrum);
+  color: #fff;
+  border-radius: 9px;
+  min-width: 1.15rem;
+  padding: 0 0.3rem;
+  font-size: 0.7rem;
+  line-height: 1.15rem;
+  text-align: center;
+  box-sizing: border-box;
+}
+.attention-fab {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 1500;
+}
+.attention-popover {
+  position: fixed;
+  left: 1rem;
+  bottom: 4.6rem; /* clears the 3rem FAB + gap */
+  z-index: 1500;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: min(60vh, 30rem);
+  overflow-y: auto;
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-left: 3px solid var(--pill-decision);
   border-radius: 4px;
   background: var(--card-bg);
-  padding: 0.35rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   font-size: 0.85rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
-.attention-details summary { cursor: pointer; font-weight: 600; }
+.att-header { font-weight: 600; }
 .att-count {
   display: inline-block;
   background: var(--pill-fulcrum);

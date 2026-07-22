@@ -42,6 +42,9 @@ const state = {
   // Text search (T3-html-view-interactivity) — view-independent like
   // projectFilter: one input, matches entity ids across board/tree/flow.
   searchQuery: "",
+  // Awaiting-operator popover (bottom-left FAB) — starts open; the FAB
+  // toggles it and the choice survives re-renders.
+  attentionOpen: true,
   // Flow view — T3 (leaf) rows are grouped into bands by `flowAggregate`,
   // INDEPENDENT of which parent bands are shown. "none" = one flat T3 band.
   flowAggregate: "milestone", // "milestone" | "t2" | "none"
@@ -235,18 +238,36 @@ function renderAttentionPanel() {
       return `<span class="mp-pill ${cls}" title="${escapeHtml(mid)}: ${done}/${total} scheduled T3s complete, ${m.live_t3_count} live">${attentionEntityLink(mid)}<span class="mp-count">${done}/${total}</span></span>`;
     }).join("");
 
-  host.innerHTML = `<details class="attention-details"${queueCount ? " open" : ""}>
-    <summary>Awaiting operator${queueCount ? ` <span class="att-count">${queueCount}</span>` : ""}</summary>
+  host.innerHTML = `<div class="attention-popover" id="attention-popover" role="region"
+      aria-label="Awaiting operator"${state.attentionOpen ? "" : " hidden"}>
+    <div class="att-header">Awaiting operator${queueCount ? ` <span class="att-count">${queueCount}</span>` : ""}</div>
     <div class="att-body">
       ${rows.join("") || '<div class="att-section"><span class="att-age">Nothing awaiting the operator.</span></div>'}
       <div class="att-section att-milestones"><span class="att-label">Milestones</span>${pills}</div>
     </div>
-  </details>`;
+  </div>
+  <button id="attention-fab" class="fab attention-fab" aria-controls="attention-popover"
+      aria-expanded="${state.attentionOpen}" title="Awaiting operator${queueCount ? ` (${queueCount})` : ""}">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+      <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+    </svg>${queueCount ? `<span class="fab-badge">${queueCount}</span>` : ""}
+  </button>`;
   host.hidden = false;
+
+  const fab = host.querySelector("#attention-fab");
+  const popover = host.querySelector("#attention-popover");
+  const setOpen = (open) => {
+    state.attentionOpen = open;
+    popover.hidden = !open;
+    fab.setAttribute("aria-expanded", String(open));
+  };
+  fab.addEventListener("click", () => setOpen(!state.attentionOpen));
+
   host.querySelectorAll(".att-link").forEach(a => a.addEventListener("click", (e) => {
     e.preventDefault();
     const entity = (state.projection.entities || {})[`plan:${a.dataset.eid}`];
     if (!entity) return;
+    setOpen(false); // don't cover the flow view we're navigating to
     if (state.currentView !== "flow") switchView("flow");
     showPlanMarkdown(entity);
   }));
