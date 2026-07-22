@@ -11,7 +11,8 @@ FAIL=0
 # Fixture caches are derived — rebuild from scratch every run so a stale
 # cache (same event count, different content) can't mask a regression.
 rm -f fixture-corrupt/cache.sqlite fixture-drift/cache.sqlite fixture-attention/cache.sqlite \
-      fixture-project-move/cache.sqlite fixture-project-move-nodecision/cache.sqlite
+      fixture-project-move/cache.sqlite fixture-project-move-nodecision/cache.sqlite \
+      fixture-attribution-drift/cache.sqlite
 
 check() { # check <desc> <test-expr...>
   local desc="$1"; shift
@@ -210,6 +211,19 @@ check "exit 1"                                  [ "$CODE" -eq 1 ]
 check "fulcrum block names project.assigned"    grep -q '^BLOCK \[fulcrum-without-decision\].*project\.assigned' <<<"$OUT"
 check "referential block names FIX-GHOST"       grep -q "^BLOCK \[referential\].*'FIX-GHOST'" <<<"$OUT"
 check "schema block on the 0.3.0-stamped event" grep -q '^BLOCK \[schema\].*\[0\.3\.0\]' <<<"$OUT"
+
+# --- Case 5d: attribution-drift — stamp vs file location ------------------
+# T3-project-attribution: an OPEN plan stamped rootb whose file sits under
+# the main root WARNs (the stamp is authoritative; the file is stale); the
+# CLOSED plan in the same shape stays quiet (retrospective annotation
+# without file moves is the blessed workflow). Advisory only — exit 0.
+echo "== attribution-drift fixture / registry config"
+OUT="$(python3 "$GATE" --repo-root . --data-dir fixture-attribution-drift --config config-attribution.toml 2>&1)"
+CODE=$?
+check "exit 0 (warn-only)"                      [ "$CODE" -eq 0 ]
+check_absent "no BLOCK lines"                   '^BLOCK'
+check "open stamped plan warns"                 grep -q "^WARN \[attribution-drift\].*'FIX-AD' asserted project 'rootb'.*root 'main'" <<<"$OUT"
+check_absent "closed stamped plan stays quiet"  "\[attribution-drift\].*FIX-AD-CLOSED"
 
 # --- Case 6: the real log, repo defaults (§4.1) --------------------------
 echo "== real log / repo defaults"

@@ -132,7 +132,7 @@ else
 # never failing. Moving an id between the lists changes enforcement
 # without code edits.
 blocking = ["schema", "referential", "sealed-tail", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision"]
-warn = ["drift", "orphans", "stalled", "long-blockers"]
+warn = ["drift", "orphans", "stalled", "long-blockers", "attribution-drift"]
 
 [storage]
 # APV_DATA_DIR env var overrides this; default is .apv/ when neither is set.

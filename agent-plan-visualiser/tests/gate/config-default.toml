@@ -1,4 +1,4 @@
 # Mirror of the repo-root .apv-config.toml [gate] defaults — fixture baseline.
 [gate]
 blocking = ["schema", "referential", "sealed-tail", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision"]
-warn = ["drift", "orphans", "stalled", "long-blockers", "pending-ceremony", "deferred-verification"]
+warn = ["drift", "orphans", "stalled", "long-blockers", "pending-ceremony", "deferred-verification", "attribution-drift"]

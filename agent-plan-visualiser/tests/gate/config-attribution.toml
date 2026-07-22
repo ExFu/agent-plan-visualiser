@@ -1,0 +1,16 @@
+# Attribution-drift fixture config (T3-project-attribution): a registry with
+# one named sub-project; both fixture plans are stamped rootb while their
+# files sit under the implicit main root. The OPEN one must WARN
+# [attribution-drift]; the CLOSED one is the blessed annotation-without-move
+# workflow and must stay quiet.
+[gate]
+blocking = ["schema", "referential", "sealed-tail", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision"]
+warn = ["drift", "attribution-drift"]
+
+[storage]
+data_dir = "fixture-attribution-drift"
+planning_dir = "fixture-ad-planning"
+
+[projects.rootb]
+planning_dir = "fixture-ad-planning-b"
+dirs = ["rootb-src/"]

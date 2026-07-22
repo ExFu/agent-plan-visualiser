@@ -9,7 +9,7 @@
 # blocking = corruption of the record (exit 1); warn = advisory, printed, never failing.
 # Moving an id between the two lists changes enforcement without code edits.
 blocking = ["schema", "referential", "sealed-tail", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision"]
-warn = ["drift", "orphans", "stalled", "long-blockers", "pending-ceremony", "deferred-verification"]
+warn = ["drift", "orphans", "stalled", "long-blockers", "pending-ceremony", "deferred-verification", "attribution-drift"]
 
 [storage]
 # Middle layer of the data-dir resolution order: APV_DATA_DIR env var -> this

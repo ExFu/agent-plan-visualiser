@@ -111,7 +111,7 @@ DEFAULT_BLOCKING = [
 ]
 DEFAULT_WARN = [
     "drift", "orphans", "stalled", "long-blockers",
-    "pending-ceremony", "deferred-verification",
+    "pending-ceremony", "deferred-verification", "attribution-drift",
 ]
 
 LONG_BLOCKER_COMMITS = 5  # warn when a live blocker has outlived N commits
@@ -541,6 +541,48 @@ def check_drift(ctx):
     return instances
 
 
+def check_attribution_drift(ctx):
+    """Stamped membership vs file location (T3-project-attribution): a
+    non-closed plan whose event-sourced project (explicit
+    `attributes.project`, latest-recorded — the fold's first rung) disagrees
+    with the planning root that currently owns its file. The stamp is
+    authoritative (events are SSOT) — the FILE is the stale artifact: move
+    it, or re-assert via project.assigned. Closed plans are exempt
+    (retrospective annotation without file moves is the blessed
+    T3-retrospective-project-annotation workflow). Registry-less repos with
+    no stamps: vacuous."""
+    instances = []
+    conn = ctx.cache()
+    states = {
+        row[0]: row[1]
+        for row in conn.execute(
+            "SELECT entity_id, derived_state FROM entities WHERE entity_type='plan'"
+        )
+    }
+    stamped = {}
+    for ev in ctx.events:
+        if ev.get("entity_type") != "plan":
+            continue
+        proj = (ev.get("attributes") or {}).get("project")
+        if proj:
+            stamped[ctx.rid(ev.get("entity_id"))] = proj
+    for pid, declared in stamped.items():
+        if states.get(pid) not in ("live", "draft", "dormant"):
+            continue
+        owner = None
+        for root_name, root_dir in ctx.planning_roots:
+            if (root_dir / f"{pid}.md").exists():
+                owner = root_name
+                break
+        if owner is not None and owner != declared:
+            instances.append(
+                f"plan '{pid}' asserted project '{declared}' but its file sits "
+                f"under root '{owner}' — the stamp is authoritative (events are "
+                f"SSOT); move the file or re-assert via project.assigned"
+            )
+    return instances
+
+
 def check_orphans(ctx):
     """audit-orphans.sql against the cache: children of closed parents (via
     spawns) still live/dormant/unknown."""
@@ -707,6 +749,7 @@ CHECKS = {
     "resurrection-without-reopen": check_resurrection,
     "fulcrum-without-decision": check_fulcrum,
     "drift": check_drift,
+    "attribution-drift": check_attribution_drift,
     "orphans": check_orphans,
     "stalled": check_stalled,
     "long-blockers": check_long_blockers,
