@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-22T11:52:03Z
+# Project state — generated 2026-07-22T11:52:39Z
 
-**Total events:** 626  ·  **Draft:** 15  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 59  ·  **Orphaned:** 0
+**Total events:** 629  ·  **Draft:** 15  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 60  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -29,7 +29,6 @@
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
-  - `T3-project-attribution` (14 events): verification.tested → entity.progressed → verification.tested
 
 ### By milestone
 
@@ -41,14 +40,13 @@
 
 - **M4-fresh-install**
   - `T3-distribution`
-  - `T3-project-attribution`
   - `T3-retrospective-project-annotation`
 
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 8 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 115 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 9 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 116 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -105,7 +103,7 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 4/7 T3 complete (57%); 3 live
+- **M4-fresh-install**: 5/7 T3 complete (71%); 2 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
