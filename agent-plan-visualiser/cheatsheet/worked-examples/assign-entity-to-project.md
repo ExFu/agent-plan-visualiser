@@ -10,6 +10,12 @@ The primitive is **`project.assigned`** (schema 0.6.0): a state-neutral
 membership *assertion*. It is a **fulcrum** event — pair it with a
 `decision` in the same sealed block.
 
+(Creation-time attribution is automatic in registry repos —
+T3-project-attribution: new entities are stamped by location as they are
+captured/extracted. This example is the MOVE/retro-history path: re-homing
+existing entities, legacy `unassigned` triage, and closed-entity
+annotation.)
+
 ## Single entity (open or closed)
 
 Append to the capture block (see `/apv-capture` for mechanics), then seal

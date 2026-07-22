@@ -8,7 +8,8 @@ bash "$APV/scripts/trace-decision-history.sh" <entity-id>
 ```
 
 This walks the entity's fulcrum events (`renamed`, `parked`, `cancelled`,
-`superseded`, `reopened`) and prints each with its paired `decision` text —
+`superseded`, `reopened`, `project.assigned`) and prints each with its
+paired `decision` text —
 the arc metadata that explains the pivot. Every fulcrum is required to have
 one; a gap here is itself a finding (and the `fulcrum-without-decision`
 audit will be flagging it).

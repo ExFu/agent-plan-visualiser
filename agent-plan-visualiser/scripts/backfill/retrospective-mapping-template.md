@@ -49,6 +49,15 @@ triage sitting instead. Same shape as the triage checklist:
 |---|---|---|
 | <a1b2c3d / "switch to postgres"> | <MongoDB → Postgres on the data layer> | <"aggregate queries were unshardable; decided in the 2024-03 arch review"> |
 
+## Sub-projects (only if the repo registers a `[projects]` carve-out map)
+
+- <Which historical areas map to which `[projects.<name>]` — e.g. "the old
+  `web/` tree is today's `site` sub-project". The walk stamps
+  `attributes.project` mechanically from TODAY's carve-outs applied to each
+  historical commit's paths; where history diverges from today's layout,
+  note it here and correct at triage with the bulk `project.assigned`
+  pattern (`cheatsheet/worked-examples/assign-entity-to-project.md`).>
+
 ## Anything else the extractor should know
 
 <naming aliases, dead directories, vendored code to ignore, rewritten

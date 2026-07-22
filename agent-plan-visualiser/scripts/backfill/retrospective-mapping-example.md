@@ -49,6 +49,14 @@ Worked example of the template — a realistic non-native shape: ADRs +
 | "checkout: move to stripe elements" | hand-rolled card form → Stripe Elements | "PCI scope reduction — ruled at the 2025-01 security review" |
 | "drop the recommendations service" | recommendations subsystem cancelled | "vendor cost tripled at renewal; conversion lift never materialised" |
 
+## Sub-projects (only if the repo registers a `[projects]` carve-out map)
+
+- Not applicable here — acme-storefront is single-project. (In a monorepo:
+  map historical trees to today's `[projects.<name>]` carve-outs, e.g.
+  "the old `web/` tree is today's `site` sub-project"; the walk stamps
+  mechanically from today's carve-outs, and divergent history is corrected
+  at triage with bulk `project.assigned`.)
+
 ## Anything else the extractor should know
 
 - History before 2024-06 was squashed during a repo migration — expect

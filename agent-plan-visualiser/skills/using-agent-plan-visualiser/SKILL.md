@@ -57,25 +57,34 @@ lives in a sub-folder pins e.g. `planning_dir = "plugin/planning"` while
 the data dir stays at the repo root (captures are commit-anchored, and
 commits are repo-level).
 
-**Multiple sub-projects, one repo** (T3-multi-project): register each
-project's planning root as `[projects.<name>] planning_dir = "..."`. The
-log stays ONE per repo — sub-projects are a dimension of the data, never a
-partition of the record. Entity → project membership derives at projection
-time: explicit `attributes.project` on any of the entity's events
-(latest-recorded wins; the escape hatch for planless entities — inbox
-items, blockers) → else whichever registered root owns
-`<root>/<entity_id>.md` → else the `[storage]` root as the implicit
-project `main` → else `unassigned` (a deliberately visible triage bucket).
-The view gains a project filter (all three views) and badges; summary.md a
-`## By project` rollup; the gate's drift check walks every root and WARNs
-on a plan id present in two roots (entity ids are repo-global). No
-`[projects]` tables → single-project behaviour, unchanged. Retrospective
-membership (re)assignment — including on **closed** entities — is
-`project.assigned` (0.6.0): a state-neutral membership assertion (the
-`entity.renamed` precedent — no resurrection, no reopening needed), fulcrum
-(paired decision required; one decision covers a bulk assignment).
-Latest-recorded wins; once asserted, the attribute is authoritative over
-planning-root derivation. Procedure:
+**Multiple sub-projects, one repo** (T3-multi-project +
+T3-project-attribution): register each project's planning root as
+`[projects.<name>] planning_dir = "..."`, plus the directories it owns —
+`dirs = ["site/", ...]`, explicit carve-outs; `planning_dir` is implicitly
+owned. The log stays ONE per repo — sub-projects are a dimension of the
+data, never a partition of the record. **Attribution happens at creation,
+by location** (operator ruling 2026-07-22): a new plan under a *named*
+project's planning root, and planless work falling in a named project's
+carve-outs, are stamped `attributes.project` at capture/extraction time.
+Only named sub-projects are ever stamped — the default project (the
+`[storage]` root's implicit `main`, renamed when a registered project
+claims that root) never is; work spanning several named sub-projects
+splits into one entity per project. The fold then reads: explicit
+`attributes.project` (latest-recorded wins) → else whichever registered
+root owns `<root>/<entity_id>.md` → else `main` → else `unassigned` (a
+deliberately visible triage bucket — legacy/pre-registry entities wait
+there for deliberate operator attribution, never auto-absorbed). The view
+gains a project filter (all three views) and badges; summary.md a `## By
+project` rollup; the gate's drift check walks every root and WARNs on a
+plan id present in two roots (entity ids are repo-global), and
+`attribution-drift` WARNs when an open plan's stamp disagrees with the
+root holding its file. No `[projects]` tables → single-project behaviour,
+unchanged. Retrospective membership (re)assignment — including on
+**closed** entities — is `project.assigned` (0.6.0): a state-neutral
+membership assertion (the `entity.renamed` precedent — no resurrection, no
+reopening needed), fulcrum (paired decision required; one decision covers
+a bulk assignment). Latest-recorded wins; once asserted, the attribute is
+authoritative over planning-root derivation. Procedure:
 `cheatsheet/worked-examples/assign-entity-to-project.md`.
 
 Inside it: `events.jsonl` (canonical, append-only — all integrity

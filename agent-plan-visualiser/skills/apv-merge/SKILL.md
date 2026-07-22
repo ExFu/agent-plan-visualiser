@@ -49,7 +49,10 @@ The textual recipe cannot see meaning. Diff the two tails (each side's events si
 - closed on one side, progressed/extended on the other;
 - competing `entity.renamed` targets;
 - duplicate `entity.created` of the same id;
-- decisions that contradict each other.
+- decisions that contradict each other;
+- competing `project.assigned` (or competing latest `attributes.project`)
+  for the same entity — the membership fold is latest-recorded-wins, so a
+  silent merge would let block ordering rule a genuine dispute.
 
 Any of these → **stop. Surface both stories to the operator with a recommendation; never resolve silently.** Their ruling becomes **reconciliation events** in the block you are about to seal — typically `entity.reopened` + its paired `decision` carrying the ruling, or whatever they rule. The gate backstops this pass: a merged closed-then-progressed sequence blocks as `resurrection-without-reopen` until a reopen records the ruling. Repair is append-only by law — nothing can be inserted before the violation, so the check recognises the healed shape: a later reopen resolves what precedes it.
 
@@ -96,4 +99,7 @@ The same doctrine, condensed — for humans resolving by hand:
 - **Never edit or reorder within blocks**; never touch main's prefix; never dedupe "redundant-looking" events.
 - **Never squash or reword sealed commits** while rebasing — the orphaned seal blocks at the gate.
 - **Never self-rule a contradiction.** The operator rules; you recommend.
+- **Never let latest-wins settle membership.** Branches asserting different
+  projects for one entity is a §3 contradiction — the operator rules; the
+  ruling lands as a fresh `project.assigned` + `decision`.
 - **Never land red**, and never `--no-verify` a push of main to skip the gate — that hatch is for capture-free trivia commits, not the boundary.

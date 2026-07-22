@@ -55,7 +55,16 @@ blocks`, every `--chunk-size` blocks) transit the capture guard normally.
   `confidence: "derived"`, schema-validated at 0.4.0, fresh unique UUIDs.
 - Every seal: the historical commit's real subject/author/date +
   `commit_ref` — the model's word is never trusted for ground truth.
-- `entity.accepted` and `analysis.*` are rejected unconditionally.
+- `entity.accepted`, `analysis.*` and `project.assigned` are rejected
+  unconditionally.
+- Attribution is mechanical (multi-project repos): plan creations under a
+  named sub-project's planning root, and planless creations whose commit
+  touches a named project's `dirs` carve-outs, are stamped
+  `attributes.project` by the orchestrator from git ground truth — the
+  model never asserts membership. Historical layouts that diverge from
+  today's carve-outs are corrected at triage via the bulk
+  `project.assigned` pattern
+  (`cheatsheet/worked-examples/assign-entity-to-project.md`).
 - Unrecoverable Whys become open `hitl-question`s with candidates (tier 3),
   collected to `<data-dir>/needs-review/hypotheses-<run>.jsonl` for triage —
   a decision is only ever recovered (cited source) or recollected (operator

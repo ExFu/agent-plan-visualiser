@@ -8,10 +8,13 @@ dir (`APV_DATA_DIR` → `.apv-config.toml` `[storage] data_dir` → `.apv/`).
 Run everything from the repo root. Skills are plugin-namespaced
 (`agent-plan-visualiser:apv-capture` etc.); when a session lacks them, the
 sources are at `$APV/skills/<name>/SKILL.md`. Monorepos may register
-sub-projects (`[projects.<name>] planning_dir = "..."` in
-`.apv-config.toml`) — one shared log, per-entity `project` membership,
-filterable in the view. Assigning/moving entities between sub-projects
-(retrospectively, incl. closed entities):
+sub-projects (`[projects.<name>] planning_dir = "..."` plus owned-dir
+carve-outs `dirs = ["site/", ...]` in `.apv-config.toml`) — one shared
+log, per-entity `project` membership, filterable in the view. New entities
+are attributed at creation by location (named sub-projects stamped
+`attributes.project`; the default project never; no-carve-out planless
+work stays `unassigned` for triage). Assigning/moving entities between
+sub-projects (retrospectively, incl. closed entities):
 `worked-examples/assign-entity-to-project.md`.
 
 ## Status read (what's the project state?)

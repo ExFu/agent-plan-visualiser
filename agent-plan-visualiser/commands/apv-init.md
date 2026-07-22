@@ -38,3 +38,11 @@ it, relay its report, and handle the CLAUDE.md offer with the user.
    before each commit; branches land on main via /apv-merge; pre-init
    history is not mined (backfill is a separate opt-in step, not yet part
    of this flow).
+
+5. Monorepo with sub-projects? The generated config carries a commented
+   `[projects.<name>]` registry template (planning root + owned-dir
+   `dirs` carve-outs) — point the user at it if they mention sub-projects.
+   Uncommenting it turns on creation-time attribution (named sub-projects
+   stamped by location; the default project is named by registering a
+   project that claims the `[storage]` planning root). Single-project
+   behaviour is unchanged while it stays commented.

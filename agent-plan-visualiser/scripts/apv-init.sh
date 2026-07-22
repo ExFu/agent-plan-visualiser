@@ -142,16 +142,22 @@ data_dir = "$DATA_DIR"
 # the data dir stays at the repo root; only the plan corpus moves.
 # planning_dir = "planning"
 
-# Multiple sub-projects in one repo (T3-multi-project): register each
-# project's planning root. Commits and the event log stay repo-wide (one
-# record); entities derive project membership from which root owns their
-# plan file (explicit attributes.project overrides). The [storage] root
-# above is the implicit project "main"; unmatched entities show as
-# "unassigned". Uncomment and adapt:
+# Multiple sub-projects in one repo (T3-multi-project +
+# T3-project-attribution): register each project's planning root and the
+# directories it owns (dirs — explicit carve-outs; planning_dir is
+# implicitly owned). Commits and the event log stay repo-wide (one
+# record); entities are attributed at creation by location — named
+# sub-projects are stamped attributes.project, the default project (the
+# [storage] root's implicit "main", renamed by a project claiming that
+# root) never is; unmatched planless entities show as "unassigned" for
+# triage. Deliberate re-homes are operator-ruled project.assigned events.
+# Uncomment and adapt:
 # [projects.website]
 # planning_dir = "site/planning"
+# dirs = ["site/"]
 # [projects.plugin]
 # planning_dir = "plugin/planning"
+# dirs = ["plugin/"]
 TOML
   report created ".apv-config.toml" "default gate lists; data_dir = \"$DATA_DIR\""
 fi
@@ -519,6 +525,9 @@ plans and status prose are secondary. After each logical unit of work and
 the pre-commit guard rejects uncaptured commits (\`git commit --no-verify\`
 is the sanctioned hatch for capture-free trivia). Land branches on main via
 /apv-merge; the gate hooks refuse a main that fails the integrity check.
+Sub-projects registered under \`[projects]\` in \`.apv-config.toml\` share
+this one log — membership is derived from location at creation (or an
+operator's \`project.assigned\`), never a fork of the record.
 
 Skills are plugin-namespaced: /apv-capture may be listed as
 \`agent-plan-visualiser:apv-capture\`. If NEITHER form is available, this
