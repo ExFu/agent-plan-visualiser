@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-23T15:52:55Z
+# Project state — generated 2026-07-23T15:53:39Z
 
-**Total events:** 652  ·  **Draft:** 15  ·  **Live:** 14  ·  **Dormant:** 0  ·  **Closed:** 60  ·  **Orphaned:** 0
+**Total events:** 655  ·  **Draft:** 15  ·  **Live:** 14  ·  **Dormant:** 0  ·  **Closed:** 60  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -29,7 +29,7 @@
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-packaging**
-  - `T3-distribution` (44 events): verification.tested → entity.progressed → verification.tested
+  - `T3-distribution` (46 events): verification.tested → entity.progressed → verification.tested
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
@@ -55,8 +55,8 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 16 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 123 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 17 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 124 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
