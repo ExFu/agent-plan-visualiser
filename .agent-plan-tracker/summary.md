@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-23T15:56:14Z
+# Project state — generated 2026-07-23T16:24:31Z
 
-**Total events:** 659  ·  **Draft:** 15  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 61  ·  **Orphaned:** 0
+**Total events:** 662  ·  **Draft:** 15  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 62  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,7 +20,6 @@
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
-  - `M6-exfu-integration` (3 events): entity.created → relationship.spawns → entity.accepted
 
 - **T2-ontology**
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
@@ -39,9 +38,6 @@
 - **(self: M5-backfill)**
   - `M5-backfill`
 
-- **(self: M6-exfu-integration)**
-  - `M6-exfu-integration`
-
 - **M4-fresh-install**
   - `T3-distribution`
   - `T3-retrospective-project-annotation`
@@ -49,12 +45,11 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 18 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 125 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 19 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 126 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
-- `M6-exfu-integration`
 
 **Deferred verifications** (operator legs to come back to):
 - `T3-exfu-planning-integration` (deferred 2026-07-24): Populating the installed plugin cache with 0.6.3 requires an install/update action that changes the operator's plugin scope (APV is currently project-scoped and disabled by deliberate choice); operator-directed, deferred to them. Command: claude plugin install agent-plan-visualiser@apv (or update at the chosen scope).
