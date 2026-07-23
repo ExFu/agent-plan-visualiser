@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-22T13:17:25Z
+# Project state — generated 2026-07-23T15:52:55Z
 
-**Total events:** 643  ·  **Draft:** 15  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 60  ·  **Orphaned:** 0
+**Total events:** 652  ·  **Draft:** 15  ·  **Live:** 14  ·  **Dormant:** 0  ·  **Closed:** 60  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,6 +20,10 @@
 - **(milestone)**
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
+  - `M6-exfu-integration` (3 events): entity.created → relationship.spawns → entity.accepted
+
+- **T2-extraction**
+  - `T3-exfu-planning-integration` (5 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-ontology**
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
@@ -38,15 +42,21 @@
 - **(self: M5-backfill)**
   - `M5-backfill`
 
+- **(self: M6-exfu-integration)**
+  - `M6-exfu-integration`
+
 - **M4-fresh-install**
   - `T3-distribution`
   - `T3-retrospective-project-annotation`
 
+- **M6-exfu-integration**
+  - `T3-exfu-planning-integration`
+
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 15 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 122 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 16 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 123 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -54,19 +64,19 @@
 ## Draft
 
 - **inbox-item**
-  - `2026-05-23.autopilot-misuse-meta-observation` (60d untriaged)
-  - `2026-05-23.cheatsheet-initial-content` (60d untriaged)
-  - `2026-05-23.cowork-vs-code-altitude-guidance` (60d untriaged)
-  - `2026-05-23.extraction-prompt-template-skeleton` (60d untriaged)
-  - `2026-05-23.html-view-visual-style` (60d untriaged)
-  - `2026-05-23.mapping-note-agent-design` (60d untriaged)
-  - `2026-05-23.plugin-naming-alternatives` (60d untriaged)
-  - `2026-05-23.side-quest-formalisation` (60d untriaged)
-  - `2026-05-23.snapshot-trigger-config` (60d untriaged)
-  - `2026-05-23.verification-overhaul-candidate-model` (60d untriaged)
-  - `2026-06-10.view-hardcodes-dogfood-data-dir` (42d untriaged)
-  - `2026-07-07.dist-sandbox-test-reference-stale` (15d untriaged)
-  - `2026-07-21.methodology-name-pending` (1d untriaged)
+  - `2026-05-23.autopilot-misuse-meta-observation` (61d untriaged)
+  - `2026-05-23.cheatsheet-initial-content` (61d untriaged)
+  - `2026-05-23.cowork-vs-code-altitude-guidance` (61d untriaged)
+  - `2026-05-23.extraction-prompt-template-skeleton` (61d untriaged)
+  - `2026-05-23.html-view-visual-style` (61d untriaged)
+  - `2026-05-23.mapping-note-agent-design` (61d untriaged)
+  - `2026-05-23.plugin-naming-alternatives` (61d untriaged)
+  - `2026-05-23.side-quest-formalisation` (61d untriaged)
+  - `2026-05-23.snapshot-trigger-config` (61d untriaged)
+  - `2026-05-23.verification-overhaul-candidate-model` (61d untriaged)
+  - `2026-06-10.view-hardcodes-dogfood-data-dir` (43d untriaged)
+  - `2026-07-07.dist-sandbox-test-reference-stale` (16d untriaged)
+  - `2026-07-21.methodology-name-pending` (2d untriaged)
 - **plan**
   - `KT0-knowledge-substrate`
   - `T2-ingest`
@@ -107,6 +117,7 @@ _No flapping closures._
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
+- **M6-exfu-integration**: 0/1 T3 complete (0%); 1 live
 
 ---
-_87 entities · 118 relationships · 35 decisions._
+_89 entities · 121 relationships · 35 decisions._
