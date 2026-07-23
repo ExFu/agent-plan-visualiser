@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-23T15:53:39Z
+# Project state — generated 2026-07-23T15:56:14Z
 
-**Total events:** 655  ·  **Draft:** 15  ·  **Live:** 14  ·  **Dormant:** 0  ·  **Closed:** 60  ·  **Orphaned:** 0
+**Total events:** 659  ·  **Draft:** 15  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 61  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -21,9 +21,6 @@
   - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
   - `M6-exfu-integration` (3 events): entity.created → relationship.spawns → entity.accepted
-
-- **T2-extraction**
-  - `T3-exfu-planning-integration` (5 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-ontology**
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
@@ -49,17 +46,18 @@
   - `T3-distribution`
   - `T3-retrospective-project-annotation`
 
-- **M6-exfu-integration**
-  - `T3-exfu-planning-integration`
-
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 17 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 124 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 18 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 125 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
+- `M6-exfu-integration`
+
+**Deferred verifications** (operator legs to come back to):
+- `T3-exfu-planning-integration` (deferred 2026-07-24): Populating the installed plugin cache with 0.6.3 requires an install/update action that changes the operator's plugin scope (APV is currently project-scoped and disabled by deliberate choice); operator-directed, deferred to them. Command: claude plugin install agent-plan-visualiser@apv (or update at the chosen scope).
 
 ## Draft
 
@@ -117,7 +115,7 @@ _No flapping closures._
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
-- **M6-exfu-integration**: 0/1 T3 complete (0%); 1 live
+- **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
 _89 entities · 121 relationships · 35 decisions._
