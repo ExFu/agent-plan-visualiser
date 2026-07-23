@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-23T19:32:34Z
+# Project state — generated 2026-07-23T20:09:17Z
 
-**Total events:** 692  ·  **Draft:** 15  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 63  ·  **Orphaned:** 0
+**Total events:** 696  ·  **Draft:** 17  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 63  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -18,7 +18,7 @@
   - `T2-storage` (9 events): entity.progressed → entity.progressed → verification.tested
 
 - **(milestone)**
-  - `M4-fresh-install` (7 events): entity.extended → entity.progressed → entity.progressed
+  - `M4-fresh-install` (8 events): entity.progressed → entity.progressed → verification.tested
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
 
 - **T2-ontology**
@@ -45,8 +45,8 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 27 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 134 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 28 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 135 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -67,6 +67,8 @@
   - `2026-06-10.view-hardcodes-dogfood-data-dir` (43d untriaged)
   - `2026-07-07.dist-sandbox-test-reference-stale` (16d untriaged)
   - `2026-07-21.methodology-name-pending` (2d untriaged)
+  - `2026-07-23.exfu-plugin-project-scoped-elsewhere`
+  - `2026-07-23.stale-hooks-after-plugin-upgrade`
 - **plan**
   - `KT0-knowledge-substrate`
   - `T2-ingest`
@@ -110,4 +112,4 @@ _No flapping closures._
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_90 entities · 123 relationships · 38 decisions._
+_92 entities · 123 relationships · 38 decisions._

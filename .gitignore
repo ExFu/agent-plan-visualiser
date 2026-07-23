@@ -30,3 +30,7 @@ __pycache__/
 
 # Editor/agent-plugin local state — never plugin content.
 .omc/
+# agent-plan-visualiser local per-checkout state — never tracked
+.agent-plan-tracker/.pending-extract
+# agent-plan-visualiser local per-checkout state — never tracked
+.agent-plan-tracker/.toolchain-home
