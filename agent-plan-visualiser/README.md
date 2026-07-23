@@ -15,8 +15,8 @@ actually happened; the gap between the two is signal.
 /plugin marketplace add https://github.com/ExFu/claude-marketplace
 /plugin install agent-plan-visualiser@exfu
 #    Offline/dev alternative — build a local single-plugin marketplace instead:
-#    bash agent-plan-visualiser/scripts/build-bundle.sh   # -> dist/apv-marketplace/
-#    /plugin marketplace add <path>/apv-marketplace && /plugin install agent-plan-visualiser@apv
+#    bash agent-plan-visualiser/scripts/build-bundle.sh   # -> dist/exfu-marketplace/
+#    /plugin marketplace add <path>/exfu-marketplace && /plugin install agent-plan-visualiser@exfu
 
 # 2. Attach a project (fresh or existing repo — attaches from now):
 /apv-init          # seeds .apv/, writes config, installs the git hooks

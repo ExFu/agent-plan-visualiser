@@ -156,13 +156,13 @@ check "second accept is a no-op"        [ "$(grep -cF 'apv:orientation' CLAUDE.m
 
 # --- Case 6: plugin-cache install -> enablement persistence -------------------
 echo "== cache install: enablement written to .claude/settings.json, tracked-ness checked"
-CACHE_HOME="$SANDBOX/cc/plugins/cache/apv/agent-plan-visualiser/9.9.9"
+CACHE_HOME="$SANDBOX/cc/plugins/cache/exfu/agent-plan-visualiser/9.9.9"
 mkdir -p "$(dirname "$CACHE_HOME")"
 cp -R "$WT_ROOT/agent-plan-visualiser" "$CACHE_HOME"
 new_repo cachey
 run env CLAUDE_CONFIG_DIR="$SANDBOX/cc" bash "$CACHE_HOME/scripts/apv-init.sh"
 check "cache init exits 0"              [ "$CODE" -eq 0 ]
-check "enablement key written"          grep -q '"agent-plan-visualiser@apv": true' .claude/settings.json
+check "enablement key written"          grep -q '"agent-plan-visualiser@exfu": true' .claude/settings.json
 check "untracked warned loudly"         grep -q "UNTRACKED" <<<"$OUT"
 check "next-steps says commit it"       grep -q "COMMIT .claude/settings.json" <<<"$OUT"
 check "gate hooks NOT baked to cache"   grep -q 'APV_HOME=""' .git/hooks/pre-push
@@ -185,7 +185,7 @@ check "commit lands via cache-discovered gate" [ "$CODE" -eq 0 ]
 echo "== cache install, user scope: nothing to persist"
 CC2="$SANDBOX/cc2"
 mkdir -p "$CC2/plugins"
-printf '{"version":2,"plugins":{"agent-plan-visualiser@apv":[{"scope":"user"}]}}\n' > "$CC2/plugins/installed_plugins.json"
+printf '{"version":2,"plugins":{"agent-plan-visualiser@exfu":[{"scope":"user"}]}}\n' > "$CC2/plugins/installed_plugins.json"
 new_repo userscoped
 run env CLAUDE_CONFIG_DIR="$CC2" bash "$CACHE_HOME/scripts/apv-init.sh"
 check "user-scope init exits 0"         [ "$CODE" -eq 0 ]

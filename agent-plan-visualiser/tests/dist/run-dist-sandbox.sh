@@ -52,7 +52,7 @@ check "zip produced"                    [ -n "$ZIP" ] && [ -f "$ZIP" ]
 echo "== artefact: unzip is structurally a plugin"
 mkdir -p "$SANDBOX/downloaded"
 (cd "$SANDBOX/downloaded" && unzip -q "$ZIP")
-MARKET="$SANDBOX/downloaded/apv-marketplace"
+MARKET="$SANDBOX/downloaded/exfu-marketplace"
 BUNDLE="$MARKET/agent-plan-visualiser"
 check "marketplace manifest parses"     python3 -c "import json; json.load(open('$MARKET/.claude-plugin/marketplace.json'))"
 check "marketplace source resolves"     python3 -c "

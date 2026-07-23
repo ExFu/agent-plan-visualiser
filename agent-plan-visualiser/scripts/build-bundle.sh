@@ -3,7 +3,7 @@
 # (T3-distribution §2.2). Version comes from the manifest; the output is
 # a staged install-source tree plus one uploadable zip:
 #
-#   <out>/apv-marketplace/                       staged single-plugin marketplace
+#   <out>/exfu-marketplace/                       staged single-plugin marketplace
 #     .claude-plugin/marketplace.json            (source: "./agent-plan-visualiser")
 #     agent-plan-visualiser/                     the plugin tree
 #   <out>/agent-plan-visualiser-<v>.zip          the bundle (test channel: exfu.ai)
@@ -33,7 +33,7 @@ VERSION="$(python3 -c "import json; print(json.load(open('$PLUGIN_DIR/.claude-pl
   exit 1
 }
 
-MARKET="$OUT/apv-marketplace"
+MARKET="$OUT/exfu-marketplace"
 STAGE="$MARKET/agent-plan-visualiser"
 ZIP="$OUT/agent-plan-visualiser-$VERSION.zip"
 mkdir -p "$OUT"
@@ -56,7 +56,7 @@ mkdir -p "$STAGE"
 mkdir -p "$MARKET/.claude-plugin"
 cat > "$MARKET/.claude-plugin/marketplace.json" <<JSON
 {
-  "name": "apv",
+  "name": "exfu",
   "owner": { "name": "Alastair Brayne" },
   "plugins": [
     {
@@ -75,5 +75,5 @@ echo "build-bundle: bundle  $ZIP ($(du -h "$ZIP" | cut -f1 | tr -d ' '))"
 echo
 echo "Install locally (Claude Code):"
 echo "  /plugin marketplace add $MARKET"
-echo "  /plugin install agent-plan-visualiser@apv"
+echo "  /plugin install agent-plan-visualiser@exfu"
 echo "Then, in the project to attach:  /apv-init"
