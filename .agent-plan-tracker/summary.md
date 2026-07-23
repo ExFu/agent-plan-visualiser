@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-23T16:30:30Z
+# Project state — generated 2026-07-23T16:35:58Z
 
-**Total events:** 667  ·  **Draft:** 15  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 62  ·  **Orphaned:** 0
+**Total events:** 669  ·  **Draft:** 15  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 62  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -45,14 +45,11 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 21 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 128 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 22 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 129 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
-
-**Deferred verifications** (operator legs to come back to):
-- `T3-exfu-planning-integration` (deferred 2026-07-24): Populating the installed plugin cache with 0.6.3 requires an install/update action that changes the operator's plugin scope (APV is currently project-scoped and disabled by deliberate choice); operator-directed, deferred to them. Command: claude plugin install agent-plan-visualiser@apv (or update at the chosen scope).
 
 ## Draft
 
