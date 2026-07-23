@@ -58,3 +58,11 @@ Everything before this T3 makes the plugin *work* anywhere; this T3 makes it *ar
 - **README quickstart (§2.5)**: rewritten — install → init → first captured commit; the stale status section removed outright (docs carry no progress state; state lives in the log and its projections).
 - **Verification**: `tests/dist/run-dist-sandbox.sh` is §4.1 and §4.3 plus the M4 §6 cold-agent core — build → unzip elsewhere → structural checks → from the bundle alone: init attaches a fresh repo, session orientation fires, guard rejects/passes, corrupt branch refused, clean branch lands, push gated, CI step green/red. ALL PASS.
 - **Open — operator legs**: the **exfu.ai upload/placement walkthrough** (§6 Q1, unchanged) and the **Cowork verification (§2 item 3 / §4.2)** — both need the operator's environments; recorded as verification.skipped in the log, and this T3 stays live until they land. The first *real* Claude Code install of the bundle (plugin loads, skills surface, hooks fire in-session) is likewise the operator's local test — the sandbox proves everything up to the plugin-loader boundary.
+
+## 8. Ruling (2026-07-23) — public distribution decided
+
+Resolves §6 Q1's remaining public-distribution leg (was "deferred, not decided"). **Public distribution is a git marketplace**: marketplace `exfu` @ https://github.com/ExFu/claude-marketplace, with the plugin published to its own repo https://github.com/ExFu/agent-plan-visualiser and installed `agent-plan-visualiser@exfu`. The exfu.ai private-bundle test channel (§2.1) is **superseded** for public delivery; `build-bundle.sh` and its local single-plugin marketplace survive as the offline/dev install path only.
+
+Rationale: a git-hosted marketplace is the **only channel both Claude Code and Cowork honour**, so it is the mechanism that fixes cross-client enablement rather than papering over it. Publishing across the exfu plugin family is now git-push-to-publish, one marketplace for all of them.
+
+The consumer-side model this unlocks — one global install, a repo that declares its own APV dependency portably, per-client verify-and-whinge — is carried by [[T3-cross-client-install]] (new sibling in the M4 wave). README + the `apv-init.sh` not-found hint already point at the public marketplace (operator-directed, pre-plan).

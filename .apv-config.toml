@@ -16,3 +16,12 @@ warn = ["drift", "orphans", "stalled", "long-blockers", "pending-ceremony", "def
 # -> default (.apv/). This repo's data dir keeps its pre-rename name — the
 # log's history lives there and the pin makes the rename a non-event for it.
 data_dir = ".agent-plan-tracker"
+
+[requires]
+# The plugin this project depends on (T3-cross-client-install). session-orient
+# warns when the loaded plugin version is behind apv_min_version; the CLAUDE.md
+# orientation block tells a cold agent how to install it when the skills are
+# absent entirely. The floor is a deliberate minimum — the operator raises it
+# when a newer feature is needed; it is never auto-bumped.
+apv_min_version = "0.6.3"
+skills = ["apv-capture", "apv-merge", "using-agent-plan-visualiser"]

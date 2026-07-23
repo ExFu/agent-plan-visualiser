@@ -2,9 +2,12 @@
 description: Land a branch on main without corrupting the event log — branch-side reconciliation, main only ever receives gate-green logs. Use when a branch is ready for main, and especially when git reports a merge conflict on events.jsonl.
 ---
 
-Bring the branch to main with the record intact. The canonical procedure is
-the apv-merge skill; this command is its slash-invocable surface — do not
-improvise from memory, and never auto-resolve an `events.jsonl` conflict.
+Slash alias (Claude Code) for the skill `agent-plan-visualiser:apv-merge`. The
+**skill** is the canonical procedure and the cross-client primitive; this
+command is only its slash-invocable surface in Claude Code, and may be absent
+in Cowork/Desktop even when the skill is loaded. Invoke the skill and follow it
+exactly — do not improvise from memory, and never auto-resolve an
+`events.jsonl` conflict.
 
 1. Read the skill in full and follow it exactly:
 

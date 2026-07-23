@@ -10,10 +10,13 @@ actually happened; the gap between the two is signal.
 ## Quickstart
 
 ```text
-# 1. Build (or download) the bundle, then install the plugin:
-bash agent-plan-visualiser/scripts/build-bundle.sh        # -> dist/apv-marketplace/
-/plugin marketplace add <path>/apv-marketplace
-/plugin install agent-plan-visualiser@apv
+# 1. Add the exfu marketplace (once per client — Claude Code and Cowork alike),
+#    then install the plugin from it:
+/plugin marketplace add https://github.com/ExFu/claude-marketplace
+/plugin install agent-plan-visualiser@exfu
+#    Offline/dev alternative — build a local single-plugin marketplace instead:
+#    bash agent-plan-visualiser/scripts/build-bundle.sh   # -> dist/apv-marketplace/
+#    /plugin marketplace add <path>/apv-marketplace && /plugin install agent-plan-visualiser@apv
 
 # 2. Attach a project (fresh or existing repo — attaches from now):
 /apv-init          # seeds .apv/, writes config, installs the git hooks

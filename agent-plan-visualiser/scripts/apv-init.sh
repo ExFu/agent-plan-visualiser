@@ -162,6 +162,25 @@ TOML
   report created ".apv-config.toml" "default gate lists; data_dir = \"$DATA_DIR\""
 fi
 
+# --- 2b. requires floor (T3-cross-client-install) ----------------------------
+# The dependency this project declares on the plugin. session-orient warns when
+# the loaded plugin is behind apv_min_version; the CLAUDE.md block tells a cold
+# agent how to install it when the skills are absent entirely. Idempotent: a
+# new TOML table appended once at EOF (valid anywhere), seeded from the plugin
+# manifest, then respected. Absent [requires] degrades gracefully everywhere.
+if grep -q '^\[requires\]' .apv-config.toml 2>/dev/null; then
+  report ok ".apv-config.toml [requires]" "present"
+else
+  APV_VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$TOOLCHAIN_HOME/.claude-plugin/plugin.json" 2>/dev/null | head -n 1)
+  {
+    printf '\n[requires]\n'
+    printf '# The plugin this project depends on (T3-cross-client-install).\n'
+    [ -n "$APV_VERSION" ] && printf 'apv_min_version = "%s"\n' "$APV_VERSION"
+    printf 'skills = ["apv-capture", "apv-merge", "using-agent-plan-visualiser"]\n'
+  } >> .apv-config.toml
+  report created ".apv-config.toml [requires]" "${APV_VERSION:+apv_min_version=\"$APV_VERSION\"; }skills pinned"
+fi
+
 # --- 3. command launcher -----------------------------------------------------
 # A short entry point — `<data-dir>/bin/apv` — so nobody has to type
 # `python3 <toolchain>/scripts/...` by hand. The shim is a pure passthrough
@@ -268,7 +287,8 @@ if usable "$newest"; then
 fi
 echo "apv: APV toolchain not found (tried \$APV_HOME, a vendored agent-plan-visualiser/," >&2
 echo "apv: $data_dir/.toolchain-home, and $cache)." >&2
-echo "apv: install the plugin (/plugin install agent-plan-visualiser@apv) or set APV_HOME," >&2
+echo "apv: install the plugin (/plugin marketplace add https://github.com/ExFu/claude-marketplace" >&2
+echo "apv: then /plugin install agent-plan-visualiser@exfu) or set APV_HOME," >&2
 echo "apv: then re-run — or re-attach with /apv-init." >&2
 exit 127
 LAUNCH
@@ -529,12 +549,24 @@ Sub-projects registered under \`[projects]\` in \`.apv-config.toml\` share
 this one log — membership is derived from location at creation (or an
 operator's \`project.assigned\`), never a fork of the record.
 
-Skills are plugin-namespaced: /apv-capture may be listed as
-\`agent-plan-visualiser:apv-capture\`. If NEITHER form is available, this
-session did not load the plugin (typical in worktree checkouts that lack
-\`.claude/settings.json\`) — read the skill source directly and follow it:
-the newest \`~/.claude/plugins/cache/*/agent-plan-visualiser/*/skills/apv-capture/SKILL.md\`
+This project REQUIRES the agent-plan-visualiser plugin (the version floor is
+pinned in \`.apv-config.toml\` \`[requires]\`). The **skill**
+\`agent-plan-visualiser:apv-capture\` is the cross-client primitive;
+\`/apv-capture\` is only its Claude-Code slash alias and may be absent in
+Cowork/Desktop even when the skill is loaded. Before any work, confirm that
+skill is available. If NEITHER the skill nor the command is present, this
+session did not load the plugin (typical in worktree checkouts that lack a
+committed \`.claude/settings.json\`, or in Cowork/Desktop before install) — do
+NOT fabricate captures by hand. Load it:
+\`/plugin marketplace add https://github.com/ExFu/claude-marketplace\` then
+\`/plugin install agent-plan-visualiser@exfu\`; or read the skill source and
+follow it directly — the newest
+\`~/.claude/plugins/cache/*/agent-plan-visualiser/*/skills/apv-capture/SKILL.md\`
 (same pattern for apv-merge and using-agent-plan-visualiser).
+
+Fresh clone or new worktree? The git hooks live in \`.git/\` and are not
+committed — run /apv-init once here to install the capture-guard and gate
+adapters. It is idempotent: it repairs only what is missing.
 BLOCK
 }
 if [ -f CLAUDE.md ] && grep -qF "$APV_MD_MARKER" CLAUDE.md; then

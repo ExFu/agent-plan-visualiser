@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-23T16:24:31Z
+# Project state — generated 2026-07-23T18:40:00Z
 
-**Total events:** 662  ·  **Draft:** 15  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 62  ·  **Orphaned:** 0
+**Total events:** 670  ·  **Draft:** 15  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 62  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -25,7 +25,8 @@
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-packaging**
-  - `T3-distribution` (46 events): verification.tested → entity.progressed → verification.tested
+  - `T3-cross-client-install` (6 events): entity.progressed → verification.tested → verification.deferred
+  - `T3-distribution` (47 events): entity.extended → entity.progressed → verification.tested
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
@@ -39,20 +40,22 @@
   - `M5-backfill`
 
 - **M4-fresh-install**
+  - `T3-cross-client-install`
   - `T3-distribution`
   - `T3-retrospective-project-annotation`
 
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 19 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 126 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 20 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 127 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
 
 **Deferred verifications** (operator legs to come back to):
 - `T3-exfu-planning-integration` (deferred 2026-07-24): Populating the installed plugin cache with 0.6.3 requires an install/update action that changes the operator's plugin scope (APV is currently project-scoped and disabled by deliberate choice); operator-directed, deferred to them. Command: claude plugin install agent-plan-visualiser@apv (or update at the chosen scope).
+- `T3-cross-client-install` (deferred 2026-07-23): Two operator-environment legs (plan §5.4 and §5.5) need the operator's clients and the marketplace listing APV live: (§5.4) Claude Code auto-enabling from the committed .claude/settings.json pin, and (§5.5) Cowork surfacing the REQUIRES whinge from the CLAUDE.md block. Deferred to the operator like the T3-distribution Cowork leg.
 
 ## Draft
 
@@ -106,11 +109,11 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 5/7 T3 complete (71%); 2 live
+- **M4-fresh-install**: 5/8 T3 complete (62%); 3 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_89 entities · 121 relationships · 35 decisions._
+_90 entities · 123 relationships · 35 decisions._
