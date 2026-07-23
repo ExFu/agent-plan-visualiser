@@ -1,4 +1,4 @@
-# agent-plan-visualiser (APV)
+# ExFu Agent Plan Visualiser (APV)
 
 Event-sourced planning methodology + tracking spine, packaged as a Claude
 Code plugin. Git commit history is the one artefact that cannot lie about
@@ -13,10 +13,10 @@ actually happened; the gap between the two is signal.
 # 1. Add the exfu marketplace (once per client — Claude Code and Cowork alike),
 #    then install the plugin from it:
 /plugin marketplace add https://github.com/ExFu/claude-marketplace
-/plugin install agent-plan-visualiser@exfu
+/plugin install exfu-agent-plan-visualiser@exfu
 #    Offline/dev alternative — build a local single-plugin marketplace instead:
 #    bash agent-plan-visualiser/scripts/build-bundle.sh   # -> dist/exfu-marketplace/
-#    /plugin marketplace add <path>/exfu-marketplace && /plugin install agent-plan-visualiser@exfu
+#    /plugin marketplace add <path>/exfu-marketplace && /plugin install exfu-agent-plan-visualiser@exfu
 
 # 2. Attach a project (fresh or existing repo — attaches from now):
 /apv-init          # seeds .apv/, writes config, installs the git hooks
@@ -35,10 +35,10 @@ reference-transaction hooks keep an untrustworthy log off main either way.
 `git commit --no-verify` is the sanctioned hatch for capture-free trivia.
 
 Skills install plugin-namespaced — in a session's skill list they appear as
-`agent-plan-visualiser:apv-capture` etc. If neither that nor `/apv-capture`
+`exfu-agent-plan-visualiser:apv-capture` etc. If neither that nor `/apv-capture`
 is available, the session didn't load the plugin (usually a checkout without
 `.claude/settings.json`); the skill sources remain readable at the newest
-`~/.claude/plugins/cache/*/agent-plan-visualiser/*/skills/`.
+`~/.claude/plugins/cache/*/exfu-agent-plan-visualiser/*/skills/`.
 
 ## What's in the box
 

@@ -56,12 +56,12 @@ skill_hint() {
     [ -d "$pinned/skills" ] && home="$pinned"
   fi
   if [ -z "$home" ]; then
-    newest="$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1)"
+    newest="$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/*agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1)"
     newest="${newest%/}"
     if [ -n "$newest" ] && [ -d "$newest/skills" ]; then home="$newest"; fi
   fi
   if [ -n "$home" ]; then
-    echo "apv: if /apv-capture (or agent-plan-visualiser:apv-capture) is not an available" >&2
+    echo "apv: if /apv-capture (or exfu-agent-plan-visualiser:apv-capture) is not an available" >&2
     echo "apv: skill in this session, read and follow: $home/skills/apv-capture/SKILL.md" >&2
   else
     echo "apv: (apv-capture ships with the agent-plan-visualiser plugin)" >&2

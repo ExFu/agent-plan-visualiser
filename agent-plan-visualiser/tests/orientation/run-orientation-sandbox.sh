@@ -47,7 +47,7 @@ check "one line"                        [ "$(wc -l <<<"$OUT")" -eq 1 ]
 check "names the log path"              grep -q ".apv/events.jsonl" <<<"$OUT"
 check "points at capture"               grep -q "/apv-capture" <<<"$OUT"
 check "points at merge"                 grep -q "/apv-merge" <<<"$OUT"
-check "namespaced skill named"          grep -q "agent-plan-visualiser:apv-capture" <<<"$OUT"
+check "namespaced skill named"          grep -q "exfu-agent-plan-visualiser:apv-capture" <<<"$OUT"
 
 # With the plugin root exported (as Claude hooks do), the line also carries
 # the literal skill-source path — the fallback for truncated skill lists.

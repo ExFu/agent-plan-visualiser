@@ -60,7 +60,7 @@ cat > "$MARKET/.claude-plugin/marketplace.json" <<JSON
   "owner": { "name": "Alastair Brayne" },
   "plugins": [
     {
-      "name": "agent-plan-visualiser",
+      "name": "exfu-agent-plan-visualiser",
       "source": "./agent-plan-visualiser",
       "description": "Event-sourced planning methodology with git-history extraction and projection."
     }
@@ -75,5 +75,5 @@ echo "build-bundle: bundle  $ZIP ($(du -h "$ZIP" | cut -f1 | tr -d ' '))"
 echo
 echo "Install locally (Claude Code):"
 echo "  /plugin marketplace add $MARKET"
-echo "  /plugin install agent-plan-visualiser@exfu"
+echo "  /plugin install exfu-agent-plan-visualiser@exfu"
 echo "Then, in the project to attach:  /apv-init"

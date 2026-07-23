@@ -40,7 +40,7 @@ if [ -n "$REQ_MIN" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$CLAUDE_PLUGIN
   if [ -n "$CUR" ] && [ "$CUR" != "$REQ_MIN" ]; then
     LOWEST=$(printf '%s\n%s\n' "$REQ_MIN" "$CUR" | sort -V 2>/dev/null | head -n 1)
     if [ "$LOWEST" = "$CUR" ]; then
-      echo "apv: ⚠ the loaded agent-plan-visualiser ($CUR) is BEHIND this project's required floor $REQ_MIN (.apv-config.toml [requires]). Update it: /plugin marketplace update exfu && /plugin update agent-plan-visualiser@exfu."
+      echo "apv: ⚠ the loaded exfu-agent-plan-visualiser ($CUR) is BEHIND this project's required floor $REQ_MIN (.apv-config.toml [requires]). Update it: /plugin marketplace update exfu && /plugin update exfu-agent-plan-visualiser@exfu."
     fi
   fi
 fi
@@ -49,7 +49,7 @@ fi
 # (hooks receive CLAUDE_PLUGIN_ROOT) give the literal source path too, so
 # even a session whose skill listing is truncated — or a subagent — can
 # read the SKILL.md directly instead of concluding the skill is missing.
-SKILL_HINT="the skills are plugin-namespaced (agent-plan-visualiser:apv-capture etc.)"
+SKILL_HINT="the skills are plugin-namespaced (exfu-agent-plan-visualiser:apv-capture etc.)"
 [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && SKILL_HINT="$SKILL_HINT, sources at $CLAUDE_PLUGIN_ROOT/skills/<name>/SKILL.md"
 echo "apv: this project is tracked by agent-plan-visualiser — the append-only event log at $DATA_DIR/events.jsonl is the source of truth for planning state. Run /apv-capture after each logical unit of work, immediately before every commit (the pre-commit guard rejects uncaptured commits); land branches on main via /apv-merge; $SKILL_HINT. For how the tracking works, see the using-agent-plan-visualiser skill."
 exit 0

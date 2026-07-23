@@ -4,6 +4,8 @@ Event-sourced planning methodology — packaged as a reusable Claude Code plugin
 
 (Renamed from **agent-plan-tracker** to **agent-plan-visualiser (APV)**, 2026-06-10, M4. The event log, closed plans and git history keep the old name as true record — append-only law. The dogfood data dir remains `.agent-plan-tracker/`, pinned via `.apv-config.toml` `[storage] data_dir`.)
 
+(Plugin package identity set 2026-07-23: the installable plugin is **`exfu-agent-plan-visualiser`** — label *ExFu Agent Plan Visualiser* — distributed via the **exfu** marketplace (`/plugin install exfu-agent-plan-visualiser@exfu`), repo `https://github.com/ExFu/agent-plan-visualiser`. Only the plugin `name` gained the `exfu-` prefix; the folder `agent-plan-visualiser/`, the methodology name APV, the data dir, and the `apv-*` commands/config are unchanged, so plugin `name` ≠ folder by design. Historical `planning/` docs keep the pre-prefix install strings as append-only record.)
+
 The premise: git commit history is the only artefact in a planning-driven project that cannot lie about what happened. Plans, decision logs, and status reports are all secondary — useful as inputs, never authoritative on their own. By event-sourcing from commits directly, every projection (current state, completion audits, smell detection) derives from a single source of truth.
 
 The plugin is project-agnostic. Any planning-driven project that uses git + writes plans can adopt it.
@@ -42,5 +44,5 @@ This project uses the planning methodology it captures (dogfooding).
   - `XT<n>-<slug>.md` — crosscut workstream plans (X prefix).
   - `<L>T<n>-<slug>.md` — side-quest workstream plans (any capital letter L other than X — e.g., `PT2-client-editor.md`).
 - **`.agent-plan-tracker/`** holds the event log (`events.jsonl`), cache, projection, snapshots — the tracking spine for this project itself (we dogfood). Pre-rename name kept deliberately, pinned via `.apv-config.toml`; fresh installs use `.apv/`.
-- **`agent-plan-visualiser/`** is the packaged plugin: `skills/`, `commands/`, `hooks/`, `scripts/`, `bin/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`, `tests/`.
+- **`agent-plan-visualiser/`** is the packaged plugin: `skills/`, `commands/`, `hooks/`, `scripts/`, `bin/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`, `tests/`. It installs as the plugin **`exfu-agent-plan-visualiser`** from the `exfu` marketplace; the folder name is kept as the dev/dogfood home (plugin `name` ≠ folder, by design).
 - **No `product/`** until there's actual product code. Design + bootstrap first; implementation follows.

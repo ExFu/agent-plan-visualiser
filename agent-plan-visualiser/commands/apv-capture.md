@@ -2,7 +2,7 @@
 description: Capture the current session's work as sealed events in the event log. Run after each logical unit of work, immediately before committing — capture is the last act before a commit.
 ---
 
-Slash alias (Claude Code) for the skill `agent-plan-visualiser:apv-capture`.
+Slash alias (Claude Code) for the skill `exfu-agent-plan-visualiser:apv-capture`.
 The **skill** is the canonical procedure and the cross-client primitive; this
 command is only its slash-invocable surface in Claude Code, and may be absent
 in Cowork/Desktop even when the skill is loaded. Invoke the skill and follow it

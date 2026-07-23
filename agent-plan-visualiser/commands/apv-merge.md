@@ -2,7 +2,7 @@
 description: Land a branch on main without corrupting the event log — branch-side reconciliation, main only ever receives gate-green logs. Use when a branch is ready for main, and especially when git reports a merge conflict on events.jsonl.
 ---
 
-Slash alias (Claude Code) for the skill `agent-plan-visualiser:apv-merge`. The
+Slash alias (Claude Code) for the skill `exfu-agent-plan-visualiser:apv-merge`. The
 **skill** is the canonical procedure and the cross-client primitive; this
 command is only its slash-invocable surface in Claude Code, and may be absent
 in Cowork/Desktop even when the skill is loaded. Invoke the skill and follow it

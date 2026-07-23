@@ -288,7 +288,7 @@ fi
 echo "apv: APV toolchain not found (tried \$APV_HOME, a vendored agent-plan-visualiser/," >&2
 echo "apv: $data_dir/.toolchain-home, and $cache)." >&2
 echo "apv: install the plugin (/plugin marketplace add https://github.com/ExFu/claude-marketplace" >&2
-echo "apv: then /plugin install agent-plan-visualiser@exfu) or set APV_HOME," >&2
+echo "apv: then /plugin install exfu-agent-plan-visualiser@exfu) or set APV_HOME," >&2
 echo "apv: then re-run — or re-attach with /apv-init." >&2
 exit 127
 LAUNCH
@@ -551,7 +551,7 @@ operator's \`project.assigned\`), never a fork of the record.
 
 This project REQUIRES the agent-plan-visualiser plugin (the version floor is
 pinned in \`.apv-config.toml\` \`[requires]\`). The **skill**
-\`agent-plan-visualiser:apv-capture\` is the cross-client primitive;
+\`exfu-agent-plan-visualiser:apv-capture\` is the cross-client primitive;
 \`/apv-capture\` is only its Claude-Code slash alias and may be absent in
 Cowork/Desktop even when the skill is loaded. Before any work, confirm that
 skill is available. If NEITHER the skill nor the command is present, this
@@ -559,9 +559,9 @@ session did not load the plugin (typical in worktree checkouts that lack a
 committed \`.claude/settings.json\`, or in Cowork/Desktop before install) — do
 NOT fabricate captures by hand. Load it:
 \`/plugin marketplace add https://github.com/ExFu/claude-marketplace\` then
-\`/plugin install agent-plan-visualiser@exfu\`; or read the skill source and
+\`/plugin install exfu-agent-plan-visualiser@exfu\`; or read the skill source and
 follow it directly — the newest
-\`~/.claude/plugins/cache/*/agent-plan-visualiser/*/skills/apv-capture/SKILL.md\`
+\`~/.claude/plugins/cache/*/exfu-agent-plan-visualiser/*/skills/apv-capture/SKILL.md\`
 (same pattern for apv-merge and using-agent-plan-visualiser).
 
 Fresh clone or new worktree? The git hooks live in \`.git/\` and are not
