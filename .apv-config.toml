@@ -23,5 +23,5 @@ data_dir = ".agent-plan-tracker"
 # orientation block tells a cold agent how to install it when the skills are
 # absent entirely. The floor is a deliberate minimum — the operator raises it
 # when a newer feature is needed; it is never auto-bumped.
-apv_min_version = "0.6.3"
+apv_min_version = "0.6.4"
 skills = ["apv-capture", "apv-merge", "using-agent-plan-visualiser"]
