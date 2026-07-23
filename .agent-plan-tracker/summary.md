@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-23T20:59:49Z
+# Project state — generated 2026-07-23T21:08:36Z
 
-**Total events:** 706  ·  **Draft:** 17  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 64  ·  **Orphaned:** 0
+**Total events:** 708  ·  **Draft:** 17  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 64  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -45,8 +45,8 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 30 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 137 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 31 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 138 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -112,4 +112,4 @@ _No flapping closures._
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_93 entities · 125 relationships · 39 decisions._
+_93 entities · 125 relationships · 40 decisions._
