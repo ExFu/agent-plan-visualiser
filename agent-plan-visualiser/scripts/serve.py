@@ -12,8 +12,9 @@ Endpoints (T2-analyser §3.4):
   POST /api/save-summary        — appends analysis.live-summary events + writes md files
   POST /api/invalidate-summary  — Phase D will implement; Phase B returns HTTP 501 stub
 
-Usage:
-  python3 agent-plan-visualiser/scripts/serve.py [--port 8765] [--host 127.0.0.1]
+Usage (prefer the launcher, which refreshes the projection first):
+  apv serve [--port 8765] [--host 127.0.0.1]
+  python3 "$APV/scripts/serve.py" [--port 8765] [--host 127.0.0.1]
 
 Replaces `python3 -m http.server 8765` for any flow that needs save-summary. Plain
 http.server still works for read-only browsing.

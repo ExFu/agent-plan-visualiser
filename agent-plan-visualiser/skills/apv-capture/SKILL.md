@@ -9,11 +9,26 @@ You (the in-session agent) are the extractor. You have full session context: you
 
 **Append-only. One capture = one sealed block = the git commit you are about to make.**
 
-## 0. Resolve the data dir and schema
+## 0. Resolve the toolchain, the data dir, and the schema
 
-- `DATA_DIR` = `$APV_DATA_DIR` if set (absolute, or relative to repo root), else `.agent-plan-tracker/`.
+The toolchain and the tracked repo are separate locations: on a normal plugin
+install the toolchain sits in the plugin cache, nowhere near the repo. Resolve
+`$APV` once, then address every script through it — never by a bare relative
+path (which only resolves inside APV's own dogfood repo):
+
+```bash
+APV="${APV_HOME:-${CLAUDE_PLUGIN_ROOT:-}}"
+if [ -z "$APV" ]; then
+  R="$(git rev-parse --show-toplevel 2>/dev/null)"
+  [ -n "$R" ] && [ -d "$R/agent-plan-visualiser/scripts" ] && APV="$R/agent-plan-visualiser"
+fi
+[ -n "$APV" ] || APV="$(ls -d "$HOME"/.claude/plugins/cache/*/*agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -1)"
+[ -n "$APV" ] || { echo "APV toolchain not found — set APV_HOME"; exit 2; }
+```
+
+- `DATA_DIR` = `$APV_DATA_DIR` if set (absolute, or relative to repo root), else `.apv-config.toml` `[storage] data_dir`, else `.apv/`. (This repo's own dogfood log pins the pre-rename `.agent-plan-tracker/` through that config — it is not the default.)
 - Events file: `$DATA_DIR/events.jsonl`. Never create it implicitly — if it doesn't exist, stop and ask the operator (the project may not be initialised).
-- Emit events at `schema_version: "0.3.0"` (two later-epoch exceptions — see §2 and §5). Precise field shapes: `agent-plan-visualiser/schemas/0.3.0/events.schema.json` (and `plan-frontmatter.schema.json` for plan attributes).
+- Emit events at `schema_version: "0.3.0"` (two later-epoch exceptions — see §2 and §5). Precise field shapes: `$APV/schemas/0.3.0/events.schema.json` (and `plan-frontmatter.schema.json` for plan attributes).
 
 ## 1. When to run
 
@@ -103,7 +118,7 @@ You (the in-session agent) are the extractor. You have full session context: you
 sqlite3 "$DATA_DIR/cache.sqlite" "SELECT derived_state FROM entities WHERE entity_id='<id>';"
 ```
 
-(If the cache is stale, rebuild via `python3 agent-plan-visualiser/scripts/cache-build.py`, or scan the entity's event history in the log tail.)
+(If the cache is stale, rebuild via `python3 "$APV/scripts/cache-build.py"`, or scan the entity's event history in the log tail.)
 
 - State `draft` → **stop**. Ask the operator to accept the entity. On their confirmation, emit `entity.accepted` (their say-so is the event), *then* the lifecycle event. Never silently progress or complete a draft, and never self-accept. **One carve-out**: `implicit-work` created-and-completed in the same block (the planless-commit pattern) passes through draft transiently by design — no acceptance needed.
 - `entity.extended` (refining the entity's own document) is valid in any state, including draft — authoring is not implementation.
@@ -135,7 +150,7 @@ with open(EVENTS_PATH, "a") as f:
 
 ## 6. Validate, then timestamp
 
-1. `bash agent-plan-visualiser/scripts/repack-validate.sh` — must pass end-to-end (honours `APV_DATA_DIR`). A failure means your block is malformed: fix by appending nothing further until you understand it; ask the operator if unclear. (Pre-seal you may correct an uncommitted block only by consulting the operator — the default remains append-only.)
+1. `bash "$APV/scripts/repack-validate.sh"` (§0 resolves `$APV`) — must pass end-to-end (honours `APV_DATA_DIR`). A failure means your block is malformed: fix by appending nothing further until you understand it; ask the operator if unclear. (Pre-seal you may correct an uncommitted block only by consulting the operator — the default remains append-only.)
 2. Sanity-check derived states for the entities your block touched — closures show `closed`, new untriaged items show `draft`:
 
 ```bash

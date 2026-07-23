@@ -62,8 +62,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue
 
   GATE_CHECK="$(resolve_gate_check)" || {
-    echo "apv: gate-check.sh not found (set APV_GATE_CHECK, or install the" >&2
-    echo "apv: toolchain at agent-plan-visualiser/scripts/, or put it on PATH)." >&2
+    echo "apv: gate-check.sh not found (set APV_GATE_CHECK or APV_HOME, install" >&2
+    echo "apv: the plugin then re-attach with /apv-init, or put it on PATH)." >&2
     exit 1
   }
   if ! bash "$GATE_CHECK" --repo-root "$(pwd)" --ref "$local_sha"; then

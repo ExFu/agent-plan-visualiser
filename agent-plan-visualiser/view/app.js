@@ -153,8 +153,8 @@ async function main() {
        From the repo root run <code>./apv refresh</code>, then reload — or restart
        <code>./apv</code>: serve refreshes the projection on start.</p>
        <p>If you're opening this from <code>file://</code>, your browser may block fetch —
-       serve it with <code>./apv</code> instead (dogfood checkout without the launcher:
-       <code>python3 agent-plan-visualiser/scripts/serve.py</code>).</p>`;
+       serve it with <code>./apv</code> instead (no launcher in this checkout:
+       <code>python3 "$APV/scripts/serve.py"</code>, $APV = the toolchain home).</p>`;
     return;
   }
 

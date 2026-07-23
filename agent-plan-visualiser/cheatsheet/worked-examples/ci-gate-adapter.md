@@ -37,9 +37,13 @@ jobs:
 
       - name: Gate the PR head
         run: |
-          bash agent-plan-visualiser/scripts/gate-check.sh \
+          # $APV = wherever step "Fetch APV toolchain" put it. gate-check
+          # resolves its own siblings, so only this one path must be right.
+          bash "$APV/scripts/gate-check.sh" \
             --repo-root "$PWD" \
             --ref "${{ github.event.pull_request.head.sha }}"
+        env:
+          APV: agent-plan-visualiser   # (a) vendored; for (b) point at the unpacked bundle
 ```
 
 The job fails exactly when the gate blocks (exit 1: corruption of the

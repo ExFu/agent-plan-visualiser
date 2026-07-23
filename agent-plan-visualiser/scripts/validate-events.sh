@@ -6,11 +6,24 @@ set -uo pipefail
 # accepting every prior epoch's events, so one pass covers a whole log.
 # (The gate's per-version routing stays strict; this default serves the
 # repack pipeline and manual runs.)
-SCHEMA="${1:-agent-plan-visualiser/schemas/0.6.0/events.schema.json}"
-# Data dir defaults to .agent-plan-tracker/; override with APV_DATA_DIR
-# (relative paths resolve against the cwd, expected to be the repo root).
-DATA_DIR="${APV_DATA_DIR:-.agent-plan-tracker}"
-EVENTS="${2:-${DATA_DIR}/events.jsonl}"
+# Toolchain CONTENT (schemas) is code: it lives beside this script, wherever
+# the toolchain is installed — the plugin cache on a normal install, a
+# vendored dir in the dogfood repo. Never resolve it against the cwd.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCHEMA="${1:-$SCRIPT_DIR/../schemas/0.6.0/events.schema.json}"
+# The DATA dir, by contrast, belongs to the repo being validated, and
+# resolves through apvlib (APV_DATA_DIR -> .apv-config.toml -> .apv/) — the
+# same precedence the Python pipeline steps use.
+EVENTS="${2:-}"
+if [ -z "$EVENTS" ]; then
+  EVENTS="$(python3 - "$SCRIPT_DIR" <<'PYEOF'
+import sys
+sys.path.insert(0, sys.argv[1])
+import apvlib
+print(apvlib.apv_data_dir(apvlib.repo_root()) / "events.jsonl")
+PYEOF
+  )" || { echo "validate-events: could not resolve the data dir" >&2; exit 2; }
+fi
 
 if ! command -v check-jsonschema >/dev/null 2>&1; then
   echo "check-jsonschema not installed; trying python3 fallback..." >&2

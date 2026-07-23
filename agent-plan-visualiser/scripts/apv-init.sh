@@ -280,7 +280,11 @@ if [ -f "$data_dir/.toolchain-home" ]; then
   esac
 fi
 cache="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache"
-newest="$(ls -d "$cache"/*/agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1 || true)"
+# The leading * on the package segment is load-bearing: the installable
+# plugin is named `exfu-agent-plan-visualiser`, so a `*/agent-plan-visualiser/*/`
+# glob matches only pre-rename installs and silently resolves to a retired
+# version (or nothing). Matches hooks/gate-prepush.sh's ladder.
+newest="$(ls -d "$cache"/*/*agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1 || true)"
 newest="${newest%/}"
 if usable "$newest"; then
   exec "$newest/bin/apv" "$@"

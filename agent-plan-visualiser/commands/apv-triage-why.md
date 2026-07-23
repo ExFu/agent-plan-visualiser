@@ -40,7 +40,7 @@ hypotheses. The operator was there; you are harvesting their recollection —
    their say-so is the event), closes answered questions, leaves unknowns
    standing, and archives the hypotheses file.
 
-4. Conclude per capture discipline: validate (`repack-validate.sh`), stamp
+4. Conclude per capture discipline: validate (`bash "$APV/scripts/repack-validate.sh"`), stamp
    `.last-capture`, and seal the triage commit via /apv-capture — the
    block's seal message should name the run (e.g. "triage(bf-...): N
    recollected, M left open").

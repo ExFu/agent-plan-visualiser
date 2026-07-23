@@ -18,5 +18,6 @@ exactly — do not improvise from memory.
    (`APV_DATA_DIR` → `.apv-config.toml` → default), append ONE block of
    events for the work just completed, ending in a `commit.recorded` seal
    whose `message_first_line` exactly matches the git commit you are about
-   to make; validate (`repack-validate.sh`); stamp `.last-capture`; then
+   to make; validate (`bash "$APV/scripts/repack-validate.sh"`, `$APV` per
+   the skill's §0); stamp `.last-capture`; then
    commit. Append-only, always.

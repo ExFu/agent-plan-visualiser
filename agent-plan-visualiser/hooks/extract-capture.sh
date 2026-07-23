@@ -72,6 +72,15 @@ resolve_extractor() {
   if [ -f "agent-plan-visualiser/scripts/extract-commit.py" ]; then
     echo "agent-plan-visualiser/scripts/extract-commit.py"; return 0
   fi
+  # Plugin-cache installs are never baked: install-extractor.sh seds APV_HOME
+  # only when given --home, and apv-init passes nothing for a */plugins/cache/*
+  # toolchain. Without this rung no rung can succeed there, and every commit
+  # is blocked. Mirrors hooks/gate-prepush.sh.
+  newest="$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/*agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1)"
+  newest="${newest%/}"
+  if [ -n "$newest" ] && [ -f "$newest/scripts/extract-commit.py" ]; then
+    echo "$newest/scripts/extract-commit.py"; return 0
+  fi
   return 1
 }
 

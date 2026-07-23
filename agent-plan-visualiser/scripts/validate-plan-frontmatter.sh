@@ -3,8 +3,22 @@
 # Also enforces filename-equals-id rule (not in JSON Schema).
 # Usage: validate-plan-frontmatter.sh [schema-path] [plans-dir]
 set -euo pipefail
-SCHEMA="${1:-agent-plan-visualiser/schemas/0.2.0/plan-frontmatter.schema.json}"
-PLANS_DIR="${2:-planning}"
+# Schema = toolchain content, resolved beside this script (see validate-events.sh).
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCHEMA="${1:-$SCRIPT_DIR/../schemas/0.2.0/plan-frontmatter.schema.json}"
+# Plans belong to the repo being validated: APV_PLANNING_DIR ->
+# .apv-config.toml [storage] planning_dir -> planning/. Hardcoding "planning"
+# made a monorepo with a pinned planning_dir report "all 0 plan files valid".
+PLANS_DIR="${2:-}"
+if [ -z "$PLANS_DIR" ]; then
+  PLANS_DIR="$(python3 - "$SCRIPT_DIR" <<'PYEOF'
+import sys
+sys.path.insert(0, sys.argv[1])
+import apvlib
+print(apvlib.apv_planning_dir(apvlib.repo_root()))
+PYEOF
+  )" || { echo "validate-plan-frontmatter: could not resolve the planning dir" >&2; exit 2; }
+fi
 
 python3 - "$SCHEMA" "$PLANS_DIR" <<'PYEOF'
 import sys, os, json, re, glob
@@ -61,6 +75,11 @@ for path in sorted(glob.glob(os.path.join(plans_dir, "*.md"))):
 
 if failures:
     sys.stderr.write(f"\n{failures}/{checked} plan files failed validation\n")
+    sys.exit(1)
+if not checked:
+    # A green "all 0 plan files valid" is indistinguishable from a real pass
+    # but proves nothing — it is what a mis-resolved plans dir looks like.
+    sys.stderr.write(f"no plan files found under {plans_dir!r} — nothing validated\n")
     sys.exit(1)
 print(f"\nall {checked} plan files valid")
 PYEOF
