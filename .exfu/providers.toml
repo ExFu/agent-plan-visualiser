@@ -1,0 +1,17 @@
+# ExFu provider manifest — wires optional providers into the delegation core.
+# Read by exfu-delegate. Values are opaque skill names to the core.
+# Written by exfu-planning-init ONLY IF this file is absent; an existing manifest
+# is never overwritten.
+
+[providers]
+# Grounding composes the Why/How/What of a handoff brief from a repo's corpus.
+grounding = "exfu-grounding"
+# Capture defines how delegated work enters an event log. Uncomment in a repo
+# tracked by agent-plan-visualiser:
+capture = "exfu-planning-apv-integration"
+
+[integrity]
+# Extra repo-relative paths delegates must never mutate (e.g. an event log).
+# Resolved DATA_DIR for this repo is .agent-plan-tracker (pinned in
+# .apv-config.toml [storage] data_dir), not the .apv default.
+protected_paths = [".agent-plan-tracker/events.jsonl", ".agent-plan-tracker/"]
