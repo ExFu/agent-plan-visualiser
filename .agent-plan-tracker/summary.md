@@ -1,6 +1,6 @@
-# Project state — generated 2026-07-23T15:56:14Z
+# Project state — generated 2026-07-23T16:24:36Z
 
-**Total events:** 659  ·  **Draft:** 15  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 61  ·  **Orphaned:** 0
+**Total events:** 663  ·  **Draft:** 15  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 61  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -26,7 +26,7 @@
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-packaging**
-  - `T3-distribution` (46 events): verification.tested → entity.progressed → verification.tested
+  - `T3-distribution` (48 events): verification.tested → entity.progressed → verification.tested
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
@@ -49,8 +49,8 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 18 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 125 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 19 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 126 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -118,4 +118,4 @@ _No flapping closures._
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_89 entities · 121 relationships · 35 decisions._
+_89 entities · 121 relationships · 36 decisions._
