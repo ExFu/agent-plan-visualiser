@@ -69,7 +69,7 @@ skill is available. If NEITHER the skill nor the command is present, this
 session did not load the plugin (typical in worktree checkouts that lack a
 committed `.claude/settings.json`, or in Cowork/Desktop before install) — do
 NOT fabricate captures by hand. Load it:
-`/plugin marketplace add https://github.com/ExFu/claude-marketplace` then
+`/plugin marketplace add https://github.com/ExFu/exfu-marketplace` then
 `/plugin install exfu-agent-plan-visualiser@exfu`; or read the skill source and
 follow it directly — the newest
 `~/.claude/plugins/cache/*/exfu-agent-plan-visualiser/*/skills/apv-capture/SKILL.md`
@@ -99,6 +99,6 @@ propagate) — resolve the skill source directly, in order:
 2. Else read the highest-version match under
    `${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/cache/*/exfu-agent-planning-and-delegating/*/skills/<name>/SKILL.md`.
 3. Else the plugin is not installed —
-   `claude plugin marketplace add https://github.com/ExFu/claude-marketplace.git`
+   `claude plugin marketplace add https://github.com/ExFu/exfu-marketplace.git`
    then `claude plugin install exfu-agent-planning-and-delegating@exfu`.
 <!-- /exfu-agent-planning-and-delegating:orientation -->

@@ -7,12 +7,26 @@ and derives every view of project state (status, audits, decision traces,
 an HTML flow view) from it. Plans stay rich intent; the log records what
 actually happened; the gap between the two is signal.
 
+## Before you start
+
+APV runs on `bash`, `git`, `python3` (3.11+) and `sqlite3` — all standard on
+macOS and Linux. It also needs the `jsonschema` Python package: the extractor
+validates every event before appending it, and **fails closed** if the package
+is missing, so install it before step 2:
+
+```bash
+python3 -m pip install --user jsonschema
+```
+
+(`check-jsonschema` on `PATH` works as an alternative. Without either, `/apv-init`
+succeeds but your first tracked commit halts with an explanatory error.)
+
 ## Quickstart
 
 ```text
 # 1. Add the exfu marketplace (once per client — Claude Code and Cowork alike),
 #    then install the plugin from it:
-/plugin marketplace add https://github.com/ExFu/claude-marketplace
+/plugin marketplace add https://github.com/ExFu/exfu-marketplace
 /plugin install exfu-agent-plan-visualiser@exfu
 #    Offline/dev alternative — build a local single-plugin marketplace instead:
 #    bash agent-plan-visualiser/scripts/build-bundle.sh   # -> dist/exfu-marketplace/
@@ -79,10 +93,12 @@ rationale ships in `philosophies/`.
 
 ## Requirements
 
-`bash`, `git`, `python3` (stdlib only for the gate; `jsonschema` — or
+`bash`, `git`, `python3` (3.11+; stdlib only for the gate; `jsonschema` — or
 `check-jsonschema` — for full pipeline validation), `sqlite3` for the cache
-and audits.
+and audits. See [Before you start](#before-you-start) for the install command.
 
 ## License
 
-TBD.
+Proprietary — see [LICENSE](LICENSE). This repository is public for
+distribution convenience; publication does not grant an open-source licence.
+Redistribution enquiries: al@exfu.ai

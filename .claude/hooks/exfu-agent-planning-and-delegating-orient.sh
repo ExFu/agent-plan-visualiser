@@ -15,7 +15,7 @@ session did not load the plugin), resolve the source in order:
   (b) else the highest-version match under
       ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/*/exfu-agent-planning-and-delegating/*/skills/<name>/SKILL.md;
   (c) else install it:
-      claude plugin marketplace add https://github.com/ExFu/claude-marketplace.git
+      claude plugin marketplace add https://github.com/ExFu/exfu-marketplace.git
       claude plugin install exfu-agent-planning-and-delegating@exfu
 EOF
 exit 0

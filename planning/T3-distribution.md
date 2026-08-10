@@ -87,3 +87,23 @@ The first field report from a repo running APV purely as an installed plugin (`e
 `[requires] apv_min_version` is left at `0.6.4` per its own doctrine (operator raises the floor deliberately; never auto-bumped). Raise it to `0.7.1` when a repo needs the fixed capture instructions to be guaranteed present.
 
 **Known, still open after this cut:** the analyser's live-summary save remains dead for any data dir other than `.agent-plan-tracker/` — `serve.py:59` loads `schemas/0.2.0`, so the enforcing `freeform_path` pattern is `0.2.0:335`, not the 0.6.0 copy. Out of this release's scope (it is not on the capture path) and carried separately.
+
+## 10. Release 0.7.2 (2026-08-10) — licence declared, marketplace repo renamed. **No re-attach required.**
+
+Documentation, identity and licensing only: no behaviour on the capture, gate or extraction paths changes, so the 0.7.1 re-attach instruction (§9) is not repeated. `[requires] apv_min_version` stays `0.6.4` per its own doctrine.
+
+**Provenance — this cut was authored from outside.** An agent working the `exfu` marketplace across the whole plugin family made these edits here without APV context: it did not know the repo is tracked, so the change set arrived uncommitted, uncaptured and half-staged in the working tree (three mode-only changes staged, the rest not). Reviewed retrospectively, corrected, and captured as this block. **The record was never at risk** — `events.jsonl` was untouched, and `gate-check.sh`, `audit-rename.sh` and `audit-toolchain-paths.sh` all pass against the incoming tree. The failure mode is worth naming, because it recurs whenever a cross-repo campaign meets a tracked repo: a fleet-wide sweep is exactly the kind of work that produces correct edits and no events.
+
+**What the cut carries**
+
+- **Licence declared.** Proprietary: `LICENSE` at the repo root, `"license": "Proprietary"` in the manifest, licence sections in both READMEs. The repo stays public for distribution convenience; publication grants nothing.
+- **Marketplace repo renamed** `ExFu/claude-marketplace` → `ExFu/exfu-marketplace` on the live surfaces: `CLAUDE.md`, the plugin README quickstart, `apv-init.sh`'s not-found hint **and the CLAUDE.md orientation block it stamps into attached repos**. The old URL still resolves by GitHub redirect, so nothing was broken in the interim — the §8 ruling's mechanism is unchanged, only its address.
+- **Root `README.md` added** — the repo's front door (install, what's in the tree, the source/consumer duality); the plugin README remains the full quickstart.
+- **`jsonschema` documented as a real prerequisite.** The extractor fails closed without it, so a fresh installer previously met that as a halt at their first tracked commit rather than as a requirement up front.
+- Executable bits set on `capture-guard.sh`, `extract-amend.sh`, `install-hook.sh` (cosmetic — `install-hook.sh` chmods on copy regardless).
+
+**Defect found and fixed in review: `../LICENSE` was dangling in every install shape.** The marketplace installs APV as `git-subdir` at `path: agent-plan-visualiser`, and `build-bundle.sh` stages that subtree alone — so a root-only `LICENSE` ships to nobody, and the plugin README pointed at a file no installed copy contains, while the manifest had just begun asserting Proprietary. The licence text now lives at `agent-plan-visualiser/LICENSE` too (the root copy stays for the repo), and the README link is plugin-root-relative. **Shape worth remembering: the repo root is not part of the artefact.** Anything an installed user must be able to read belongs inside `agent-plan-visualiser/`, and the two install shapes — git-subdir and `build-bundle.sh` — are the only tests of that.
+
+**Deliberately not changed:** the four pre-rename marketplace URLs in `planning/` (§8 above, and [[T3-cross-client-install]] §§1/2/5). Those record rulings as they were made; append-only law puts the new address in this section, not over the old prose. `audit-rename.sh` does not guard marketplace URLs — it guards the tracker→visualiser rename — so it flags neither, by design.
+
+**Residual, outside this repo (operator legs):** the `exfu-marketplace` catalogue commit declaring Proprietary on every entry is **committed but unpushed**, so the licence this manifest asserts is not yet on the surface anyone installs from; and this machine's `known_marketplaces.json` still registers `exfu` under the old URL with `autoUpdate: true`, working only by GitHub's redirect. Carried as `2026-08-10.exfu-marketplace-rename-residuals`.
