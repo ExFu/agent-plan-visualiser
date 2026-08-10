@@ -25,7 +25,7 @@ __pycache__/
 # Distribution bundles — derived output of scripts/build-bundle.sh, never
 # committed; the vendored tree stays the dev home (T3-distribution §6 Q2).
 # Anchored to the repo root: the unanchored form silently swallowed
-# agent-plan-visualiser/tests/dist/ (the T3-distribution acceptance test).
+# plugins/agent-plan-visualiser/tests/dist/ (the T3-distribution acceptance test).
 /dist/
 
 # Editor/agent-plugin local state — never plugin content.

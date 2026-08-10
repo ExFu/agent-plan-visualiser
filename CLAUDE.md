@@ -4,7 +4,7 @@ Event-sourced planning methodology — packaged as a reusable Claude Code plugin
 
 (Renamed from **agent-plan-tracker** to **agent-plan-visualiser (APV)**, 2026-06-10, M4. The event log, closed plans and git history keep the old name as true record — append-only law. The dogfood data dir remains `.agent-plan-tracker/`, pinned via `.apv-config.toml` `[storage] data_dir`.)
 
-(Plugin package identity set 2026-07-23: the installable plugin is **`exfu-agent-plan-visualiser`**, distributed via the **exfu** marketplace (`/plugin install exfu-agent-plan-visualiser@exfu`), repo `https://github.com/ExFu/agent-plan-visualiser`. Only the plugin `name` gained the `exfu-` prefix; the folder `agent-plan-visualiser/`, the methodology name APV, the data dir, and the `apv-*` commands/config are unchanged, so plugin `name` ≠ folder by design. Historical `planning/` docs keep the pre-prefix install strings as append-only record.)
+(Plugin package identity set 2026-07-23: the installable plugin is **`exfu-agent-plan-visualiser`**, distributed via the **exfu** marketplace (`/plugin install exfu-agent-plan-visualiser@exfu`), repo `https://github.com/ExFu/agent-plan-visualiser`. Only the plugin `name` gained the `exfu-` prefix; the folder name `agent-plan-visualiser/`, the methodology name APV, the data dir, and the `apv-*` commands/config are unchanged, so plugin `name` ≠ folder by design. Amended 2026-08-10: the folder keeps its name but now lives nested at `plugins/agent-plan-visualiser/`, matching the `plugins/<dir>` layout of every sibling exfu plugin whose marketplace `git-subdir` entry syncs into Claude Cowork — the single-segment top-level path was the remaining structural difference in the failing entry. Historical `planning/` docs keep the pre-prefix install strings and pre-move paths as append-only record.)
 
 **The package declares no display-name key by rule.** Neither `label` in `plugin.json` nor `displayName` in the marketplace entry belongs to the plugin/marketplace schema; `name` is the only identity the surfaces read. Both were carried until 2026-08-10 and removed while diagnosing the plugin's absence from Claude Cowork's plugin list: the account-marketplace sync that feeds Cowork validates entries server-side and drops them silently, and these were the only structural difference between this package and its siblings, which sync fine. Non-schema keys are a liability wherever a surface validates manifests strictly — do not reintroduce them to either manifest.
 
@@ -21,17 +21,17 @@ Read `planning/T1-top-level.md` first — the design source of truth: the valida
 Current project state is never recorded in this file. Read it from the event-log projections:
 
 - `.agent-plan-tracker/summary.md` — human digest: live work, awaiting-operator queues, draft/blocked/orphaned lists, milestone progress.
-- `.agent-plan-tracker/projection.json` — machine-readable state, and the browser view over it: `agent-plan-visualiser/bin/apv serve`.
-- Regenerate all derived views from the log with `agent-plan-visualiser/bin/apv` (cache → projection → summary).
+- `.agent-plan-tracker/projection.json` — machine-readable state, and the browser view over it: `plugins/agent-plan-visualiser/bin/apv serve`.
+- Regenerate all derived views from the log with `plugins/agent-plan-visualiser/bin/apv` (cache → projection → summary).
 - Milestone history lives in the event log and `planning/M*.md`.
 
 ## Standing discipline
 
 Static operational law; mechanics live in the named skills and scripts.
 
-- **Capture before commit.** After each logical unit of work and before committing, follow `/apv-capture` (`agent-plan-visualiser/skills/apv-capture/SKILL.md`) to append a sealed event block ending in a `commit.recorded` seal that matches the commit's first line. The capture-guard pre-commit hook rejects commits whose staged files are newer than the data dir's `.last-capture`; `git commit --no-verify` is the sanctioned escape hatch for capture-free trivia.
+- **Capture before commit.** After each logical unit of work and before committing, follow `/apv-capture` (`plugins/agent-plan-visualiser/skills/apv-capture/SKILL.md`) to append a sealed event block ending in a `commit.recorded` seal that matches the commit's first line. The capture-guard pre-commit hook rejects commits whose staged files are newer than the data dir's `.last-capture`; `git commit --no-verify` is the sanctioned escape hatch for capture-free trivia.
 - **Draft gate.** No implementation work may be recorded against `draft` entities; acceptance (`entity.accepted`) is operator-only, never self-issued.
-- **Main is gated.** `agent-plan-visualiser/scripts/gate-check.sh` — the integrity composite plus the seal↔commit correspondence check, policy lists in the committed `.apv-config.toml` — fires through three adapters: `/apv-merge` (primary, skill-procedural — `agent-plan-visualiser/skills/apv-merge/SKILL.md`), pre-push, and the reference-transaction local gate (`APV_SKIP_GATE=1` is its hatch).
+- **Main is gated.** `plugins/agent-plan-visualiser/scripts/gate-check.sh` — the integrity composite plus the seal↔commit correspondence check, policy lists in the committed `.apv-config.toml` — fires through three adapters: `/apv-merge` (primary, skill-procedural — `plugins/agent-plan-visualiser/skills/apv-merge/SKILL.md`), pre-push, and the reference-transaction local gate (`APV_SKIP_GATE=1` is its hatch).
 - **Data dir resolution.** `APV_DATA_DIR` env var → `.apv-config.toml [storage] data_dir` → default `.apv/`. This repo pins `.agent-plan-tracker/`.
 
 ## Conventions
@@ -46,7 +46,7 @@ This project uses the planning methodology it captures (dogfooding).
   - `XT<n>-<slug>.md` — crosscut workstream plans (X prefix).
   - `<L>T<n>-<slug>.md` — side-quest workstream plans (any capital letter L other than X — e.g., `PT2-client-editor.md`).
 - **`.agent-plan-tracker/`** holds the event log (`events.jsonl`), cache, projection, snapshots — the tracking spine for this project itself (we dogfood). Pre-rename name kept deliberately, pinned via `.apv-config.toml`; fresh installs use `.apv/`.
-- **`agent-plan-visualiser/`** is the packaged plugin: `skills/`, `commands/`, `hooks/`, `scripts/`, `bin/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`, `tests/`. It installs as the plugin **`exfu-agent-plan-visualiser`** from the `exfu` marketplace; the folder name is kept as the dev/dogfood home (plugin `name` ≠ folder, by design).
+- **`plugins/agent-plan-visualiser/`** is the packaged plugin: `skills/`, `commands/`, `hooks/`, `scripts/`, `bin/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`, `tests/`. It installs as the plugin **`exfu-agent-plan-visualiser`** from the `exfu` marketplace; the folder name is kept as the dev/dogfood home (plugin `name` ≠ folder, by design).
 - **No `product/`** until there's actual product code. Design + bootstrap first; implementation follows.
 <!-- apv:orientation -->
 ## agent-plan-visualiser (APV) tracking

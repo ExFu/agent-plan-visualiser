@@ -16,8 +16,8 @@ if usable "${APV_HOME:-}"; then
   exec "$APV_HOME/bin/apv" "$@"
 fi
 repo_root="$(git -C "$self_dir" rev-parse --show-toplevel 2>/dev/null || true)"
-if [ -n "$repo_root" ] && usable "$repo_root/agent-plan-visualiser"; then
-  exec "$repo_root/agent-plan-visualiser/bin/apv" "$@"
+if [ -n "$repo_root" ] && usable "$repo_root/plugins/agent-plan-visualiser"; then
+  exec "$repo_root/plugins/agent-plan-visualiser/bin/apv" "$@"
 fi
 if [ -f "$data_dir/.toolchain-home" ]; then
   pinned="$(head -n 1 "$data_dir/.toolchain-home")"
@@ -40,7 +40,7 @@ newest="${newest%/}"
 if usable "$newest"; then
   exec "$newest/bin/apv" "$@"
 fi
-echo "apv: APV toolchain not found (tried \$APV_HOME, a vendored agent-plan-visualiser/," >&2
+echo "apv: APV toolchain not found (tried \$APV_HOME, a vendored plugins/agent-plan-visualiser/," >&2
 echo "apv: $data_dir/.toolchain-home, and $cache)." >&2
 echo "apv: install the plugin (/plugin marketplace add https://github.com/ExFu/exfu-marketplace" >&2
 echo "apv: then /plugin install exfu-agent-plan-visualiser@exfu) or set APV_HOME," >&2

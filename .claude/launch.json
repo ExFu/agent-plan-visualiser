@@ -4,7 +4,7 @@
     {
       "name": "apv-view",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["agent-plan-visualiser/scripts/serve.py", "--port", "8772"],
+      "runtimeArgs": ["plugins/agent-plan-visualiser/scripts/serve.py", "--port", "8772"],
       "port": 8772
     }
   ]

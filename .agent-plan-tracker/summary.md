@@ -1,6 +1,6 @@
-# Project state — generated 2026-08-10T16:35:29Z
+# Project state — generated 2026-08-10T17:16:12Z
 
-**Total events:** 731  ·  **Draft:** 20  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 65  ·  **Orphaned:** 0
+**Total events:** 736  ·  **Draft:** 20  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 65  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -25,7 +25,7 @@
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-packaging**
-  - `T3-distribution` (62 events): verification.tested → entity.progressed → verification.deferred
+  - `T3-distribution` (65 events): entity.progressed → verification.tested → verification.deferred
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
@@ -45,15 +45,15 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 34 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 141 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 35 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 142 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
 
 **Deferred verifications** (operator legs to come back to):
 - `T3-claude-md-block-healing` (deferred 2026-08-10): The other two attached repos are separate repositories; healing their working trees is not this branch's to commit.
-- `T3-distribution` (deferred 2026-08-10): The fix cannot be verified from this branch. Confirmation requires pushing the paired 'displayName' removal in the separate exfu-marketplace repo, then removing and re-adding the marketplace inside Cowork so the account-side sync re-runs — both operator actions in another repo and another surface. The check is one line: 'grep fetchAccountScopedRemotePlugins ~/Library/Logs/Claude/main.log | tail -3' should report 14 plugins from 3 marketplace(s), up from 13. Still 13 means the manifest keys were not the cause and the next suspect is plugin content — this is the only exfu plugin shipping hooks/, commands/, bin/ and scripts/ (121 files vs 71 and 15 for its siblings), and a registry that mounts plugins into Cowork's sandbox has reason to reject a plugin declaring command hooks.
+- `T3-distribution` (deferred 2026-08-10): The actual Cowork check is still out of this session's hands: both repos must be pushed and the exfu marketplace removed/re-added (or refreshed) in Cowork. Expected signal: fetchAccountScopedRemotePlugins reports 14 plugins from 3 marketplace(s), up from 13, and exfu-agent-plan-visualiser appears in the plugin list. If it still says 13 the path shape was not the cause either; next probe is a one-entry marketplace over this repo, whose all-fail sync surfaces the backend's per-plugin error verbatim.
 
 ## Draft
 
@@ -119,4 +119,4 @@ _No flapping closures._
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_97 entities · 127 relationships · 43 decisions._
+_97 entities · 127 relationships · 44 decisions._

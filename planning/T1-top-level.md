@@ -263,15 +263,15 @@ Each T2 owns the architectural detail for its theme. T1 evolves only when the ov
 
 ### 4.2 Cross-cutting principles
 
-Captured as standalone documents in `agent-plan-visualiser/philosophies/`:
+Captured as standalone documents in `plugins/agent-plan-visualiser/philosophies/`:
 
-- [3-tier-rationale.md](../agent-plan-visualiser/philosophies/3-tier-rationale.md) — why T1/T2/T3 (and Mn) with strict separation.
-- [golden-circle-grounding.md](../agent-plan-visualiser/philosophies/golden-circle-grounding.md) — Why → How → What for downstream agents.
-- [top-down-from-job.md](../agent-plan-visualiser/philosophies/top-down-from-job.md) — architectural choices trace to concrete jobs.
-- [disposable-etl.md](../agent-plan-visualiser/philosophies/disposable-etl.md) — bridge code is throwaway by design.
-- [swap-out-surfaces.md](../agent-plan-visualiser/philosophies/swap-out-surfaces.md) — every framework choice annotated with swap-out triggers.
-- [empirical-prompt-architecture.md](../agent-plan-visualiser/philosophies/empirical-prompt-architecture.md) — start static, iterate from real failures.
-- [tracker-as-agent-memory.md](../agent-plan-visualiser/philosophies/tracker-as-agent-memory.md) — the event log substitutes for agent memory across sessions.
+- [3-tier-rationale.md](../plugins/agent-plan-visualiser/philosophies/3-tier-rationale.md) — why T1/T2/T3 (and Mn) with strict separation.
+- [golden-circle-grounding.md](../plugins/agent-plan-visualiser/philosophies/golden-circle-grounding.md) — Why → How → What for downstream agents.
+- [top-down-from-job.md](../plugins/agent-plan-visualiser/philosophies/top-down-from-job.md) — architectural choices trace to concrete jobs.
+- [disposable-etl.md](../plugins/agent-plan-visualiser/philosophies/disposable-etl.md) — bridge code is throwaway by design.
+- [swap-out-surfaces.md](../plugins/agent-plan-visualiser/philosophies/swap-out-surfaces.md) — every framework choice annotated with swap-out triggers.
+- [empirical-prompt-architecture.md](../plugins/agent-plan-visualiser/philosophies/empirical-prompt-architecture.md) — start static, iterate from real failures.
+- [tracker-as-agent-memory.md](../plugins/agent-plan-visualiser/philosophies/tracker-as-agent-memory.md) — the event log substitutes for agent memory across sessions.
 
 The plugin's skills surface these to downstream agents for judgement-call grounding.
 

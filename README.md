@@ -24,13 +24,13 @@ python3 -m pip install --user jsonschema
 ```
 
 Full quickstart, requirements, and command reference:
-**[`agent-plan-visualiser/README.md`](agent-plan-visualiser/README.md)**.
+**[`plugins/agent-plan-visualiser/README.md`](plugins/agent-plan-visualiser/README.md)**.
 
 ## What's in this repo
 
 | Path | What it is |
 | --- | --- |
-| [`agent-plan-visualiser/`](agent-plan-visualiser) | The plugin itself — skills, commands, hooks, scripts, schemas. This is what the marketplace installs. |
+| [`plugins/agent-plan-visualiser/`](plugins/agent-plan-visualiser) | The plugin itself — skills, commands, hooks, scripts, schemas. This is what the marketplace installs. |
 | [`WHITEPAPER.md`](WHITEPAPER.md) | The reasoning behind event-sourced planning — why commit history is the trustworthy substrate. |
 | `planning/` | This project's own tiered plan corpus (T1–T3 + milestones). |
 | `.agent-plan-tracker/` | This repo's own event log — APV tracks itself. |
