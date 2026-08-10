@@ -1,6 +1,6 @@
-# Project state — generated 2026-08-10T17:16:12Z
+# Project state — generated 2026-08-10T17:51:57Z
 
-**Total events:** 736  ·  **Draft:** 20  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 65  ·  **Orphaned:** 0
+**Total events:** 742  ·  **Draft:** 21  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 65  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -25,7 +25,7 @@
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-packaging**
-  - `T3-distribution` (65 events): entity.progressed → verification.tested → verification.deferred
+  - `T3-distribution` (68 events): entity.progressed → verification.tested → verification.deferred
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
@@ -45,15 +45,15 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 35 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 142 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 36 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 143 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
 
 **Deferred verifications** (operator legs to come back to):
 - `T3-claude-md-block-healing` (deferred 2026-08-10): The other two attached repos are separate repositories; healing their working trees is not this branch's to commit.
-- `T3-distribution` (deferred 2026-08-10): The actual Cowork check is still out of this session's hands: both repos must be pushed and the exfu marketplace removed/re-added (or refreshed) in Cowork. Expected signal: fetchAccountScopedRemotePlugins reports 14 plugins from 3 marketplace(s), up from 13, and exfu-agent-plan-visualiser appears in the plugin list. If it still says 13 the path shape was not the cause either; next probe is a one-entry marketplace over this repo, whose all-fail sync surfaces the backend's per-plugin error verbatim.
+- `T3-distribution` (deferred 2026-08-10): Final Cowork confirmation needs the operator: push this repo's main, re-add the one-entry probe marketplace in Cowork — the add should now succeed and exfu-agent-plan-visualiser appear. Then restore the full five-plugin manifest (revert the probe commit 284ba0c in exfu-marketplace), push, and re-add; expect fetchAccountScopedRemotePlugins 14 from 3 marketplaces. This resolves-and-renews the two prior open deferrals on this plan, whose question (why does Cowork drop the plugin) is now answered.
 
 ## Draft
 
@@ -75,6 +75,7 @@
   - `2026-07-23.stale-hooks-after-plugin-upgrade` (18d untriaged)
   - `2026-08-10.exfu-marketplace-rename-residuals`
   - `2026-08-10.legacy-command-files-shadowed-by-skills`
+  - `2026-08-10.reinit-shims-after-bin-move`
   - `2026-08-10.session-orient-block-drift-nag`
 - **plan**
   - `KT0-knowledge-substrate`
@@ -119,4 +120,4 @@ _No flapping closures._
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_97 entities · 127 relationships · 44 decisions._
+_98 entities · 127 relationships · 45 decisions._

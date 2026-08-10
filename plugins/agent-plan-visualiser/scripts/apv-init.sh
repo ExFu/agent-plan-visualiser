@@ -184,7 +184,7 @@ fi
 # --- 3. command launcher -----------------------------------------------------
 # A short entry point — `<data-dir>/bin/apv` — so nobody has to type
 # `python3 <toolchain>/scripts/...` by hand. The shim is a pure passthrough
-# to the toolchain's bin/apv dispatcher (serve / init / backfill / refresh),
+# to the toolchain's scripts/apv dispatcher (serve / init / backfill / refresh),
 # so new subcommands arrive with a plugin update, no re-init needed.
 # The shim is MACHINE-INDEPENDENT (operator ruling 2026-07-07: repo content
 # carries zero machine-specific dependency — the plugin runs wherever the
@@ -259,14 +259,14 @@ self="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$0")"
 self_dir="$(dirname "$self")"
 data_dir="$(dirname "$self_dir")"
 
-usable() { [ -n "${1:-}" ] && [ -x "$1/bin/apv" ]; }
+usable() { [ -n "${1:-}" ] && [ -x "$1/scripts/apv" ]; }
 
 if usable "${APV_HOME:-}"; then
-  exec "$APV_HOME/bin/apv" "$@"
+  exec "$APV_HOME/scripts/apv" "$@"
 fi
 repo_root="$(git -C "$self_dir" rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -n "$repo_root" ] && usable "$repo_root/plugins/agent-plan-visualiser"; then
-  exec "$repo_root/plugins/agent-plan-visualiser/bin/apv" "$@"
+  exec "$repo_root/plugins/agent-plan-visualiser/scripts/apv" "$@"
 fi
 if [ -f "$data_dir/.toolchain-home" ]; then
   pinned="$(head -n 1 "$data_dir/.toolchain-home")"
@@ -276,7 +276,7 @@ if [ -f "$data_dir/.toolchain-home" ]; then
   # toolchains only.
   case "$pinned" in
     */plugins/cache/*) : ;;
-    *) if usable "$pinned"; then exec "$pinned/bin/apv" "$@"; fi ;;
+    *) if usable "$pinned"; then exec "$pinned/scripts/apv" "$@"; fi ;;
   esac
 fi
 cache="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache"
@@ -287,7 +287,7 @@ cache="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache"
 newest="$(ls -d "$cache"/*/*agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -n 1 || true)"
 newest="${newest%/}"
 if usable "$newest"; then
-  exec "$newest/bin/apv" "$@"
+  exec "$newest/scripts/apv" "$@"
 fi
 echo "apv: APV toolchain not found (tried \$APV_HOME, a vendored plugins/agent-plan-visualiser/," >&2
 echo "apv: $data_dir/.toolchain-home, and $cache)." >&2

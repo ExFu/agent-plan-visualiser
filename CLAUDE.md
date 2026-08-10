@@ -21,8 +21,8 @@ Read `planning/T1-top-level.md` first — the design source of truth: the valida
 Current project state is never recorded in this file. Read it from the event-log projections:
 
 - `.agent-plan-tracker/summary.md` — human digest: live work, awaiting-operator queues, draft/blocked/orphaned lists, milestone progress.
-- `.agent-plan-tracker/projection.json` — machine-readable state, and the browser view over it: `plugins/agent-plan-visualiser/bin/apv serve`.
-- Regenerate all derived views from the log with `plugins/agent-plan-visualiser/bin/apv` (cache → projection → summary).
+- `.agent-plan-tracker/projection.json` — machine-readable state, and the browser view over it: `plugins/agent-plan-visualiser/scripts/apv serve`.
+- Regenerate all derived views from the log with `plugins/agent-plan-visualiser/scripts/apv` (cache → projection → summary).
 - Milestone history lives in the event log and `planning/M*.md`.
 
 ## Standing discipline
@@ -46,7 +46,7 @@ This project uses the planning methodology it captures (dogfooding).
   - `XT<n>-<slug>.md` — crosscut workstream plans (X prefix).
   - `<L>T<n>-<slug>.md` — side-quest workstream plans (any capital letter L other than X — e.g., `PT2-client-editor.md`).
 - **`.agent-plan-tracker/`** holds the event log (`events.jsonl`), cache, projection, snapshots — the tracking spine for this project itself (we dogfood). Pre-rename name kept deliberately, pinned via `.apv-config.toml`; fresh installs use `.apv/`.
-- **`plugins/agent-plan-visualiser/`** is the packaged plugin: `skills/`, `commands/`, `hooks/`, `scripts/`, `bin/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`, `tests/`. It installs as the plugin **`exfu-agent-plan-visualiser`** from the `exfu` marketplace; the folder name is kept as the dev/dogfood home (plugin `name` ≠ folder, by design).
+- **`plugins/agent-plan-visualiser/`** is the packaged plugin: `skills/`, `commands/`, `hooks/`, `scripts/`, `schemas/`, `view/`, `cheatsheet/`, `philosophies/`, `tests/`. It installs as the plugin **`exfu-agent-plan-visualiser`** from the `exfu` marketplace; the folder name is kept as the dev/dogfood home (plugin `name` ≠ folder, by design).
 - **No `product/`** until there's actual product code. Design + bootstrap first; implementation follows.
 <!-- apv:orientation -->
 ## agent-plan-visualiser (APV) tracking

@@ -115,7 +115,7 @@ check "js syntax valid"                 node --check "$APP"
 
 echo "== apv launcher: refresh rebuilds, serve refreshes on start"
 rm -f .apv/projection.json
-check "refresh rebuilds the projection"  sh -c "\"$PLUGIN_HOME/bin/apv\" refresh >/dev/null 2>&1 && [ -f .apv/projection.json ]"
+check "refresh rebuilds the projection"  sh -c "\"$PLUGIN_HOME/scripts/apv\" refresh >/dev/null 2>&1 && [ -f .apv/projection.json ]"
 
 # Monorepo case: the tracked project lives in a sub-folder — plans move to
 # plugin/planning, pinned via [storage] planning_dir; data dir stays put.
@@ -125,7 +125,7 @@ printf '[storage]\nplanning_dir = "plugin/planning"\n' > .apv-config.toml
 
 rm -f .apv/projection.json
 PORT2=8798
-"$PLUGIN_HOME/bin/apv" --port "$PORT2" >/dev/null 2>&1 &
+"$PLUGIN_HOME/scripts/apv" --port "$PORT2" >/dev/null 2>&1 &
 SERVER2_PID=$!
 for i in $(seq 1 30); do curl -sf "http://127.0.0.1:$PORT2/api/clean-check" >/dev/null 2>&1 && break; sleep 0.2; done
 check "serve emitted the projection"     [ -f .apv/projection.json ]
@@ -182,7 +182,7 @@ check "project badge wired"               grep -q "project-badge" "$APP"
 check "css project badge present"         grep -q ".badge.project-badge" "$CSS"
 
 PORT3=8797
-"$PLUGIN_HOME/bin/apv" --port "$PORT3" >/dev/null 2>&1 &
+"$PLUGIN_HOME/scripts/apv" --port "$PORT3" >/dev/null 2>&1 &
 SERVER3_PID=$!
 for i in $(seq 1 30); do curl -sf "http://127.0.0.1:$PORT3/api/clean-check" >/dev/null 2>&1 && break; sleep 0.2; done
 check "storage-root plan served"          sh -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT3/planning/VIEW-A.md)\" = '200' ]"

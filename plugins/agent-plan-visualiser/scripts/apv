@@ -4,7 +4,7 @@
 # Projects attached via apv-init get a generated shim at <data-dir>/bin/apv
 # (e.g. `.apv/bin/apv`) that execs this file with the toolchain path baked in.
 # For a repo that is not yet attached, run this file directly by path:
-# `<toolchain>/bin/apv init`.
+# `<toolchain>/scripts/apv init`.
 #
 #   apv [serve] [--port N] [--host H]   view server (default subcommand)
 #   apv init [apv-init flags]           attach or repair the current repo
@@ -51,7 +51,7 @@ case "$CMD" in
     # Best-effort: a refresh failure (e.g. malformed log) still serves —
     # the view shows what it can; `apv refresh` reports the failure loudly.
     refresh_pipeline || echo "apv: refresh failed — serving anyway (run 'apv refresh' to see why)" >&2
-    exec "$TOOLCHAIN/bin/apv-serve" "$@"
+    exec "$TOOLCHAIN/scripts/apv-serve" "$@"
     ;;
   init)
     exec bash "$TOOLCHAIN/scripts/apv-init.sh" "$@"
@@ -78,7 +78,7 @@ case "$CMD" in
   -*)
     # bare flags mean serve: `apv --port 9000` == `apv serve --port 9000`
     refresh_pipeline || echo "apv: refresh failed — serving anyway (run 'apv refresh' to see why)" >&2
-    exec "$TOOLCHAIN/bin/apv-serve" "$CMD" "$@"
+    exec "$TOOLCHAIN/scripts/apv-serve" "$CMD" "$@"
     ;;
   *)
     usage >&2

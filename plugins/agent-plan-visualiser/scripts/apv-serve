@@ -4,7 +4,7 @@
 # Run it from anywhere inside a tracked repo; serve.py resolves the caller's
 # repo from cwd (apvlib.repo_root) and the view/schemas from the toolchain
 # home. Symlink-safe: the toolchain home is resolved from this file's REAL
-# location, so `ln -s <toolchain>/bin/apv-serve serve` in a project gives a
+# location, so `ln -s <toolchain>/scripts/apv-serve serve` in a project gives a
 # one-word `./serve`.
 #
 # Usage: apv-serve [--port 8765] [--host 127.0.0.1]
