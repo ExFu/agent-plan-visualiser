@@ -11,8 +11,13 @@
 #   3. Re-run idempotency: second run all-ok, exit 0, log untouched;
 #      after deleting one hook, re-run restores only it.
 #   4. --at=manual: no git hooks installed, exit 0.
-#   5. CLAUDE.md offer: never written unasked; --accept-claude-md appends
-#      once; a further accepted run does not duplicate it.
+#   5. CLAUDE.md offer + heal: never written unasked; --accept-claude-md
+#      appends once with BOTH markers; a re-run on a current block writes
+#      nothing (asserted by content hash); a stale body between intact
+#      markers is refreshed with no flag; a legacy opening-marker-only block
+#      is migrated only under --accept-claude-md, preserving an adjacent
+#      sibling plugin's block and the user's prose; ambiguity is refused
+#      with nothing written.
 #
 # Exits 0 when every case passes; 1 on the first failure.
 set -uo pipefail
@@ -33,6 +38,16 @@ check() { # check <desc> <test-expr...>
 check_absent() { # check_absent <desc> <grep-pattern> — pattern must NOT match $OUT
   local desc="$1" pattern="$2"
   if grep -q "$pattern" <<<"$OUT"; then
+    echo "  FAIL: $desc"
+    FAIL=1
+  else
+    echo "  ok: $desc"
+  fi
+}
+
+check_file_absent() { # check_file_absent <desc> <grep-pattern> <file>
+  local desc="$1" pattern="$2" file="$3"
+  if grep -q "$pattern" "$file" 2>/dev/null; then
     echo "  FAIL: $desc"
     FAIL=1
   else
@@ -145,14 +160,123 @@ check "no pre-push hook"                [ ! -e .git/hooks/pre-push ]
 check "no ref-update hook"              [ ! -e .git/hooks/reference-transaction ]
 check "on-demand contract printed"      grep -q "gate-check.sh" <<<"$OUT"
 
-# --- Case 5: CLAUDE.md acceptance ---------------------------------------------
-echo "== CLAUDE.md: appended only on acceptance, never duplicated"
+# --- Case 5: CLAUDE.md offer + heal -------------------------------------------
+# T3-claude-md-block-healing §5. The block is the ONLY live surface APV writes
+# that it could not subsequently correct: init treated "marker present" as
+# success, so every attached repo carried a frozen snapshot of whatever the
+# toolchain said the day it attached. These cases assert on CONTENT, not on
+# marker count — the old `grep -c == 1` assertion passed happily while the
+# block rotted, and naming the defect ("second accept is a no-op") as the
+# expected result is what carried it through an acceptance ceremony.
+echo "== CLAUDE.md: appended only on acceptance, then kept current"
 cd "$SANDBOX/fresh" || exit 2
 run bash "$INIT" --accept-claude-md
 check "accepted run exits 0"            [ "$CODE" -eq 0 ]
 check "block appended"                  grep -qF "<!-- apv:orientation -->" CLAUDE.md
+check "closing marker emitted"          grep -qF "<!-- /apv:orientation -->" CLAUDE.md
+check "glob survives a rename (Q5)"     grep -qF 'cache/*/*agent-plan-visualiser/*/' CLAUDE.md
+check_file_absent "no pre-rename glob"  'cache/\*/agent-plan-visualiser/\*/' CLAUDE.md
+
+# §5.2 — a re-run on a current block must perform ZERO writes. Assert on the
+# file's content hash, not on marker count.
+BEFORE="$(shasum CLAUDE.md | cut -d' ' -f1)"
 run bash "$INIT" --accept-claude-md
-check "second accept is a no-op"        [ "$(grep -cF 'apv:orientation' CLAUDE.md)" -eq 1 ]
+check "re-run exits 0"                  [ "$CODE" -eq 0 ]
+check "re-run reports current"          grep -q "orientation block current" <<<"$OUT"
+check "re-run wrote nothing"            [ "$(shasum CLAUDE.md | cut -d' ' -f1)" = "$BEFORE" ]
+check "markers still single"            [ "$(grep -cF '<!-- apv:orientation -->' CLAUDE.md)" -eq 1 ]
+
+# §5.5 — stale body between intact markers is refreshed, WITHOUT the flag (Q1).
+perl -0pi -e 's/^## agent-plan-visualiser \(APV\) tracking$/## STALE HEADING/m' CLAUDE.md
+run bash "$INIT"
+check "stale refresh needs no flag"     grep -q "orientation block refreshed" <<<"$OUT"
+check "canonical heading restored"      grep -qF '## agent-plan-visualiser (APV) tracking' CLAUDE.md
+check_file_absent "stale text gone"     'STALE HEADING' CLAUDE.md
+check "still exactly one open marker"   [ "$(grep -cF '<!-- apv:orientation -->' CLAUDE.md)" -eq 1 ]
+check "still exactly one end marker"    [ "$(grep -cF '<!-- /apv:orientation -->' CLAUDE.md)" -eq 1 ]
+
+# §5.3/§5.4/§5.6 — the real-world legacy layout: an opening-marker-only block
+# carrying the dead pre-rename glob, immediately followed by a FULLY DELIMITED
+# sibling plugin's block, with user prose on both sides. This is the exact
+# shape of all three attached repos found in the field (this repo, the
+# exfu-agent-planning-and-delegating consumer, and agent-library) — so
+# end-detection must stop at the sibling opening comment, not swallow it.
+new_repo legacy
+cat > CLAUDE.md <<'LEGACY'
+# My project
+
+Prose above the block, which must survive byte-for-byte.
+
+<!-- apv:orientation -->
+## agent-plan-visualiser (APV) tracking
+
+This repository is tracked by agent-plan-visualiser. Stale 0.6-era text.
+Read the newest `~/.claude/plugins/cache/*/agent-plan-visualiser/*/skills/apv-capture/SKILL.md`.
+
+<!-- exfu-agent-planning-and-delegating:orientation -->
+## sibling plugin block
+
+Owned by another plugin. Must not be touched.
+<!-- /exfu-agent-planning-and-delegating:orientation -->
+
+## User's own heading
+
+Prose below, also byte-for-byte.
+LEGACY
+SIBLING_BEFORE="$(sed -n '/exfu-agent-planning-and-delegating:orientation/,/\/exfu-agent-planning-and-delegating:orientation/p' CLAUDE.md | shasum)"
+
+# §5.7-adjacent — the migration is gated: it deletes lines whose extent was
+# inferred, so a flagless run must report and write NOTHING (Q1 exception).
+LEGACY_BEFORE="$(shasum CLAUDE.md | cut -d' ' -f1)"
+run bash "$INIT"
+check "legacy exits 0 without flag"     [ "$CODE" -eq 0 ]
+check "legacy migration is offered"     grep -q "legacy block found" <<<"$OUT"
+check "flagless legacy wrote nothing"   [ "$(shasum CLAUDE.md | cut -d' ' -f1)" = "$LEGACY_BEFORE" ]
+check "offer shows the region"          grep -q "would be replaced" <<<"$OUT"
+
+run bash "$INIT" --accept-claude-md
+check "migration exits 0"               [ "$CODE" -eq 0 ]
+check "migration reported"              grep -q "migrated to delimited form" <<<"$OUT"
+check "one open marker"                 [ "$(grep -cF '<!-- apv:orientation -->' CLAUDE.md)" -eq 1 ]
+check "one end marker"                  [ "$(grep -cF '<!-- /apv:orientation -->' CLAUDE.md)" -eq 1 ]
+check_file_absent "pre-rename glob gone" 'cache/\*/agent-plan-visualiser/\*/' CLAUDE.md
+check "survivable glob stamped"         grep -qF 'cache/*/*agent-plan-visualiser/*/' CLAUDE.md
+check_file_absent "stale 0.6 text gone" '0.6-era' CLAUDE.md
+check "sibling block untouched"         [ "$(sed -n '/exfu-agent-planning-and-delegating:orientation/,/\/exfu-agent-planning-and-delegating:orientation/p' CLAUDE.md | shasum)" = "$SIBLING_BEFORE" ]
+check "prose above preserved"           grep -qF "Prose above the block, which must survive byte-for-byte." CLAUDE.md
+check "prose below preserved"           grep -qF "Prose below, also byte-for-byte." CLAUDE.md
+check "user heading preserved"          grep -qF "## User's own heading" CLAUDE.md
+
+# Second migration run is now an ordinary current-block no-op.
+MIGRATED="$(shasum CLAUDE.md | cut -d' ' -f1)"
+run bash "$INIT"
+check "post-migration run is current"   grep -q "orientation block current" <<<"$OUT"
+check "post-migration wrote nothing"    [ "$(shasum CLAUDE.md | cut -d' ' -f1)" = "$MIGRATED" ]
+
+# §5.7 — ambiguity is refused, loudly, with nothing written.
+new_repo ambiguous
+cat > CLAUDE.md <<'AMBIG'
+<!-- apv:orientation -->
+## agent-plan-visualiser (APV) tracking
+first block
+<!-- apv:orientation -->
+## agent-plan-visualiser (APV) tracking
+second block
+AMBIG
+AMBIG_BEFORE="$(shasum CLAUDE.md | cut -d' ' -f1)"
+run bash "$INIT" --accept-claude-md
+check "duplicate markers refused"       [ "$CODE" -ne 0 ]
+check "refusal names the cause"         grep -q "cannot determine the block's extent" <<<"$OUT"
+check "refusal wrote nothing"           [ "$(shasum CLAUDE.md | cut -d' ' -f1)" = "$AMBIG_BEFORE" ]
+
+# An opening marker followed by text we do not recognise is also refused —
+# we will not infer an extent for a block that is not ours.
+new_repo unrecognised
+printf '<!-- apv:orientation -->\n## Something else entirely\nwho knows\n' > CLAUDE.md
+UNREC_BEFORE="$(shasum CLAUDE.md | cut -d' ' -f1)"
+run bash "$INIT" --accept-claude-md
+check "foreign block refused"           [ "$CODE" -ne 0 ]
+check "foreign refusal wrote nothing"   [ "$(shasum CLAUDE.md | cut -d' ' -f1)" = "$UNREC_BEFORE" ]
 
 # --- Case 6: plugin-cache install -> enablement persistence -------------------
 echo "== cache install: enablement written to .claude/settings.json, tracked-ness checked"

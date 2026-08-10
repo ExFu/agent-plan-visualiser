@@ -533,10 +533,22 @@ PY
     ;;
 esac
 
-# --- 6. CLAUDE.md orientation offer ------------------------------------------
+# --- 6. CLAUDE.md orientation offer / heal ------------------------------------
 # Ruled (M4 §7 Q4, 2026-06-10): offer only; init is the offer's ONLY
-# trigger; writing requires explicit user acceptance (--accept-claude-md).
+# trigger; the FIRST write requires explicit acceptance (--accept-claude-md).
+#
+# Ruled (T3-claude-md-block-healing §8, 2026-08-10):
+#   Q1 — once the user has accepted the block, the managed region is APV's to
+#        keep CURRENT. A plain re-run replaces a stale delimited block with no
+#        flag. The one-time legacy migration is the exception: it deletes lines
+#        whose extent was INFERRED, so it still requires --accept-claude-md.
+#   Q5 — the fallback glob below carries a leading `*` on the package segment,
+#        matching hooks/{capture-guard,gate-prepush,gate-refupdate,extract-capture}.
+#        `cache/*/agent-plan-visualiser/*/` matched nothing after the exfu-
+#        rename; a hard-coded `exfu-` prefix would die at the next one. The
+#        recovery path of last resort must outlive the machinery it recovers.
 APV_MD_MARKER="<!-- apv:orientation -->"
+APV_MD_END_MARKER="<!-- /apv:orientation -->"
 claude_md_block() {
   cat <<BLOCK
 $APV_MD_MARKER
@@ -565,16 +577,122 @@ NOT fabricate captures by hand. Load it:
 \`/plugin marketplace add https://github.com/ExFu/exfu-marketplace\` then
 \`/plugin install exfu-agent-plan-visualiser@exfu\`; or read the skill source and
 follow it directly — the newest
-\`~/.claude/plugins/cache/*/exfu-agent-plan-visualiser/*/skills/apv-capture/SKILL.md\`
+\`~/.claude/plugins/cache/*/*agent-plan-visualiser/*/skills/apv-capture/SKILL.md\`
 (same pattern for apv-merge and using-agent-plan-visualiser).
 
 Fresh clone or new worktree? The git hooks live in \`.git/\` and are not
 committed — run /apv-init once here to install the capture-guard and gate
 adapters. It is idempotent: it repairs only what is missing.
+$APV_MD_END_MARKER
 BLOCK
 }
 if [ -f CLAUDE.md ] && grep -qF "$APV_MD_MARKER" CLAUDE.md; then
-  report ok "CLAUDE.md" "orientation block present"
+  # Present is not correct. Compare the managed region against canonical and
+  # replace it when it has drifted; legacy (opening-marker-only) blocks have
+  # no declared extent, so their end is inferred and their migration gated.
+  # Hoisted: a nested $(...) inside this command substitution trips the
+  # bash 3.2 parser that ships on macOS. Apostrophes in the heredoc below
+  # do the same — keep the Python comments free of them.
+  CANON_BLOCK="$(claude_md_block)"
+  HEAL="$(python3 - "$CANON_BLOCK" CLAUDE.md "$APV_MD_MARKER" "$APV_MD_END_MARKER" "$ACCEPT_CLAUDE_MD" <<'PY'
+import os, sys, tempfile
+
+canonical, path, start, end, accept = sys.argv[1:6]
+accept = accept == "1"
+canon_lines = canonical.split("\n")
+heading = next((l for l in canon_lines if l.startswith("## ")), None)
+
+raw = open(path, encoding="utf-8").read()
+lines = raw.split("\n")
+
+def emit(state, region=None):
+    print(state)
+    if region:
+        sys.stdout.write("\n".join(region) + "\n")
+    sys.exit(0)
+
+opens = [i for i, l in enumerate(lines) if l.strip() == start]
+closes = [i for i, l in enumerate(lines) if l.strip() == end]
+
+# Anything other than exactly one opening marker is not ours to guess at.
+if len(opens) != 1 or len(closes) > 1:
+    emit("ambiguous", lines[opens[0]:opens[0] + 40] if opens else [])
+si = opens[0]
+
+if closes:
+    ei = closes[0]
+    if ei < si:
+        emit("ambiguous", lines[si:si + 40])
+    legacy = False
+else:
+    legacy = True
+    # First non-blank line after the marker must be the canonical heading;
+    # if it is not, this is not a block we recognise well enough to delete.
+    j = si + 1
+    while j < len(lines) and lines[j].strip() == "":
+        j += 1
+    if heading is None or j >= len(lines) or lines[j].strip() != heading.strip():
+        emit("ambiguous", lines[si:si + 40])
+    # Scan forward; stop at the next HTML comment (a sibling plugin block),
+    # the next level-2 heading, or EOF — whichever comes first.
+    k = j + 1
+    while k < len(lines):
+        s = lines[k].lstrip()
+        if s.startswith("<!--") or s.startswith("## "):
+            break
+        k += 1
+    # Trailing blank lines belong to the document, not to the block.
+    while k - 1 > si and lines[k - 1].strip() == "":
+        k -= 1
+    ei = k - 1
+
+if legacy and not accept:
+    emit("needs-accept", lines[si:ei + 1])
+
+new_raw = "\n".join(lines[:si] + canon_lines + lines[ei + 1:])
+if new_raw == raw:
+    emit("current")
+
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)),
+                          prefix=".CLAUDE.", suffix=".tmp")
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(new_raw)
+    os.chmod(tmp, os.stat(path).st_mode & 0o777)
+    os.replace(tmp, path)
+except Exception:
+    if os.path.exists(tmp):
+        os.unlink(tmp)
+    raise
+emit("migrated" if legacy else "updated")
+PY
+)"
+  HEAL_STATE="$(printf '%s\n' "$HEAL" | head -n 1)"
+  case "$HEAL_STATE" in
+    current)
+      report ok "CLAUDE.md" "orientation block current" ;;
+    updated)
+      report updated "CLAUDE.md" "orientation block refreshed — stale text replaced between markers" ;;
+    migrated)
+      report updated "CLAUDE.md" "legacy block migrated to delimited form (both markers now present)" ;;
+    needs-accept)
+      report offered "CLAUDE.md" "legacy block found — migration NOT written"
+      echo
+      echo "apv-init: ---- this block predates the closing marker, so its extent was"
+      echo "apv-init: ---- INFERRED. Review the region below; it would be replaced:"
+      printf '%s\n' "$HEAL" | tail -n +2 | sed 's/^/    | /'
+      echo "apv-init: to accept the migration, re-run with --accept-claude-md."
+      echo "apv-init: after this one-time step, refreshes need no flag." ;;
+    ambiguous)
+      report REFUSED "CLAUDE.md" "cannot determine the block's extent — resolve by hand, nothing written"
+      echo
+      echo "apv-init: ---- refusing to guess. Context from the opening marker:"
+      printf '%s\n' "$HEAL" | tail -n +2 | sed 's/^/    | /'
+      FAIL=1 ;;
+    *)
+      report REFUSED "CLAUDE.md" "orientation heal failed (unrecognised state '$HEAL_STATE')"
+      FAIL=1 ;;
+  esac
 elif [ "$ACCEPT_CLAUDE_MD" -eq 1 ]; then
   { [ -f CLAUDE.md ] && [ -n "$(tail -c 1 CLAUDE.md 2>/dev/null)" ] && echo; } >> CLAUDE.md 2>/dev/null || true
   claude_md_block >> CLAUDE.md

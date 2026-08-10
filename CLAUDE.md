@@ -72,12 +72,13 @@ NOT fabricate captures by hand. Load it:
 `/plugin marketplace add https://github.com/ExFu/exfu-marketplace` then
 `/plugin install exfu-agent-plan-visualiser@exfu`; or read the skill source and
 follow it directly — the newest
-`~/.claude/plugins/cache/*/exfu-agent-plan-visualiser/*/skills/apv-capture/SKILL.md`
+`~/.claude/plugins/cache/*/*agent-plan-visualiser/*/skills/apv-capture/SKILL.md`
 (same pattern for apv-merge and using-agent-plan-visualiser).
 
 Fresh clone or new worktree? The git hooks live in `.git/` and are not
 committed — run /apv-init once here to install the capture-guard and gate
 adapters. It is idempotent: it repairs only what is missing.
+<!-- /apv:orientation -->
 
 <!-- exfu-agent-planning-and-delegating:orientation -->
 ## exfu-agent-planning-and-delegating (ExFu Agent Planning & Delegating)

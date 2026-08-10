@@ -1,6 +1,6 @@
-# Project state — generated 2026-08-10T14:37:07Z
+# Project state — generated 2026-08-10T15:34:27Z
 
-**Total events:** 715  ·  **Draft:** 18  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 64  ·  **Orphaned:** 0
+**Total events:** 726  ·  **Draft:** 19  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 65  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -45,11 +45,14 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 32 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 139 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 33 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 140 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
+
+**Deferred verifications** (operator legs to come back to):
+- `T3-claude-md-block-healing` (deferred 2026-08-10): The other two attached repos are separate repositories; healing their working trees is not this branch's to commit.
 
 ## Draft
 
@@ -70,6 +73,7 @@
   - `2026-07-23.exfu-plugin-project-scoped-elsewhere` (18d untriaged)
   - `2026-07-23.stale-hooks-after-plugin-upgrade` (18d untriaged)
   - `2026-08-10.exfu-marketplace-rename-residuals`
+  - `2026-08-10.session-orient-block-drift-nag`
 - **plan**
   - `KT0-knowledge-substrate`
   - `T2-ingest`
@@ -106,11 +110,11 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 7/9 T3 complete (77%); 2 live
+- **M4-fresh-install**: 8/10 T3 complete (80%); 2 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_94 entities · 125 relationships · 41 decisions._
+_96 entities · 127 relationships · 42 decisions._
