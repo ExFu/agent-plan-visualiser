@@ -1,6 +1,6 @@
-# Project state — generated 2026-08-10T17:51:57Z
+# Project state — generated 2026-08-20T13:22:11Z
 
-**Total events:** 742  ·  **Draft:** 21  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 65  ·  **Orphaned:** 0
+**Total events:** 746  ·  **Draft:** 21  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -45,8 +45,8 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 36 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 143 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 37 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 144 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -58,25 +58,25 @@
 ## Draft
 
 - **inbox-item**
-  - `2026-05-23.autopilot-misuse-meta-observation` (79d untriaged)
-  - `2026-05-23.cheatsheet-initial-content` (79d untriaged)
-  - `2026-05-23.cowork-vs-code-altitude-guidance` (79d untriaged)
-  - `2026-05-23.extraction-prompt-template-skeleton` (79d untriaged)
-  - `2026-05-23.html-view-visual-style` (79d untriaged)
-  - `2026-05-23.mapping-note-agent-design` (79d untriaged)
-  - `2026-05-23.plugin-naming-alternatives` (79d untriaged)
-  - `2026-05-23.side-quest-formalisation` (79d untriaged)
-  - `2026-05-23.snapshot-trigger-config` (79d untriaged)
-  - `2026-05-23.verification-overhaul-candidate-model` (79d untriaged)
-  - `2026-06-10.view-hardcodes-dogfood-data-dir` (61d untriaged)
-  - `2026-07-07.dist-sandbox-test-reference-stale` (34d untriaged)
-  - `2026-07-21.methodology-name-pending` (20d untriaged)
-  - `2026-07-23.exfu-plugin-project-scoped-elsewhere` (18d untriaged)
-  - `2026-07-23.stale-hooks-after-plugin-upgrade` (18d untriaged)
-  - `2026-08-10.exfu-marketplace-rename-residuals`
-  - `2026-08-10.legacy-command-files-shadowed-by-skills`
-  - `2026-08-10.reinit-shims-after-bin-move`
-  - `2026-08-10.session-orient-block-drift-nag`
+  - `2026-05-23.autopilot-misuse-meta-observation` (89d untriaged)
+  - `2026-05-23.cheatsheet-initial-content` (89d untriaged)
+  - `2026-05-23.cowork-vs-code-altitude-guidance` (89d untriaged)
+  - `2026-05-23.extraction-prompt-template-skeleton` (89d untriaged)
+  - `2026-05-23.html-view-visual-style` (89d untriaged)
+  - `2026-05-23.mapping-note-agent-design` (89d untriaged)
+  - `2026-05-23.plugin-naming-alternatives` (89d untriaged)
+  - `2026-05-23.side-quest-formalisation` (89d untriaged)
+  - `2026-05-23.snapshot-trigger-config` (89d untriaged)
+  - `2026-05-23.verification-overhaul-candidate-model` (89d untriaged)
+  - `2026-06-10.view-hardcodes-dogfood-data-dir` (71d untriaged)
+  - `2026-07-07.dist-sandbox-test-reference-stale` (44d untriaged)
+  - `2026-07-21.methodology-name-pending` (30d untriaged)
+  - `2026-07-23.exfu-plugin-project-scoped-elsewhere` (28d untriaged)
+  - `2026-07-23.stale-hooks-after-plugin-upgrade` (28d untriaged)
+  - `2026-08-10.exfu-marketplace-rename-residuals` (10d untriaged)
+  - `2026-08-10.legacy-command-files-shadowed-by-skills` (10d untriaged)
+  - `2026-08-10.reinit-shims-after-bin-move` (10d untriaged)
+  - `2026-08-10.session-orient-block-drift-nag` (10d untriaged)
 - **plan**
   - `KT0-knowledge-substrate`
   - `T2-ingest`
@@ -97,10 +97,10 @@ _No orphaned entities._
 - `2026-06-09.commit-recorded-entity-subject-drift` (inbox-item)
 - `2026-07-03.ceremony-prompting-gap` (inbox-item)
 - `2026-07-07.backfill-sandbox-triage-check-fails` (inbox-item)
+- `2026-08-20.apv-serve-port-collision-fallback` (inbox-item)
 - `M1-bootstrap` (plan)
 - `M1.1-analyser` (plan)
 - `M1.2-relationship-ssot` (plan)
-- `M2-auto-extract` (plan)
 
 ## Notable patterns
 
@@ -120,4 +120,4 @@ _No flapping closures._
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_98 entities · 127 relationships · 45 decisions._
+_99 entities · 127 relationships · 45 decisions._

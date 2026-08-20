@@ -20,6 +20,7 @@ Replaces `python3 -m http.server 8765` for any flow that needs save-summary. Pla
 http.server still works for read-only browsing.
 """
 import argparse
+import errno
 import json
 import os
 import subprocess
@@ -567,9 +568,30 @@ class APTHandler(SimpleHTTPRequestHandler):
         return True
 
 
+def find_available_server(host, start_port, max_tries=50):
+    """Bind the first free port from start_port upward.
+
+    apv serve is a local dev tool run ad hoc, often with a prior instance
+    still up in another terminal/tab — a hard failure on the default port is
+    just friction. Scan forward instead of dying on EADDRINUSE.
+    """
+    port = start_port
+    for _ in range(max_tries):
+        try:
+            return HTTPServer((host, port), APTHandler), port
+        except OSError as e:
+            if e.errno != errno.EADDRINUSE:
+                raise
+            port += 1
+    raise OSError(
+        f"no free port found in {start_port}-{start_port + max_tries - 1} "
+        f"(tried {max_tries} ports)"
+    )
+
+
 def run(port=8765, host="127.0.0.1"):
     os.chdir(str(REPO_ROOT))
-    server = HTTPServer((host, port), APTHandler)
+    server, port = find_available_server(host, port)
     print(f"serve.py listening on http://{host}:{port}")
     print(f"  view:   http://{host}:{port}/view/index.html (from {VIEW_DIR})")
     print(f"  data:   /data/* -> {DATA_DIR}")
