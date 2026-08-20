@@ -1,6 +1,7 @@
 /* Functional baseline — polish is a separate concern. */
 :root {
   /* derived-state colours */
+  --color-draft: #00897b;      /* teal — not yet accepted, pre-work */
   --color-live: #0288d1;       /* blue — active, ongoing (distinct from green/completed) */
   --color-dormant: #f9a825;    /* amber */
   --color-closed: #757575;     /* grey */
@@ -127,6 +128,7 @@ button:disabled {
   font-weight: 600;
   color: white;
 }
+.badge.draft { background: var(--color-draft); }
 .badge.live { background: var(--color-live); }
 .badge.dormant { background: var(--color-dormant); }
 .badge.closed { background: var(--color-closed); }

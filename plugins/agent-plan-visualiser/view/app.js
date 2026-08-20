@@ -161,6 +161,7 @@ async function main() {
   document.getElementById("meta").textContent =
     `Generated ${state.projection.generated_at} · ` +
     `${state.projection.summary_stats.total_events} events · ` +
+    `${state.projection.summary_stats.draft_count} draft · ` +
     `${state.projection.summary_stats.live_count} live · ` +
     `${state.projection.summary_stats.dormant_count} dormant · ` +
     `${state.projection.summary_stats.closed_count} closed · ` +
@@ -400,7 +401,7 @@ function renderBoard(p, content) {
   bar.className = "sub-toolbar";
   bar.appendChild(lifecycleChips(() => switchView("board")));
   content.appendChild(bar);
-  const states = ["live", "dormant", "orphaned", "unknown", "closed"];
+  const states = ["draft", "live", "dormant", "orphaned", "unknown", "closed"];
   for (const stateName of states) {
     const entries = Object.values(p.entities)
       .filter(e => e.derived_state === stateName && projectMatch(e)
