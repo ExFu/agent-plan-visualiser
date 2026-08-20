@@ -1,6 +1,6 @@
-# Project state — generated 2026-08-20T13:22:08Z
+# Project state — generated 2026-08-20T13:31:29Z
 
-**Total events:** 745  ·  **Draft:** 21  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
+**Total events:** 750  ·  **Draft:** 21  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 67  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -45,8 +45,8 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 37 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 144 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 39 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 146 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -97,10 +97,10 @@ _No orphaned entities._
 - `2026-06-09.commit-recorded-entity-subject-drift` (inbox-item)
 - `2026-07-03.ceremony-prompting-gap` (inbox-item)
 - `2026-07-07.backfill-sandbox-triage-check-fails` (inbox-item)
+- `2026-08-20.apv-serve-port-collision-fallback` (inbox-item)
 - `M1-bootstrap` (plan)
 - `M1.1-analyser` (plan)
 - `M1.2-relationship-ssot` (plan)
-- `M2-auto-extract` (plan)
 
 ## Notable patterns
 
@@ -120,4 +120,4 @@ _No flapping closures._
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
 
 ---
-_99 entities · 127 relationships · 45 decisions._
+_100 entities · 127 relationships · 45 decisions._
