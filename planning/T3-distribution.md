@@ -107,3 +107,16 @@ Documentation, identity and licensing only: no behaviour on the capture, gate or
 **Deliberately not changed:** the four pre-rename marketplace URLs in `planning/` (§8 above, and [[T3-cross-client-install]] §§1/2/5). Those record rulings as they were made; append-only law puts the new address in this section, not over the old prose. `audit-rename.sh` does not guard marketplace URLs — it guards the tracker→visualiser rename — so it flags neither, by design.
 
 **Residual, outside this repo (operator legs):** the `exfu-marketplace` catalogue commit declaring Proprietary on every entry is **committed but unpushed**, so the licence this manifest asserts is not yet on the surface anyone installs from; and this machine's `known_marketplaces.json` still registers `exfu` under the old URL with `autoUpdate: true`, working only by GitHub's redirect. Carried as `2026-08-10.exfu-marketplace-rename-residuals`.
+
+## 11. Release 0.8.0 (2026-08-20) — Cowork sync fixes, CLAUDE.md self-healing, view/dashboard fixes. **No re-attach required.**
+
+Minor bump: one genuine feature landed alongside five fixes since 0.7.2, none of which touch `apv_min_version`-gated capture/gate/extraction behaviour, so no re-attach instruction is issued.
+
+**What the cut carries**
+
+- **feat:** `apv-init` now heals a drifted CLAUDE.md orientation block on re-run instead of treating "marker present" as success — the one live surface APV writes that APV could never previously correct (`entity.created`/`entity.completed` under `T3-claude-md-block-healing`).
+- **fix:** three T3-distribution manifest/layout corrections chasing the Cowork marketplace sync failure — dropped non-schema manifest keys, nested the plugin tree at `plugins/agent-plan-visualiser` for git-subdir parity with sibling exfu plugins, and moved the dispatcher out of `bin/` (`claude.ai` rejects plugins shipping a top-level `bin/`).
+- **fix:** `apv serve` now falls back to the next free port on a collision instead of crashing, so a second `apv serve` in another repo/worktree no longer dies outright.
+- **fix:** the served dashboard (`view/`) didn't surface draft-vs-accepted plan status — the Board view's state list omitted `draft` entirely, `.badge.draft` had no colour rule (invisible white-on-white wherever it did render), and the header summary line never read the already-computed `draft_count`. All three fixed and verified live in the served view.
+
+`[requires] apv_min_version` stays `0.6.4` per its own doctrine — none of this cut's fixes are on the capture/gate path a floor-raise would guard.
