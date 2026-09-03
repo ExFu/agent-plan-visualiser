@@ -211,7 +211,8 @@ class Ctx:
         blocking checks never read the cache.)"""
         if self._cache_conn is not None:
             return self._cache_conn
-        cache_path = self.data_dir / "cache.sqlite"
+        cache_path = apvlib.apv_cache_path(
+            self.data_dir, self.repo_root, getattr(self, "config_path", None))
         stale = True
         if cache_path.exists():
             try:

@@ -20,7 +20,7 @@ PLANNING_DIR = apvlib.apv_planning_dir(REPO_ROOT)
 PLANNING_ROOTS = apvlib.apv_planning_roots(REPO_ROOT)
 HAS_REGISTRY = bool(apvlib.apv_projects(REPO_ROOT))
 EVENTS = DATA_DIR / "events.jsonl"
-CACHE = DATA_DIR / "cache.sqlite"
+CACHE = apvlib.apv_cache_path(DATA_DIR, REPO_ROOT)
 # Toolchain content resolves against THIS script's home, never the target
 # repo — on a plugin install the schemas live in the plugin cache.
 SCHEMA_DDL = Path(__file__).resolve().parents[1] / "schemas/0.6.0/cache.schema.sql"

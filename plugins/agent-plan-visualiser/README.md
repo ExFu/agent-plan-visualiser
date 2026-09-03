@@ -9,7 +9,8 @@ actually happened; the gap between the two is signal.
 
 ## Before you start
 
-APV runs on `bash`, `git`, `python3` (3.11+) and `sqlite3` — all standard on
+APV runs on `bash`, `git` and `python3` (3.11+; its stdlib `sqlite3` module
+covers the cache and audits — no `sqlite3` CLI needed) — all standard on
 macOS and Linux. It also needs the `jsonschema` Python package: the extractor
 validates every event before appending it, and **fails closed** if the package
 is missing, so install it before step 2:
@@ -93,9 +94,9 @@ rationale ships in `philosophies/`.
 
 ## Requirements
 
-`bash`, `git`, `python3` (3.11+; stdlib only for the gate; `jsonschema` — or
-`check-jsonschema` — for full pipeline validation), `sqlite3` for the cache
-and audits. See [Before you start](#before-you-start) for the install command.
+`bash`, `git`, `python3` (3.11+; stdlib only for the gate, cache and audits;
+`jsonschema` — or `check-jsonschema` — for full pipeline validation). The
+`sqlite3` CLI is optional: handy for ad-hoc queries, required by nothing. See [Before you start](#before-you-start) for the install command.
 
 ## License
 

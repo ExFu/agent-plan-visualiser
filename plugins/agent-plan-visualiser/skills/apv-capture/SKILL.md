@@ -115,7 +115,7 @@ fi
 **No implementation work may be recorded against a `draft` entity.** Before emitting `entity.progressed` **or `entity.completed`** (both record implementation work — a draft must not be progressed *or* sealed closed unreviewed), check the entity's current derived state:
 
 ```bash
-sqlite3 "$DATA_DIR/cache.sqlite" "SELECT derived_state FROM entities WHERE entity_id='<id>';"
+printf '%s' "SELECT derived_state FROM entities WHERE entity_id='<id>';" | python3 "$APV/scripts/audit-run.py" -
 ```
 
 (If the cache is stale, rebuild via `python3 "$APV/scripts/cache-build.py"`, or scan the entity's event history in the log tail.)
@@ -156,7 +156,7 @@ with open(EVENTS_PATH, "a") as f:
 2. Sanity-check derived states for the entities your block touched — closures show `closed`, new untriaged items show `draft`:
 
 ```bash
-sqlite3 "$DATA_DIR/cache.sqlite" "SELECT entity_id, derived_state FROM entities WHERE entity_id IN ('<id1>','<id2>');"
+printf '%s' "SELECT entity_id, derived_state FROM entities WHERE entity_id IN ('<id1>','<id2>');" | python3 "$APV/scripts/audit-run.py" -
 ```
 
 3. Write the capture timestamp — **the very last action**, consumed by the capture-guard pre-commit hook (gitignored local state):

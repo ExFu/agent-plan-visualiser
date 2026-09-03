@@ -52,9 +52,11 @@ run_step "validate plan frontmatter"      bash "$TOOLCHAIN/scripts/validate-plan
 run_step "rebuild SQLite cache"           python3 "$TOOLCHAIN/scripts/cache-build.py"            || exit 1
 run_step "emit projection.json"           python3 "$TOOLCHAIN/scripts/projection-emit.py"        || exit 1
 run_step "emit summary.md"                python3 "$TOOLCHAIN/scripts/summary-emit.py"           || exit 1
-run_step "audit-stalled"                  sh -c "sqlite3 '${DATA_DIR}/cache.sqlite' < '$TOOLCHAIN/scripts/audit-stalled.sql'" || exit 1
-run_step "audit-fulcrum-without-decision" sh -c "sqlite3 '${DATA_DIR}/cache.sqlite' < '$TOOLCHAIN/scripts/audit-fulcrum-without-decision.sql'" || exit 1
-run_step "audit-orphans"                  sh -c "sqlite3 '${DATA_DIR}/cache.sqlite' < '$TOOLCHAIN/scripts/audit-orphans.sql'" || exit 1
+# Audits run through Python's sqlite3 module (audit-run.py) — the CLI is not
+# a dependency; the cache path resolves the same way the build steps did.
+run_step "audit-stalled"                  python3 "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-stalled.sql"                  || exit 1
+run_step "audit-fulcrum-without-decision" python3 "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-fulcrum-without-decision.sql" || exit 1
+run_step "audit-orphans"                  python3 "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-orphans.sql"                  || exit 1
 
 echo
 echo "${GREEN}All ${#PASS[@]} steps passed.${RESET}"

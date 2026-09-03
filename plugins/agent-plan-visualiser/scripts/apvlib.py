@@ -220,6 +220,26 @@ def apv_planning_dir(repo_root: Path, config_path=None) -> Path:
     return repo_root / "planning"
 
 
+# --- Where derived files live (T3-synced-folder-runtime §2.3/§2.4) ----------
+# cache.sqlite (+ journal) and projection.json are derived — rebuilt from
+# events.jsonl on every run (T2-storage §3.1 trust hierarchy). Every consumer
+# resolves their location through these three functions, never by hand.
+
+def apv_cache_dir(data_dir, repo_root=None, config_path=None) -> Path:
+    """The directory holding the derived cache files for `data_dir`.
+    §2.3 stub: the data dir itself (today's layout). §2.4 adds the
+    relocation rule for data dirs outside a git work tree."""
+    return Path(data_dir)
+
+
+def apv_cache_path(data_dir, repo_root=None, config_path=None) -> Path:
+    return apv_cache_dir(data_dir, repo_root, config_path) / "cache.sqlite"
+
+
+def apv_projection_path(data_dir, repo_root=None, config_path=None) -> Path:
+    return apv_cache_dir(data_dir, repo_root, config_path) / "projection.json"
+
+
 # --- What counts as a plan file (T3-synced-folder-runtime §2.1) ------------
 # Fail-closed: every *.md directly under a planning root is a plan and must
 # validate, with exactly three carve-outs, checked in this order:

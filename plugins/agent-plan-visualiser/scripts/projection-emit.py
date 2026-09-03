@@ -13,8 +13,8 @@ import apvlib
 
 REPO_ROOT = apvlib.repo_root()
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
-CACHE = DATA_DIR / "cache.sqlite"
-OUT = DATA_DIR / "projection.json"
+CACHE = apvlib.apv_cache_path(DATA_DIR, REPO_ROOT)
+OUT = apvlib.apv_projection_path(DATA_DIR, REPO_ROOT)
 
 SCHEMA_VERSION = "0.6.0"
 ONTOLOGY_VERSION = "0.6.0"

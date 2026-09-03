@@ -77,6 +77,32 @@ check "gate-composite exits 0" [ "$CODE" -eq 0 ]
 check_absent "gate did not look for events beside the toolchain" "no events.jsonl"
 check_present "gate reports the folder's blocking list (stalled moved to blocking)" "blocking=\[.*'stalled'"
 
+# --- §2.3 audits without the sqlite3 CLI -----------------------------------
+# Emulate a machine without the sqlite3 CLI: a shim that fails like a missing
+# command sits first on PATH (stripping whole PATH dirs would also remove sed
+# and friends, which is not the environment under test).
+mkdir -p "$T/nosql"
+printf '#!/bin/sh\necho "sqlite3: command not found" >&2\nexit 127\n' > "$T/nosql/sqlite3"; chmod +x "$T/nosql/sqlite3"
+NOSQL_PATH="$T/nosql:$PATH"
+echo "== audit-run.py runs the audit SQL through Python's sqlite3 module"
+run in_t env PATH="$NOSQL_PATH" python3 "$APV/scripts/audit-run.py" "$APV/scripts/audit-stalled.sql"
+check "audit file runs (exit 0)" [ "$CODE" -eq 0 ]
+check_present "column header printed, dot-commands stripped" "entity_id"
+check_absent "no .headers/.mode leakage" "^\.\(headers\|mode\)"
+run bash -c "cd '$T' && printf 'SELECT COUNT(*) AS n FROM events;' | env PATH='$NOSQL_PATH' python3 '$APV/scripts/audit-run.py' -"
+check "stdin SQL runs" [ "$CODE" -eq 0 ]
+check_present "row value printed" "^10$"
+run bash -c "cd '$T' && python3 '$APV/scripts/audit-run.py' --cache '$T/nowhere.sqlite' '$APV/scripts/audit-orphans.sql'"
+check "missing cache exits 2" [ "$CODE" -eq 2 ]
+check_present "missing cache names cache-build" "cache-build"
+
+echo "== repack-validate end to end with no sqlite3 on PATH"
+run in_t env PATH="$NOSQL_PATH" bash "$APV/scripts/repack-validate.sh"
+check "repack-validate exits 0 without the CLI" [ "$CODE" -eq 0 ]
+check_present "all eight steps passed" "All 8 steps passed"
+check_present "agent.md skipped" "SKIP .*agent.md"
+check_absent "no 'sqlite3: command not found'" "sqlite3: command not found"
+
 echo
 if [ "$FAIL" -eq 0 ]; then
   rm -rf "$T"

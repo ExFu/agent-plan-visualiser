@@ -13,7 +13,7 @@ import apvlib
 
 REPO_ROOT = apvlib.repo_root()
 DATA_DIR = apvlib.apv_data_dir(REPO_ROOT)
-PROJECTION = DATA_DIR / "projection.json"
+PROJECTION = apvlib.apv_projection_path(DATA_DIR, REPO_ROOT)
 OUT = DATA_DIR / "summary.md"
 
 

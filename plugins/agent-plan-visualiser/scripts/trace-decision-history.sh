@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Given an entity_id, list all decision events touching it (via referenced_event_ids).
 # Usage: trace-decision-history.sh <entity_id>
+# Reads the cache through audit-run.py (Python sqlite3 — no CLI needed); the
+# cache path resolves via apvlib (APV_DATA_DIR -> .apv-config.toml -> .apv/,
+# then the cache dir), or pass CACHE=<path> to override.
 set -euo pipefail
 ENTITY_ID="${1:?usage: $0 <entity_id>}"
-CACHE="${CACHE:-${APV_DATA_DIR:-.agent-plan-tracker}/cache.sqlite}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CACHE_ARGS=()
+[ -n "${CACHE:-}" ] && CACHE_ARGS=(--cache "$CACHE")
 
-sqlite3 -header -column "$CACHE" <<SQL
+python3 "$SCRIPT_DIR/audit-run.py" - ${CACHE_ARGS[@]+"${CACHE_ARGS[@]}"} <<SQL
 WITH related_events AS (
   SELECT event_id FROM events WHERE entity_id = '${ENTITY_ID}'
 )

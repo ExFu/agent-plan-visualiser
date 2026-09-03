@@ -57,6 +57,7 @@ try:
 except ValueError:
     DATA_DIR_PREFIX = str(DATA_DIR)
 EVENTS = DATA_DIR / "events.jsonl"
+PROJECTION = apvlib.apv_projection_path(DATA_DIR, REPO_ROOT)  # derived: may live outside the data dir
 SUMMARIES_DIR = DATA_DIR / "summaries"
 SCHEMA_PATH = TOOLCHAIN / "schemas/0.2.0/events.schema.json"
 
@@ -212,6 +213,10 @@ class APTHandler(SimpleHTTPRequestHandler):
             return
         if self.path.startswith("/view/"):
             return self._serve_file(VIEW_DIR, self.path[len("/view/"):])
+        if self.path.split("?", 1)[0] == "/data/projection.json":
+            # Derived file: lives in the cache dir, which may sit outside the
+            # data dir (apvlib.apv_projection_path, T3-synced-folder-runtime).
+            return self._serve_file(PROJECTION.parent, PROJECTION.name)
         if self.path.startswith("/data/"):
             return self._serve_file(DATA_DIR, self.path[len("/data/"):])
         if self.path.startswith("/planning/"):
@@ -404,7 +409,7 @@ class APTHandler(SimpleHTTPRequestHandler):
         # We only consider event-sourced spawns (source='event'), not
         # frontmatter-derived edges — those are timeless and would over-cascade.
         try:
-            proj = json.loads((DATA_DIR / "projection.json").read_text())
+            proj = json.loads(PROJECTION.read_text())
             event_spawn_edges = [
                 r for r in proj.get("relationships", [])
                 if r.get("type") == "spawns" and r.get("source") == "event"
