@@ -1,6 +1,6 @@
-# Project state — generated 2026-09-03T16:30:44Z
+# Project state — generated 2026-09-03T16:38:04Z
 
-**Total events:** 780  ·  **Draft:** 21  ·  **Live:** 14  ·  **Dormant:** 0  ·  **Closed:** 67  ·  **Orphaned:** 0
+**Total events:** 785  ·  **Draft:** 21  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 68  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -27,7 +27,6 @@
 
 - **T2-packaging**
   - `T3-distribution` (68 events): entity.progressed → verification.tested → verification.deferred
-  - `T3-git-less-init` (5 events): entity.extended → entity.extended → entity.accepted
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
@@ -47,17 +46,15 @@
   - `T3-distribution`
   - `T3-retrospective-project-annotation`
 
-- **M7-git-less-scopes**
-  - `T3-git-less-init`
-
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 46 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 153 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 47 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 154 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
+- `M7-git-less-scopes`
 
 **Deferred verifications** (operator legs to come back to):
 - `T3-claude-md-block-healing` (deferred 2026-08-10): The other two attached repos are separate repositories; healing their working trees is not this branch's to commit.
@@ -126,7 +123,7 @@ _No flapping closures._
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
-- **M7-git-less-scopes**: 1/2 T3 complete (50%); 1 live
+- **M7-git-less-scopes**: 2/2 T3 complete (100%); 0 live
 
 ---
 _102 entities · 132 relationships · 47 decisions._

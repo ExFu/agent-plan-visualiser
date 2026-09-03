@@ -3,10 +3,17 @@
 #
 # Usage (from anywhere inside the target repo):
 #   bash <toolchain>/scripts/apv-init.sh \
-#     [--at=all|pre-push|ref-update|manual] [--accept-claude-md]
+#     [--at=all|pre-push|ref-update|manual] [--with-extractor] [--accept-claude-md]
+#   bash <toolchain>/scripts/apv-init.sh --no-git [--accept-claude-md]
+#     (from the ROOT of a plain folder with no repository — a synced ExFu
+#     scope, say; T3-git-less-init / M7 §2.3: explicit, never inferred)
 #
 # What it does — create-if-missing, NEVER clobber (T3-project-init-flow §2):
-#   1. Preconditions: inside a non-bare git work tree.
+#   1. Preconditions: inside a non-bare git work tree — or, with --no-git,
+#      OUTSIDE any work tree (the flag inside a repo is refused). --no-git
+#      writes steps 2 and 6 only: no launcher, no pointer, no .gitignore, no
+#      hooks; the config declares `no_git = true` so derived files stay out
+#      of the folder (apvlib.apv_cache_dir).
 #   2. Seed: the data dir (default `.apv/` — APV_DATA_DIR or an existing
 #      `.apv-config.toml` [storage] data_dir override it) with an empty
 #      events.jsonl — this is THE one sanctioned creation site; the capture
@@ -43,32 +50,54 @@
 set -uo pipefail
 
 AT="all"
+AT_EXPLICIT=0
 ACCEPT_CLAUDE_MD=0
 WITH_EXTRACTOR=0
+NO_GIT=0
+USAGE="usage: apv-init.sh [--at=all|pre-push|ref-update|manual] [--with-extractor] [--accept-claude-md] | apv-init.sh --no-git [--accept-claude-md]"
 for arg in "$@"; do
   case "$arg" in
-    --at=all)        AT="all" ;;
-    --at=pre-push)   AT="pre-push" ;;
-    --at=ref-update) AT="ref-update" ;;
-    --at=manual)     AT="manual" ;;
+    --at=all)        AT="all"; AT_EXPLICIT=1 ;;
+    --at=pre-push)   AT="pre-push"; AT_EXPLICIT=1 ;;
+    --at=ref-update) AT="ref-update"; AT_EXPLICIT=1 ;;
+    --at=manual)     AT="manual"; AT_EXPLICIT=1 ;;
     --accept-claude-md) ACCEPT_CLAUDE_MD=1 ;;
     --with-extractor)   WITH_EXTRACTOR=1 ;;
+    --no-git)           NO_GIT=1 ;;
     *)
-      echo "usage: apv-init.sh [--at=all|pre-push|ref-update|manual] [--with-extractor] [--accept-claude-md]" >&2
+      echo "$USAGE" >&2
       exit 2
       ;;
   esac
 done
+if [ "$NO_GIT" -eq 1 ] && [ "$AT_EXPLICIT" -eq 1 ]; then
+  echo "apv-init: --no-git installs no git hooks; drop --at" >&2
+  exit 2
+fi
+if [ "$NO_GIT" -eq 1 ] && [ "$WITH_EXTRACTOR" -eq 1 ]; then
+  echo "apv-init: --no-git installs no git hooks; the extractor is a commit-msg hook — drop --with-extractor" >&2
+  exit 2
+fi
 
 # --- preconditions ----------------------------------------------------------
+# Git-less attach is explicit, never inferred (M7 §2.3, operator ruling
+# 2026-09-03): a folder that merely lacks .git must not be attached by accident.
 if [ "$(git rev-parse --is-bare-repository 2>/dev/null)" = "true" ]; then
   echo "apv-init: this is a bare repository — tracking needs a work tree." >&2
   exit 2
 fi
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
-  echo "apv-init: not inside a git repository — run from the repo to attach." >&2
-  exit 2
-}
+if [ "$NO_GIT" -eq 1 ]; then
+  if TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    echo "apv-init: --no-git given inside a git repository ($TOPLEVEL) — drop the flag, or run from the folder you mean to attach." >&2
+    exit 2
+  fi
+  REPO_ROOT="$(pwd -P)"
+else
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    echo "apv-init: not inside a git repository — run from the repo to attach, or pass --no-git to attach this folder without one." >&2
+    exit 2
+  }
+fi
 cd "$REPO_ROOT" || exit 2
 
 # The toolchain home is wherever this script lives — the plugin cache on a
@@ -98,7 +127,7 @@ report() { # report <state> <component> [detail]
   printf '  %-8s %s%s\n' "$1" "$2" "${3:+ — $3}"
 }
 
-echo "apv-init: attaching $REPO_ROOT"
+echo "apv-init: attaching $REPO_ROOT$([ "$NO_GIT" -eq 1 ] && echo ' (git-less: capture seals, no hooks)')"
 echo "apv-init: toolchain home $TOOLCHAIN_HOME ($([ "$VENDORED" -eq 1 ] && echo vendored || echo external))"
 echo
 
@@ -120,6 +149,50 @@ fi
 # --- 2. config ---------------------------------------------------------------
 if [ -f ".apv-config.toml" ]; then
   report ok ".apv-config.toml" "existing config respected"
+  if [ "$NO_GIT" -eq 1 ] && ! grep -q '^[[:space:]]*no_git[[:space:]]*=[[:space:]]*true' .apv-config.toml; then
+    report ACTION ".apv-config.toml" "add 'no_git = true' under [storage] so derived files stay out of this folder (not edited: existing config is respected)"
+  fi
+elif [ "$NO_GIT" -eq 1 ]; then
+  # Git-less template. Never a machine-specific path: this file is shared by
+  # every machine that syncs the folder (M7 §2.4; the launcher's zero-machine-
+  # dependency ruling). planning_dir is explicit — no repo convention here.
+  cat > .apv-config.toml <<TOML
+# .apv-config.toml — agent-plan-visualiser configuration for this folder.
+# Lives at the folder root (it names the data dir, so it cannot live inside it).
+# Git-less mode: this is a synced folder with no repository. Seals are capture
+# seals (the block's one-line summary), the gate is advisory and run on demand,
+# and derived files live OUTSIDE this folder. Unknown keys are tolerated.
+
+[gate]
+# Check ids the integrity composite (gate-composite.py) enforces when run.
+# blocking = corruption of the record (exit 1); warn = advisory. Seal<->commit
+# correspondence cannot be checked without git and is not attempted.
+blocking = ["schema", "referential", "sealed-tail", "implementation-on-draft", "resurrection-without-reopen", "fulcrum-without-decision"]
+warn = ["drift", "orphans", "stalled", "long-blockers", "attribution-drift"]
+
+[storage]
+# The record: events.jsonl, schema-version.txt and the human summary.md.
+data_dir = "$DATA_DIR"
+# The plan corpus, relative to this folder.
+planning_dir = "planning"
+# Declared git-less: derived files (cache.sqlite, its journal, projection.json)
+# are written to a per-machine cache dir outside this folder —
+# \${XDG_CACHE_HOME:-~/.cache}/apv/<folder>-<hash>/ — never beside the log,
+# because synced mounts cannot always lock SQLite and two machines writing one
+# file produce conflicted copies. repack-validate.sh prints the path as
+# "cache dir:". APV_CACHE_DIR overrides it for one run.
+no_git = true
+# Do NOT set cache_dir to a machine path here; other machines sync this file.
+# cache_dir = ".apv-cache"
+
+# [planning]
+# Files under planning/ that are not plans. Default: the ExFu folder descriptor
+# and a readme. Two in-tree routes need no config: a \`.apv-ignore\` marker file
+# excludes a sub-folder; \`apv: ignore\` in a file's frontmatter excludes that
+# file. Everything else under planning/ must be a valid plan.
+# non_plan_files = ["agent.md", "readme.md"]
+TOML
+  report created ".apv-config.toml" "git-less template; data_dir = \"$DATA_DIR\", planning_dir = \"planning\", no_git = true"
 else
   cat > .apv-config.toml <<TOML
 # .apv-config.toml — committed project configuration for agent-plan-visualiser.
@@ -209,6 +282,16 @@ fi
 # contract, applied here).
 LAUNCHER_PATH="$DATA_DIR/bin/apv"
 LAUNCHER_OK=1
+SYMLINK_OK=0
+
+if [ "$NO_GIT" -eq 1 ]; then
+  # A shared folder carries the minimum surface: the shim's discovery ladder is
+  # git-aware and `serve` assumes git for its clean-check; the pointer file is
+  # machine-specific (T3-git-less-init §2.2, Q1 revisits the shim later).
+  report skipped "launcher ($LAUNCHER_PATH)" "--no-git: run the toolchain via \$APV (see the orientation block)"
+  report skipped "$DATA_DIR/.toolchain-home" "--no-git: nothing machine-specific is written into a shared folder"
+  LAUNCHER_OK=0
+else
 
 # Remove our comment+entry pairs from .gitignore. Pair-scoped: an entry is
 # only removed when immediately preceded by our exact comment line — a bare
@@ -397,11 +480,16 @@ if [ "$LAUNCHER_OK" -eq 1 ]; then
   fi
 fi
 
+fi  # NO_GIT: launcher, pointer and symlink skipped above
+
 # --- 4. gitignore the local per-checkout state -------------------------------
 # The stamp (guard), the pending-extract flag (extractor's post-commit half),
 # and the toolchain pointer are per-checkout local state; never tracked.
 # One line each, appended once. The shim and ./apv symlink are deliberately
 # NOT here — they are machine-independent and may be committed.
+if [ "$NO_GIT" -eq 1 ]; then
+  report skipped ".gitignore" "--no-git: no repository, nothing to ignore"
+else
 IGNORE_LINES=("$DATA_DIR/.last-capture" "$DATA_DIR/.pending-extract" "$DATA_DIR/.toolchain-home")
 IGNORED_ALL=1
 for LOCAL_LINE in "${IGNORE_LINES[@]}"; do
@@ -419,6 +507,7 @@ if [ "$IGNORED_ALL" -eq 1 ]; then
 else
   report created ".gitignore" "ignoring $IGNORE_DETAIL"
 fi
+fi  # NO_GIT
 
 # --- 5. hooks -----------------------------------------------------------------
 run_installer() { # run_installer <component> <cmd...>
@@ -440,7 +529,12 @@ run_installer() { # run_installer <component> <cmd...>
   fi
 }
 
-if [ "$AT" = "manual" ]; then
+if [ "$NO_GIT" -eq 1 ]; then
+  report skipped "git hooks" "--no-git: no hooks; run the checks on demand after every capture:"
+  echo "    | bash \"\$APV/scripts/repack-validate.sh\"      # validate, rebuild derived files, audits"
+  echo "    | python3 \"\$APV/scripts/gate-composite.py\"   # integrity composite (advisory here)"
+  echo "    | (\$APV = this toolchain: $TOOLCHAIN_HOME)"
+elif [ "$AT" = "manual" ]; then
   report skipped "git hooks" "--at=manual: no hooks; run the gate on demand:"
   echo "    | bash \"$TOOLCHAIN_HOME/scripts/gate-check.sh\" [--ref <committish>]"
   echo "    | (capture discipline is unenforced without the pre-commit guard)"
@@ -534,7 +628,9 @@ PY
           report created "$SETTINGS" "enabledPlugins[\"$PLUGIN_ID\"] = true" ;;
       esac
       if [ "$WROTE" != "invalid" ]; then
-        if git ls-files --error-unmatch "$SETTINGS" >/dev/null 2>&1; then
+        if [ "$NO_GIT" -eq 1 ]; then
+          report ok "$SETTINGS (synced)" "travels with the folder; every machine that syncs it loads the plugin"
+        elif git ls-files --error-unmatch "$SETTINGS" >/dev/null 2>&1; then
           report ok "$SETTINGS (tracked)" "worktree checkouts and clones will load the plugin"
         else
           report ACTION "$SETTINGS" "UNTRACKED — commit it, or worktree checkouts and clones will NOT load the plugin (no skills, no commands) while the git hooks still fire"
@@ -561,7 +657,61 @@ esac
 #        recovery path of last resort must outlive the machinery it recovers.
 APV_MD_MARKER="<!-- apv:orientation -->"
 APV_MD_END_MARKER="<!-- /apv:orientation -->"
+# Two bodies, one marker pair: the healing logic below keys on the markers
+# alone, so a folder that later gains a repository heals to the git text on
+# re-init (and vice versa). The git-less body names no commit, hook,
+# --no-verify, .last-capture or /apv-merge (T3-git-less-init §2.2 item 8).
 claude_md_block() {
+  if [ "$NO_GIT" -eq 1 ]; then claude_md_block_nogit; else claude_md_block_git; fi
+}
+claude_md_block_nogit() {
+  cat <<BLOCK
+$APV_MD_MARKER
+## agent-plan-visualiser (APV) tracking — git-less folder
+
+This folder is tracked by agent-plan-visualiser without a git repository.
+The append-only event log at \`$DATA_DIR/events.jsonl\` is the source of
+truth for planning state; plans and status prose are secondary. After each
+logical unit of work, follow the apv-capture skill to append one sealed
+block: it still ends in a \`commit.recorded\` **capture seal**, whose
+\`message_first_line\` is the block's one-line summary (there is no git
+commit to match), \`author\` is the actor, \`date\` the day. Then rebuild
+the derived files — whoever captures, rebuilds:
+\`bash "\$APV/scripts/repack-validate.sh"\` and
+\`python3 "\$APV/scripts/gate-composite.py"\` from this folder (no
+environment exports needed; \`\$APV\` is the plugin's toolchain directory,
+per the skill's section 0 — on Desktop/Cowork export \`APV_HOME\` quoted).
+Derived files (\`cache.sqlite\`, \`projection.json\`) live in a per-machine
+cache dir outside this folder; \`summary.md\` stays here so state is
+readable with nothing installed.
+
+There are no hooks and no merge ceremony here; integrity comes from running
+those two commands after every capture. **One writer at a time.** The
+folder syncs with no merge: if two agents append to \`events.jsonl\` while
+both copies are unsynced, the sync client writes a **conflicted copy**.
+Whoever finds one appends its new lines (only the lines not already in the
+main file, in their original order) to the main file, deletes the copy,
+re-runs the two commands, and records what happened in a \`decision\` event
+in their next block. Never auto-merge the log. Acceptance
+(\`entity.accepted\`) is a human ruling — agents never self-accept and never
+record implementation against a draft.
+
+This folder REQUIRES the agent-plan-visualiser plugin (the version floor is
+pinned in \`.apv-config.toml\` \`[requires]\`). The **skill**
+\`exfu-agent-plan-visualiser:apv-capture\` is the cross-client primitive;
+\`/apv-capture\` is only its Claude-Code slash alias and may be absent in
+Cowork/Desktop even when the skill is loaded. Before any work, confirm that
+skill is available. If NEITHER the skill nor the command is present, this
+session did not load the plugin — do NOT fabricate captures by hand. Load it:
+\`/plugin marketplace add https://github.com/ExFu/exfu-marketplace\` then
+\`/plugin install exfu-agent-plan-visualiser@exfu\`; or read the skill source and
+follow it directly — the newest
+\`~/.claude/plugins/cache/*/*agent-plan-visualiser/*/skills/apv-capture/SKILL.md\`
+(same pattern for using-agent-plan-visualiser).
+$APV_MD_END_MARKER
+BLOCK
+}
+claude_md_block_git() {
   cat <<BLOCK
 $APV_MD_MARKER
 ## agent-plan-visualiser (APV) tracking
@@ -720,7 +870,17 @@ fi
 
 # --- 7. next steps ------------------------------------------------------------
 echo
-if [ "$FAIL" -eq 0 ]; then
+if [ "$FAIL" -eq 0 ] && [ "$NO_GIT" -eq 1 ]; then
+  echo "apv-init: attached (git-less). Next steps:"
+  echo "  - Put the plans in planning/ (a planning/agent.md descriptor is fine — it is"
+  echo "    skipped by default; other non-plan content: .apv-ignore in a sub-folder,"
+  echo "    or 'apv: ignore' in a file's frontmatter)."
+  echo "  - Then capture your first block: follow the apv-capture skill; in a git-less"
+  echo "    folder the seal's message_first_line is your block summary."
+  echo "  - After every capture, from this folder:"
+  echo "      bash \"\$APV/scripts/repack-validate.sh\" && python3 \"\$APV/scripts/gate-composite.py\""
+  echo "  - One writer at a time; reconcile a conflicted copy of events.jsonl by hand."
+elif [ "$FAIL" -eq 0 ]; then
   echo "apv-init: attached. Next steps:"
   if [ "$NEEDS_SETTINGS_COMMIT" -eq 1 ]; then
     echo "  - COMMIT .claude/settings.json (plugin enablement): without it, worktree"

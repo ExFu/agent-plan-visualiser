@@ -29,6 +29,10 @@ abandoned work nor misses open threads.
 
 - **`/apv-init`** — once per repo: attach it (seed the data dir, write
   config, install the git hooks). Idempotent; re-run to audit and repair.
+  A plain synced folder with no repository attaches with `--no-git`
+  (explicit, never inferred): capture seals instead of commits, checks run
+  on demand, derived files kept outside the folder. One page:
+  `cheatsheet/git-less-mode.md`.
 - **`/apv-capture`** — after each logical unit of work, immediately
   **before every commit**: append one sealed event block. The installed
   pre-commit guard rejects uncaptured commits; `git commit --no-verify` is

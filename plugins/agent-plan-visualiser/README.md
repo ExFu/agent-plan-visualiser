@@ -35,6 +35,8 @@ succeeds but your first tracked commit halts with an explanatory error.)
 
 # 2. Attach a project (fresh or existing repo — attaches from now):
 /apv-init          # seeds .apv/, writes config, installs the git hooks
+#    Folder without git (a synced ExFu scope)? From its root:
+#    bash "$APV/scripts/apv-init.sh" --no-git   # see cheatsheet/git-less-mode.md
 
 # 3. Commit the plugin enablement with your first tracked commit:
 git add .claude/settings.json
