@@ -509,8 +509,20 @@ def check_drift(ctx):
     # checked; a plan id present in TWO roots is itself a defect (entity ids
     # are repo-global in the one-log model) and surfaces here as drift.
     seen_ids = {}
+    non_plan = apvlib.apv_non_plan_files(ctx.repo_root, getattr(ctx, "config_path", None))
     for root_name, root_dir in ctx.planning_roots:
-        for md in sorted(root_dir.glob("*.md")):
+        if not root_dir.is_dir():
+            continue
+        try:
+            listing = apvlib.plan_files(root_dir, non_plan)
+        except ValueError as e:  # the root itself carries .apv-ignore
+            instances.append(str(e))
+            continue
+        # Same three carve-outs as validate-plan-frontmatter.sh (T3-synced-
+        # folder-runtime §2.1): agent.md in two roots is not a duplicate plan.
+        # Files with an unknown apv: value are treated as plans here — the
+        # validator is what fails them.
+        for md in listing["plans"] + [p for p, _ in listing["bad_apv"]]:
             pid = md.stem
             if pid in seen_ids:
                 instances.append(
@@ -832,6 +844,7 @@ def main():
         return 2
 
     ctx = Ctx(repo_root, data_dir, planning_dir, planning_roots)
+    ctx.config_path = args.config  # the drift check reads [planning] through it
 
     n_block = n_warn = 0
     for cid in blocking_ids:

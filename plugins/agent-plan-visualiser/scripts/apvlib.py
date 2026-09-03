@@ -220,6 +220,97 @@ def apv_planning_dir(repo_root: Path, config_path=None) -> Path:
     return repo_root / "planning"
 
 
+# --- What counts as a plan file (T3-synced-folder-runtime §2.1) ------------
+# Fail-closed: every *.md directly under a planning root is a plan and must
+# validate, with exactly three carve-outs, checked in this order:
+#   1. a sub-folder holding a `.apv-ignore` marker is not planning content;
+#   2. a basename in `[planning] non_plan_files` (default: the ExFu folder
+#      descriptor `agent.md` and a folder `readme.md`) — for files that
+#      cannot carry frontmatter;
+#   3. a file whose own frontmatter says `apv: ignore`.
+# Anything else fails loudly downstream. The validator never learns what a
+# plan id looks like beyond what the schema enforces (operator ruling
+# 2026-09-03: baking the plan shape into the validator is fail-open).
+IGNORE_MARKER = ".apv-ignore"
+DEFAULT_NON_PLAN_FILES = ("agent.md", "readme.md")
+_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---(?:\n|\Z)", re.DOTALL)
+_APV_KEY_RE = re.compile(r"^apv:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+
+
+def apv_non_plan_files(repo_root: Path, config_path=None) -> set:
+    """Lower-cased basenames excluded from plan validation — `[planning]
+    non_plan_files` when set, else DEFAULT_NON_PLAN_FILES. Fail-loud on a
+    non-list value (a string would silently exclude nothing)."""
+    raw = (apv_config(repo_root, config_path).get("planning") or {}).get("non_plan_files")
+    if raw is None:
+        return {n.lower() for n in DEFAULT_NON_PLAN_FILES}
+    if not isinstance(raw, list) or not all(isinstance(x, str) and x.strip() for x in raw):
+        raise ValueError("[planning] non_plan_files must be an array of file names, "
+                         f"e.g. {list(DEFAULT_NON_PLAN_FILES)!r}")
+    return {x.strip().lower() for x in raw}
+
+
+def apv_dir_ignored(directory) -> bool:
+    """True when `directory` carries the `.apv-ignore` marker file."""
+    return (Path(directory) / IGNORE_MARKER).exists()
+
+
+def frontmatter_apv_key(path):
+    """The value of a top-level `apv:` key in the file's YAML frontmatter,
+    quotes stripped, or None when there is no frontmatter or no such key.
+    Regex on the head of the file — stdlib only, no pyyaml."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    m = _FRONTMATTER_RE.match(text)
+    if not m:
+        return None
+    k = _APV_KEY_RE.search(m.group(1))
+    return k.group(1).strip("'\"") if k else None
+
+
+def plan_files(root, non_plan_files) -> dict:
+    """Classify the direct children of one planning root.
+
+    Returns {"plans": [Path], "skipped": [(Path, reason)],
+    "unmarked_subdirs": [Path], "bad_apv": [(Path, value)]}.
+    `plans` must validate; `skipped` are the three carve-outs with their
+    reason text; `unmarked_subdirs` are sub-folders without the marker
+    (never scanned — plan ids are flat — but worth one notice so agents
+    learn the marker exists); `bad_apv` carry an `apv:` value other than
+    `ignore` and must FAIL (a typo cannot hide a plan). Dot-directories are
+    ignored silently (never planning content). Raises ValueError when the
+    ROOT itself carries the marker — a misconfiguration, not a carve-out."""
+    root = Path(root)
+    if apv_dir_ignored(root):
+        raise ValueError(f"planning root {root} carries {IGNORE_MARKER} — "
+                         "remove the marker or change planning_dir")
+    out = {"plans": [], "skipped": [], "unmarked_subdirs": [], "bad_apv": []}
+    for child in sorted(root.iterdir()):
+        if child.is_dir():
+            if child.name.startswith("."):
+                continue
+            if apv_dir_ignored(child):
+                out["skipped"].append((child, f"{IGNORE_MARKER} marker"))
+            else:
+                out["unmarked_subdirs"].append(child)
+            continue
+        if child.suffix != ".md":
+            continue
+        if child.name.lower() in non_plan_files:
+            out["skipped"].append((child, "listed non-plan file"))
+            continue
+        value = frontmatter_apv_key(child)
+        if value is None:
+            out["plans"].append(child)
+        elif value == "ignore":
+            out["skipped"].append((child, "frontmatter apv: ignore"))
+        else:
+            out["bad_apv"].append((child, value))
+    return out
+
+
 def _dir_prefix(entry, ctx: str) -> str:
     """Normalise an owned-dir carve-out entry to a repo-relative directory
     prefix with a trailing slash (the shape git's repo-relative paths match
