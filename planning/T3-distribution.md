@@ -123,3 +123,13 @@ Minor bump, deliberate: behaviour changes on two axes since 0.7.2. Derived files
 **Deliberately not built:** the Desktop plugin-path glob rung (quoted-`APV_HOME` guidance only, until a field report asks) and a launcher shim in git-less folders (revisit after the first git-less scope has run for a month). Both carried as stated leans in the two T3s.
 
 `[requires] apv_min_version` stays `0.6.4` per its own doctrine — raising it is the operator's call. The therapist-tool scope adopts the §7.1 addendum in [[T3-synced-folder-runtime]] only once this release is installed on both machines.
+
+## 12. Release 0.8.1 (2026-09-03) — dashboard draft status. **No re-attach required.**
+
+Patch bump: one fix to the served dashboard (`view/`), nothing on the capture, gate or extraction paths. `[requires] apv_min_version` stays `0.6.4`.
+
+**What the cut carries**
+
+- **fix:** the served dashboard didn't surface draft-vs-accepted plan status. The Board view's state list omitted `draft` entirely, `.badge.draft` had no colour rule (white-on-white wherever it rendered), and the header summary line never read the already-computed `draft_count`. All three fixed (`impl.dashboard-draft-status-visibility`).
+
+**Provenance.** The fix was built and captured on 2026-08-20 on a branch that also cut "0.8.0" with a §11 rolling up the five post-0.7.2 commits then on main (CLAUDE.md self-healing, the three Cowork-sync manifest corrections, the apv-serve port fallback). That branch never landed; the worktree was reused and the cut sat unnoticed until 0.8.0 shipped as the git-less release (§11). The August log block stands as record of the intent; the reconciliation ruling on the merge commit supersedes its version claim, and its release note is not carried — those five commits are already on main and ship in 0.8.0 by construction. Only the dashboard fix was new, hence a patch.
