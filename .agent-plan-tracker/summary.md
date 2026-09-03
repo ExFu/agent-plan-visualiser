@@ -1,6 +1,6 @@
-# Project state — generated 2026-09-03T15:28:59Z
+# Project state — generated 2026-09-03T15:55:56Z
 
-**Total events:** 758  ·  **Draft:** 24  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
+**Total events:** 761  ·  **Draft:** 24  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -45,11 +45,11 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 39 commit(s) ago)
-- `M7-git-less-scopes` (authored 2026-09-03, 1 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 146 commit(s) ago)
-- `T3-git-less-init` (authored 2026-09-03, 1 commit(s) ago)
-- `T3-synced-folder-runtime` (authored 2026-09-03, 1 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 40 commit(s) ago)
+- `M7-git-less-scopes` (authored 2026-09-03, 2 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 147 commit(s) ago)
+- `T3-git-less-init` (authored 2026-09-03, 2 commit(s) ago)
+- `T3-synced-folder-runtime` (authored 2026-09-03, 2 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
