@@ -29,6 +29,10 @@ abandoned work nor misses open threads.
 
 - **`/apv-init`** — once per repo: attach it (seed the data dir, write
   config, install the git hooks). Idempotent; re-run to audit and repair.
+  A plain synced folder with no repository attaches with `--no-git`
+  (explicit, never inferred): capture seals instead of commits, checks run
+  on demand, derived files kept outside the folder. One page:
+  `cheatsheet/git-less-mode.md`.
 - **`/apv-capture`** — after each logical unit of work, immediately
   **before every commit**: append one sealed event block. The installed
   pre-commit guard rejects uncaptured commits; `git commit --no-verify` is
@@ -88,9 +92,21 @@ authoritative over planning-root derivation. Procedure:
 `cheatsheet/worked-examples/assign-entity-to-project.md`.
 
 Inside it: `events.jsonl` (canonical, append-only — all integrity
-discipline applies here) plus derived, rebuildable artefacts
-(`cache.sqlite`, `projection.json`, `summary.md`) — never emit events about
-those. The toolchain itself (scripts, schemas, view) lives at the plugin
+discipline applies here) plus `summary.md` (derived, human-readable). The
+derived machine files (`cache.sqlite`, `projection.json`) sit beside them in
+a git repo and in a per-machine cache dir (`~/.cache/apv/<scope>-<hash>/`,
+printed by `repack-validate.sh` as `cache dir:`) when the data dir is not in
+a git work tree — a synced folder never receives SQLite. Never emit events
+about any derived file.
+
+**Non-plan content under `planning/`.** The plan validator is fail-closed:
+every `.md` directly under a planning root is a plan and must validate. Three
+routes, and only these, keep other content there: a `.apv-ignore` marker
+file in a sub-folder (nothing under it is planning content; an unmarked
+sub-folder gets a one-line NOTE pointing at the marker); `[planning]
+non_plan_files` in `.apv-config.toml` (default `agent.md`, `readme.md` — the
+ExFu folder descriptor cannot carry frontmatter); or `apv: ignore` in a
+file's own frontmatter. Agents, not humans, will usually add these. The toolchain itself (scripts, schemas, view) lives at the plugin
 install (`${CLAUDE_PLUGIN_ROOT}`), or vendored in-repo; it is code, not
 data, and never lives in the data dir.
 

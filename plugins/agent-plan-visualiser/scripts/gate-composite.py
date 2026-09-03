@@ -54,7 +54,6 @@ from pathlib import Path
 import apvlib
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # --- Ontology constants. MIRROR cache-build.py — keep the two in sync. ---
 STATE_FROM_EVENT = {
@@ -212,7 +211,8 @@ class Ctx:
         blocking checks never read the cache.)"""
         if self._cache_conn is not None:
             return self._cache_conn
-        cache_path = self.data_dir / "cache.sqlite"
+        cache_path = apvlib.apv_cache_path(
+            self.data_dir, self.repo_root, getattr(self, "config_path", None))
         stale = True
         if cache_path.exists():
             try:
@@ -510,8 +510,20 @@ def check_drift(ctx):
     # checked; a plan id present in TWO roots is itself a defect (entity ids
     # are repo-global in the one-log model) and surfaces here as drift.
     seen_ids = {}
+    non_plan = apvlib.apv_non_plan_files(ctx.repo_root, getattr(ctx, "config_path", None))
     for root_name, root_dir in ctx.planning_roots:
-        for md in sorted(root_dir.glob("*.md")):
+        if not root_dir.is_dir():
+            continue
+        try:
+            listing = apvlib.plan_files(root_dir, non_plan)
+        except ValueError as e:  # the root itself carries .apv-ignore
+            instances.append(str(e))
+            continue
+        # Same three carve-outs as validate-plan-frontmatter.sh (T3-synced-
+        # folder-runtime §2.1): agent.md in two roots is not a duplicate plan.
+        # Files with an unknown apv: value are treated as plans here — the
+        # validator is what fails them.
+        for md in listing["plans"] + [p for p, _ in listing["bad_apv"]]:
             pid = md.stem
             if pid in seen_ids:
                 instances.append(
@@ -783,7 +795,12 @@ def main():
     ap = argparse.ArgumentParser(
         description="Integrity composite: is this event log a trustworthy record?"
     )
-    ap.add_argument("--repo-root", type=Path, default=DEFAULT_REPO_ROOT)
+    # Default is the project being operated on (apvlib.repo_root: git
+    # toplevel → nearest .apv-config.toml → toolchain parent), resolved at
+    # invocation so the cwd decides. The old script-relative constant sent a
+    # flagless run from any non-dogfood project to `<toolchain>/../.apv`
+    # (T3-synced-folder-runtime §2.2). gate-check.sh still passes --repo-root.
+    ap.add_argument("--repo-root", type=Path, default=None)
     ap.add_argument("--config", type=Path, default=None,
                     help="path to .apv-config.toml (default: <repo-root>/.apv-config.toml; "
                          "explicit path must exist)")
@@ -797,7 +814,7 @@ def main():
     # Resolve every path to absolute up front: data_dir is re-exported as
     # APV_DATA_DIR into the cache-build subprocess (different cwd), where a
     # relative path would silently resolve against the wrong base.
-    repo_root = args.repo_root.resolve()
+    repo_root = (args.repo_root or apvlib.repo_root()).resolve()
     for name in ("config", "data_dir", "planning_dir"):
         v = getattr(args, name)
         if v is not None:
@@ -828,6 +845,7 @@ def main():
         return 2
 
     ctx = Ctx(repo_root, data_dir, planning_dir, planning_roots)
+    ctx.config_path = args.config  # the drift check reads [planning] through it
 
     n_block = n_warn = 0
     for cid in blocking_ids:

@@ -108,15 +108,18 @@ Documentation, identity and licensing only: no behaviour on the capture, gate or
 
 **Residual, outside this repo (operator legs):** the `exfu-marketplace` catalogue commit declaring Proprietary on every entry is **committed but unpushed**, so the licence this manifest asserts is not yet on the surface anyone installs from; and this machine's `known_marketplaces.json` still registers `exfu` under the old URL with `autoUpdate: true`, working only by GitHub's redirect. Carried as `2026-08-10.exfu-marketplace-rename-residuals`.
 
-## 11. Release 0.8.0 (2026-08-20) — Cowork sync fixes, CLAUDE.md self-healing, view/dashboard fixes. **No re-attach required.**
+## 11. Release 0.8.0 (2026-09-03) — git-less mode (M7). **No re-attach required.**
 
-Minor bump: one genuine feature landed alongside five fixes since 0.7.2, none of which touch `apv_min_version`-gated capture/gate/extraction behaviour, so no re-attach instruction is issued.
+Minor bump, deliberate: behaviour changes on two axes since 0.7.2. Derived files (`cache.sqlite`, its journal, `projection.json`) relocate to a per-machine cache directory outside the data dir whenever the data dir is not inside a git work tree; and the `sqlite3` CLI is no longer required anywhere on a live surface — audits run through Python's `sqlite3` module. Git-backed repos keep their layout unchanged (this repo's `cache.sqlite` still lands in `.agent-plan-tracker/`), so no re-attach instruction is issued.
 
-**What the cut carries**
+**What the cut carries** — milestone [[M7-git-less-scopes]], delivered by [[T3-synced-folder-runtime]] (T2-storage) and [[T3-git-less-init]] (T2-packaging), both closed on their §7 evidence:
 
-- **feat:** `apv-init` now heals a drifted CLAUDE.md orientation block on re-run instead of treating "marker present" as success — the one live surface APV writes that APV could never previously correct (`entity.created`/`entity.completed` under `T3-claude-md-block-healing`).
-- **fix:** three T3-distribution manifest/layout corrections chasing the Cowork marketplace sync failure — dropped non-schema manifest keys, nested the plugin tree at `plugins/agent-plan-visualiser` for git-subdir parity with sibling exfu plugins, and moved the dispatcher out of `bin/` (`claude.ai` rejects plugins shipping a top-level `bin/`).
-- **fix:** `apv serve` now falls back to the next free port on a collision instead of crashing, so a second `apv serve` in another repo/worktree no longer dies outright.
-- **fix:** the served dashboard (`view/`) didn't surface draft-vs-accepted plan status — the Board view's state list omitted `draft` entirely, `.badge.draft` had no colour rule (invisible white-on-white wherever it did render), and the header summary line never read the already-computed `draft_count`. All three fixed and verified live in the served view.
+- **feat:** project root resolves to the nearest `.apv-config.toml` when `git rev-parse` fails; the vendored-toolchain fallback stays last. A git-less folder needs no `APV_DATA_DIR`/`APV_PLANNING_DIR` exports.
+- **feat:** the plan-frontmatter validator is fail-closed over every registered planning root with exactly three carve-outs — an `.apv-ignore` marker in a sub-folder, `[planning] non_plan_files` (default `agent.md`, `readme.md`), and `apv: ignore` frontmatter.
+- **feat:** `apv init --no-git` attaches a plain folder explicitly and idempotently (operator ruling 2026-09-03: never inferred; the flag-less refusal names the flag). Git-less config template, orientation block and `cheatsheet/git-less-mode.md` ship with it; launcher shim and hooks are reported skipped.
+- **feat:** `repack-validate.sh` prints `cache dir:`; warnings fire for a leftover journal/`.tmp` and for stale derived files still beside the log.
+- **fix (in passing):** `tests/gate/run-gate-tests.sh` computed `REPO_ROOT` one directory short since the 2026-08-10 `plugins/` nesting; `gate-check.sh` ref mode now pins `APV_CACHE_DIR` to its temp dir instead of leaving a cache home behind per run.
 
-`[requires] apv_min_version` stays `0.6.4` per its own doctrine — none of this cut's fixes are on the capture/gate path a floor-raise would guard.
+**Deliberately not built:** the Desktop plugin-path glob rung (quoted-`APV_HOME` guidance only, until a field report asks) and a launcher shim in git-less folders (revisit after the first git-less scope has run for a month). Both carried as stated leans in the two T3s.
+
+`[requires] apv_min_version` stays `0.6.4` per its own doctrine — raising it is the operator's call. The therapist-tool scope adopts the §7.1 addendum in [[T3-synced-folder-runtime]] only once this release is installed on both machines.

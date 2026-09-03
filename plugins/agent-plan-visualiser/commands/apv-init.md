@@ -1,5 +1,5 @@
 ---
-description: Attach the current repository to agent-plan-visualiser tracking — seed the data dir, write the config, install the git hooks. Idempotent; re-run to audit and repair.
+description: Attach the current repository to agent-plan-visualiser tracking — seed the data dir, write the config, install the git hooks. Idempotent; re-run to audit and repair. With --no-git, attach a plain synced folder that has no repository.
 ---
 
 Attach the current repository to agent-plan-visualiser tracking (or audit an
@@ -16,6 +16,13 @@ it, relay its report, and handle the CLAUDE.md offer with the user.
    - `--at=pre-push` / `--at=ref-update` — install only that gate adapter.
    - `--at=manual` — install no git hooks; the gate runs on demand only
      (for hook-averse teams; capture discipline is then unenforced).
+   - `--no-git` — the folder has no repository (a Dropbox-synced ExFu
+     scope, say). Run it from the folder's root. Explicit only: init never
+     infers git-less mode from a missing `.git`, and refuses the flag inside
+     a repository. Writes the data dir and a git-less `.apv-config.toml`
+     (`no_git = true`, `planning_dir = "planning"`); no launcher, no hooks,
+     no `.gitignore`, nothing machine-specific. Cannot be combined with
+     `--at` or `--with-extractor`.
 
 2. Relay the per-component report to the user faithfully — created / ok /
    REFUSED lines included. A REFUSED hook means a foreign hook already
@@ -38,6 +45,13 @@ it, relay its report, and handle the CLAUDE.md offer with the user.
    before each commit; branches land on main via /apv-merge; pre-init
    history is not mined (backfill is a separate opt-in step, not yet part
    of this flow).
+
+   Git-less folder (`--no-git`): the seal is a **capture seal** (its
+   `message_first_line` is the block's one-line summary — no commit to
+   match); after every capture run `repack-validate.sh` and
+   `gate-composite.py` from the folder; one writer at a time, conflicted
+   copies of `events.jsonl` are reconciled by hand. The orientation block
+   the script offers says all of this for cold agents.
 
 5. Monorepo with sub-projects? The generated config carries a commented
    `[projects.<name>]` registry template (planning root + owned-dir

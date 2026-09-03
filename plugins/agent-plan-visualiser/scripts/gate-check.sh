@@ -156,7 +156,10 @@ if [ -n "$REF" ]; then
     exit 0
   fi
   echo "== integrity composite ($SHA)"
-  "${COMPOSITE[@]}" --data-dir "$TMP"
+  # The extracted log sits in a temp dir outside any work tree; without the
+  # pin its derived cache would relocate to ~/.cache/apv/T-<hash>/ on every
+  # gate run (apvlib.apv_cache_dir). Keep it beside the copy, gone with it.
+  APV_CACHE_DIR="$TMP" "${COMPOSITE[@]}" --data-dir "$TMP"
   COMP_CODE=$?
   echo "== seal-commit correspondence ($SHA, strict)"
   TOTAL=$(($(wc -l < "$TMP/events.jsonl")))  # $((...)) strips wc's padding

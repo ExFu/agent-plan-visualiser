@@ -5,7 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")" || exit 2
 GATE="../../scripts/gate-composite.py"
-REPO_ROOT="$(cd ../../.. && pwd)"
+REPO_ROOT="$(cd ../../../.. && pwd)"  # tests/gate -> tests -> agent-plan-visualiser -> plugins -> repo root
 FAIL=0
 
 # Fixture caches are derived — rebuild from scratch every run so a stale
@@ -138,6 +138,7 @@ check_absent "fulcrum check stays clean"        '^BLOCK \[fulcrum-without-decisi
 # --- Case 2: drift fixture, default config (§4.3) ------------------------
 # Stale frontmatter is advisory: warn reported, exit 0.
 run_case "drift fixture / default config" fixture-drift config-default.toml
+check_absent "agent.md is not a plan"             "plan 'agent'"
 check "exit 0"                                  [ "$CODE" -eq 0 ]
 check_absent "no BLOCK lines"                   '^BLOCK'
 check "WARN [drift] names the stale seed"       grep -q "^WARN \[drift\].*'FIX-T2-OLD'.*FIX-T2-NEW" <<<"$OUT"
@@ -151,6 +152,7 @@ echo "== drift across registered roots (config-resolved, no --planning-dir)"
 mkdir -p fixture-drift-planning-b
 cp fixture-drift-planning/FIX-D3.md fixture-drift-planning-b/FIX-D3.md
 OUT="$(python3 "$GATE" --repo-root . --data-dir fixture-drift --config config-projects.toml 2>&1)"
+check_absent "agent.md is not a plan"             "plan 'agent'"
 CODE=$?
 rm -rf fixture-drift-planning-b
 check "exit 0 (warn-only)"                      [ "$CODE" -eq 0 ]
@@ -171,6 +173,7 @@ check "sealed-tail surfaces as WARN"            grep -q '^WARN \[sealed-tail\]' 
 # --- Case 4: config flip, warn -> blocking (§4.4) ------------------------
 # drift promoted: the drift fixture now fails the gate.
 run_case "drift fixture / drift promoted to blocking" fixture-drift config-flip-drift-blocking.toml
+check_absent "agent.md is not a plan"             "plan 'agent'"
 check "exit 1"                                  [ "$CODE" -eq 1 ]
 check "BLOCK [drift] present"                   grep -q '^BLOCK \[drift\]' <<<"$OUT"
 

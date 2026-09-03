@@ -21,8 +21,8 @@ sub-projects (retrospectively, incl. closed entities):
 
 ```bash
 cat "$DATA/summary.md"                 # human-readable rollup (derived)
-sqlite3 "$DATA/cache.sqlite" \
-  "SELECT entity_id, derived_state FROM entities ORDER BY entity_id;"
+printf '%s' "SELECT entity_id, derived_state FROM entities ORDER BY entity_id;" \
+  | python3 "$APV/scripts/audit-run.py" -   # Python sqlite3; no CLI needed
 ```
 
 Stale or missing? Rebuild the whole derived chain:
@@ -34,9 +34,9 @@ bash "$APV/scripts/repack-validate.sh"   # validate → cache → projection →
 ## Audit queries
 
 ```bash
-sqlite3 "$DATA/cache.sqlite" < "$APV/scripts/audit-stalled.sql"                  # live but quiet
-sqlite3 "$DATA/cache.sqlite" < "$APV/scripts/audit-orphans.sql"                  # parent closed, child live
-sqlite3 "$DATA/cache.sqlite" < "$APV/scripts/audit-fulcrum-without-decision.sql" # missing rationale
+python3 "$APV/scripts/audit-run.py" "$APV/scripts/audit-stalled.sql"                  # live but quiet
+python3 "$APV/scripts/audit-run.py" "$APV/scripts/audit-orphans.sql"                  # parent closed, child live
+python3 "$APV/scripts/audit-run.py" "$APV/scripts/audit-fulcrum-without-decision.sql" # missing rationale
 ```
 
 One entity's full history, or a decision's trace:

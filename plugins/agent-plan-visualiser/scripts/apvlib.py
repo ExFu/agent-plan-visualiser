@@ -85,13 +85,21 @@ def apv_config(repo_root: Path, config_path=None) -> dict:
 
 
 def repo_root() -> Path:
-    """The repo being OPERATED ON: the enclosing repo of the cwd, falling
-    back to the toolchain's own repo (the vendored/dogfood case). The
-    toolchain may live in the plugin cache, far from any tracked repo —
-    a `parents[2]` default there points data resolution at the wrong tree
-    (the same trap gate-check's repo-root default fixed in M4). Toolchain
-    CONTENT (schemas, view) is never resolved through this — that stays
-    relative to the script's own location."""
+    """The project being OPERATED ON, resolved in three rungs:
+
+    1. the enclosing git repo of the cwd (`git rev-parse --show-toplevel`);
+    2. else the nearest ancestor of the cwd (cwd included) that holds
+       `.apv-config.toml` — the config lives at the project root by rule,
+       so it is the root marker when there is no git (a synced folder,
+       T3-synced-folder-runtime §2.2 / M7 §2.2);
+    3. else the toolchain's own repo (the vendored/dogfood case).
+
+    The toolchain may live in the plugin cache, far from any tracked
+    project — rung 3 there points data resolution at the wrong tree (the
+    same trap gate-check's repo-root default fixed in M4), which is why
+    rung 2 sits before it. Toolchain CONTENT (schemas, view) is never
+    resolved through this — that stays relative to the script's own
+    location."""
     import subprocess
     try:
         out = subprocess.run(
@@ -102,7 +110,29 @@ def repo_root() -> Path:
             return Path(out.stdout.strip())
     except OSError:
         pass
+    cwd = Path.cwd().resolve()
+    for candidate in (cwd, *cwd.parents):
+        if (candidate / ".apv-config.toml").is_file():
+            return candidate
     return Path(__file__).resolve().parents[2]
+
+
+def in_git_work_tree(path) -> bool:
+    """True when `path` (or its nearest existing ancestor) is inside a git
+    work tree. Decided from the PATH, not the cwd: callers ask about the
+    data dir, which may sit far from where the script was invoked."""
+    import subprocess
+    p = Path(path).resolve()
+    while not p.exists() and p != p.parent:
+        p = p.parent
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(p), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True,
+        )
+        return out.returncode == 0 and out.stdout.strip() == "true"
+    except OSError:
+        return False
 
 
 # Headless extractor isolation (backfill.py + extract-commit.py). Two real-run
@@ -188,6 +218,169 @@ def apv_planning_dir(repo_root: Path, config_path=None) -> Path:
         p = Path(cfg_dir)
         return p if p.is_absolute() else repo_root / p
     return repo_root / "planning"
+
+
+# --- Where derived files live (T3-synced-folder-runtime §2.3/§2.4) ----------
+# cache.sqlite (+ journal) and projection.json are derived — rebuilt from
+# events.jsonl on every run (T2-storage §3.1 trust hierarchy). Every consumer
+# resolves their location through these three functions, never by hand.
+
+def _cache_leaf(data_dir: Path) -> str:
+    """Stable per-project id for the per-machine cache: the scope's folder
+    name (human-findable) + 12 hex of sha256 over the resolved absolute data
+    dir (unique per machine path — two machines syncing the same folder each
+    get their own)."""
+    import hashlib
+    resolved = Path(data_dir).resolve()
+    digest = hashlib.sha256(str(resolved).encode("utf-8")).hexdigest()[:12]
+    return f"{resolved.parent.name or 'apv'}-{digest}"
+
+
+def apv_cache_dir(data_dir, repo_root=None, config_path=None) -> Path:
+    """The directory holding the derived cache files for `data_dir`.
+
+    Precedence (mirrors apv_data_dir):
+      1. APV_CACHE_DIR env var (absolute, or relative to repo_root);
+      2. `.apv-config.toml` `[storage] cache_dir` (same);
+      3. else, when `[storage] no_git = true` is declared OR the data dir is
+         not inside a git work tree (decided from the DATA DIR's location,
+         not the cwd, so subprocesses agree): the per-machine default
+         `${XDG_CACHE_HOME:-~/.cache}/apv/<scope>-<hash>/`, created on
+         demand; if that cannot be created, `<tempdir>/apv/<scope>-<hash>/`
+         with one stderr line saying so. Never the data dir: a synced
+         folder must not receive SQLite files (M7 §2.1);
+      4. else (a git repo): the data dir itself — unchanged layout, including
+         the dogfood repo's committed cache.sqlite.
+    """
+    import sys
+    import tempfile
+    data_dir = Path(data_dir)
+    root = Path(repo_root) if repo_root is not None else data_dir.parent
+
+    override = os.environ.get("APV_CACHE_DIR")
+    if override:
+        p = Path(override)
+        return p if p.is_absolute() else root / p
+    storage = apv_config(root, config_path).get("storage") or {}
+    cfg_dir = storage.get("cache_dir")
+    if cfg_dir:
+        p = Path(cfg_dir)
+        return p if p.is_absolute() else root / p
+
+    declared_no_git = storage.get("no_git") is True
+    if not declared_no_git and in_git_work_tree(data_dir):
+        return data_dir
+
+    leaf = _cache_leaf(data_dir)
+    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    preferred = Path(base) / "apv" / leaf
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        return preferred
+    except OSError:
+        fallback = Path(tempfile.gettempdir()) / "apv" / leaf
+        fallback.mkdir(parents=True, exist_ok=True)  # raises if even this fails
+        print(f"apv: cache dir {preferred} not writable; using {fallback}", file=sys.stderr)
+        return fallback
+
+
+def apv_cache_path(data_dir, repo_root=None, config_path=None) -> Path:
+    return apv_cache_dir(data_dir, repo_root, config_path) / "cache.sqlite"
+
+
+def apv_projection_path(data_dir, repo_root=None, config_path=None) -> Path:
+    return apv_cache_dir(data_dir, repo_root, config_path) / "projection.json"
+
+
+# --- What counts as a plan file (T3-synced-folder-runtime §2.1) ------------
+# Fail-closed: every *.md directly under a planning root is a plan and must
+# validate, with exactly three carve-outs, checked in this order:
+#   1. a sub-folder holding a `.apv-ignore` marker is not planning content;
+#   2. a basename in `[planning] non_plan_files` (default: the ExFu folder
+#      descriptor `agent.md` and a folder `readme.md`) — for files that
+#      cannot carry frontmatter;
+#   3. a file whose own frontmatter says `apv: ignore`.
+# Anything else fails loudly downstream. The validator never learns what a
+# plan id looks like beyond what the schema enforces (operator ruling
+# 2026-09-03: baking the plan shape into the validator is fail-open).
+IGNORE_MARKER = ".apv-ignore"
+DEFAULT_NON_PLAN_FILES = ("agent.md", "readme.md")
+_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---(?:\n|\Z)", re.DOTALL)
+_APV_KEY_RE = re.compile(r"^apv:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+
+
+def apv_non_plan_files(repo_root: Path, config_path=None) -> set:
+    """Lower-cased basenames excluded from plan validation — `[planning]
+    non_plan_files` when set, else DEFAULT_NON_PLAN_FILES. Fail-loud on a
+    non-list value (a string would silently exclude nothing)."""
+    raw = (apv_config(repo_root, config_path).get("planning") or {}).get("non_plan_files")
+    if raw is None:
+        return {n.lower() for n in DEFAULT_NON_PLAN_FILES}
+    if not isinstance(raw, list) or not all(isinstance(x, str) and x.strip() for x in raw):
+        raise ValueError("[planning] non_plan_files must be an array of file names, "
+                         f"e.g. {list(DEFAULT_NON_PLAN_FILES)!r}")
+    return {x.strip().lower() for x in raw}
+
+
+def apv_dir_ignored(directory) -> bool:
+    """True when `directory` carries the `.apv-ignore` marker file."""
+    return (Path(directory) / IGNORE_MARKER).exists()
+
+
+def frontmatter_apv_key(path):
+    """The value of a top-level `apv:` key in the file's YAML frontmatter,
+    quotes stripped, or None when there is no frontmatter or no such key.
+    Regex on the head of the file — stdlib only, no pyyaml."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    m = _FRONTMATTER_RE.match(text)
+    if not m:
+        return None
+    k = _APV_KEY_RE.search(m.group(1))
+    return k.group(1).strip("'\"") if k else None
+
+
+def plan_files(root, non_plan_files) -> dict:
+    """Classify the direct children of one planning root.
+
+    Returns {"plans": [Path], "skipped": [(Path, reason)],
+    "unmarked_subdirs": [Path], "bad_apv": [(Path, value)]}.
+    `plans` must validate; `skipped` are the three carve-outs with their
+    reason text; `unmarked_subdirs` are sub-folders without the marker
+    (never scanned — plan ids are flat — but worth one notice so agents
+    learn the marker exists); `bad_apv` carry an `apv:` value other than
+    `ignore` and must FAIL (a typo cannot hide a plan). Dot-directories are
+    ignored silently (never planning content). Raises ValueError when the
+    ROOT itself carries the marker — a misconfiguration, not a carve-out."""
+    root = Path(root)
+    if apv_dir_ignored(root):
+        raise ValueError(f"planning root {root} carries {IGNORE_MARKER} — "
+                         "remove the marker or change planning_dir")
+    out = {"plans": [], "skipped": [], "unmarked_subdirs": [], "bad_apv": []}
+    for child in sorted(root.iterdir()):
+        if child.is_dir():
+            if child.name.startswith("."):
+                continue
+            if apv_dir_ignored(child):
+                out["skipped"].append((child, f"{IGNORE_MARKER} marker"))
+            else:
+                out["unmarked_subdirs"].append(child)
+            continue
+        if child.suffix != ".md":
+            continue
+        if child.name.lower() in non_plan_files:
+            out["skipped"].append((child, "listed non-plan file"))
+            continue
+        value = frontmatter_apv_key(child)
+        if value is None:
+            out["plans"].append(child)
+        elif value == "ignore":
+            out["skipped"].append((child, "frontmatter apv: ignore"))
+        else:
+            out["bad_apv"].append((child, value))
+    return out
 
 
 def _dir_prefix(entry, ctx: str) -> str:

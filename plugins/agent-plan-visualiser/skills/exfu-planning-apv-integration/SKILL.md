@@ -13,7 +13,7 @@ You define what to check before a delegate runs, and how accepted delegated work
 
 1. Resolve `DATA_DIR` by APV doctrine, in order: `APV_DATA_DIR` env var → the repo's committed `.apv-config.toml` `[storage] data_dir` (most repos set this; e.g. `.apv` or `.agent-plan-tracker`) → the historical default `.agent-plan-tracker/`. The resolved dir must contain `events.jsonl`; otherwise this repo isn't APV-tracked — tell the core to proceed without capture.
 2. **Draft gate (implement mode only)**: the brief's subject plan must not be `draft` —
-   `sqlite3 $DATA_DIR/cache.sqlite "SELECT derived_state FROM entities WHERE entity_id='<id>';"` (stale/no cache → scan the log tail for the entity's lifecycle events). `draft` → REFUSE the delegation; the operator must run the acceptance ceremony first. Never self-accept. Audit and review modes are exempt — judging a draft is legitimate; implementing against one is not.
+   `printf '%s' "SELECT derived_state FROM entities WHERE entity_id='<id>';" | python3 "$APV/scripts/audit-run.py" -` (no `sqlite3` CLI needed; `$APV` per apv-capture §0) (stale/no cache → scan the log tail for the entity's lifecycle events). `draft` → REFUSE the delegation; the operator must run the acceptance ceremony first. Never self-accept. Audit and review modes are exempt — judging a draft is legitimate; implementing against one is not.
 3. **Protected paths**: declare `$DATA_DIR/events.jsonl` (and `$DATA_DIR/` generally) to the core's integrity snapshot via the manifest's `[integrity] protected_paths`. The delegate must never touch the record — the core enforces this by snapshot comparison; you supply the paths.
 
 ## 2. Post-return capture (after the orchestrator has independently accepted the work)

@@ -9,7 +9,8 @@ actually happened; the gap between the two is signal.
 
 ## Before you start
 
-APV runs on `bash`, `git`, `python3` (3.11+) and `sqlite3` — all standard on
+APV runs on `bash`, `git` and `python3` (3.11+; its stdlib `sqlite3` module
+covers the cache and audits — no `sqlite3` CLI needed) — all standard on
 macOS and Linux. It also needs the `jsonschema` Python package: the extractor
 validates every event before appending it, and **fails closed** if the package
 is missing, so install it before step 2:
@@ -34,6 +35,8 @@ succeeds but your first tracked commit halts with an explanatory error.)
 
 # 2. Attach a project (fresh or existing repo — attaches from now):
 /apv-init          # seeds .apv/, writes config, installs the git hooks
+#    Folder without git (a synced ExFu scope)? From its root:
+#    bash "$APV/scripts/apv-init.sh" --no-git   # see cheatsheet/git-less-mode.md
 
 # 3. Commit the plugin enablement with your first tracked commit:
 git add .claude/settings.json
@@ -91,11 +94,26 @@ defined ontology (entities, lifecycle, decisions-as-arc-metadata, blockers,
 verification, relationships), sealed by the commit message. The full design
 rationale ships in `philosophies/`.
 
+## Where derived files live
+
+`events.jsonl` (the record) and `summary.md` (the human digest) always sit
+in the data dir. The derived machine files — `cache.sqlite`, its journal and
+`projection.json` — sit beside them in a git repository, and **outside the
+folder** when the data dir is not inside a git work tree (a Dropbox-synced
+ExFu scope, say): `${XDG_CACHE_HOME:-~/.cache}/apv/<scope>-<hash>/`, created
+on demand. Some synced mounts cannot lock SQLite, and two machines rebuilding
+the same file produce conflicted copies; the record must never be exposed to
+either. `repack-validate.sh` prints the resolved `cache dir:` on every run.
+Override with `APV_CACHE_DIR` or `[storage] cache_dir`; declare a folder
+git-less with `[storage] no_git = true` to force the out-of-tree default even
+inside someone's checkout. If the cache home cannot be created, the temp dir
+is used and a line on stderr says so — the data dir is never the fallback.
+
 ## Requirements
 
-`bash`, `git`, `python3` (3.11+; stdlib only for the gate; `jsonschema` — or
-`check-jsonschema` — for full pipeline validation), `sqlite3` for the cache
-and audits. See [Before you start](#before-you-start) for the install command.
+`bash`, `git`, `python3` (3.11+; stdlib only for the gate, cache and audits;
+`jsonschema` — or `check-jsonschema` — for full pipeline validation). The
+`sqlite3` CLI is optional: handy for ad-hoc queries, required by nothing. See [Before you start](#before-you-start) for the install command.
 
 ## License
 

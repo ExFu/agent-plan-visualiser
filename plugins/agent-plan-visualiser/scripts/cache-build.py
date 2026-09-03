@@ -8,6 +8,7 @@
 """
 import datetime
 import json
+import os
 import sqlite3
 import subprocess
 from pathlib import Path
@@ -20,7 +21,7 @@ PLANNING_DIR = apvlib.apv_planning_dir(REPO_ROOT)
 PLANNING_ROOTS = apvlib.apv_planning_roots(REPO_ROOT)
 HAS_REGISTRY = bool(apvlib.apv_projects(REPO_ROOT))
 EVENTS = DATA_DIR / "events.jsonl"
-CACHE = DATA_DIR / "cache.sqlite"
+CACHE = apvlib.apv_cache_path(DATA_DIR, REPO_ROOT)
 # Toolchain content resolves against THIS script's home, never the target
 # repo — on a plugin install the schemas live in the plugin cache.
 SCHEMA_DDL = Path(__file__).resolve().parents[1] / "schemas/0.6.0/cache.schema.sql"
@@ -81,7 +82,14 @@ def init_db(conn):
 
 
 def resolve_blame():
-    """Returns dict {line_no: (commit_ref, author, iso_date, summary)} or empty on error."""
+    """Returns dict {line_no: (commit_ref, author, iso_date, summary)} or empty on error.
+
+    Outside a git work tree (a synced folder, M7-git-less-scopes) there is
+    nothing to blame: return {} without invoking git, so the run's stderr
+    carries no `fatal: not a git repository` — commit_ref stays NULL exactly
+    as it does on any other blame failure."""
+    if not apvlib.in_git_work_tree(EVENTS.parent):
+        return {}
     try:
         out = subprocess.check_output(
             ["git", "blame", "--line-porcelain", str(EVENTS)],
@@ -122,7 +130,14 @@ def resolve_blame():
 
 def main():
     events = load_events()
-    conn = sqlite3.connect(CACHE)
+    # Build into a sibling .tmp and os.replace() it into place: a failed build
+    # leaves cache.sqlite.tmp, never a hot -journal beside the log, and readers
+    # never see a half-written cache (T3-synced-folder-runtime §2.4).
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CACHE.with_name(CACHE.name + ".tmp")
+    if tmp.exists():
+        tmp.unlink()
+    conn = sqlite3.connect(tmp)
     init_db(conn)
     blame = resolve_blame()
 
@@ -518,6 +533,7 @@ def main():
                   "summaries")
     }
     conn.close()
+    os.replace(tmp, CACHE)
     print(f"cache built: {counts}")
 
 

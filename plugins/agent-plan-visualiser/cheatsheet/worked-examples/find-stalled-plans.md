@@ -4,7 +4,7 @@
 progressed and then went quiet.
 
 ```bash
-sqlite3 "$DATA/cache.sqlite" < "$APV/scripts/audit-stalled.sql"
+python3 "$APV/scripts/audit-run.py" "$APV/scripts/audit-stalled.sql"
 ```
 
 Reading the output: each row is a live entity with its last event date.

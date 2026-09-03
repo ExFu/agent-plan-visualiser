@@ -22,9 +22,24 @@ if [ -z "$APV" ]; then
   R="$(git rev-parse --show-toplevel 2>/dev/null)"
   [ -n "$R" ] && [ -d "$R/plugins/agent-plan-visualiser/scripts" ] && APV="$R/plugins/agent-plan-visualiser"
 fi
-[ -n "$APV" ] || APV="$(ls -d "$HOME"/.claude/plugins/cache/*/*agent-plan-visualiser/*/ 2>/dev/null | sort -V | tail -1)"
+# Newest plugin-cache install; space-safe (Desktop/Cowork plugin roots live
+# under "~/Library/Application Support/…", so never `ls | sort | tail`).
+[ -n "$APV" ] || APV="$(python3 - <<'PY'
+import glob, os, re
+cands = glob.glob(os.path.expanduser("~/.claude/plugins/cache/*/*agent-plan-visualiser/*/"))
+def ver(p): return [int(x) if x.isdigit() else 0 for x in re.split(r"[.-]", p.rstrip("/").rsplit("/", 1)[-1])]
+print(sorted(cands, key=ver)[-1].rstrip("/") if cands else "")
+PY
+)"
 [ -n "$APV" ] || { echo "APV toolchain not found — set APV_HOME"; exit 2; }
 ```
+
+**Desktop / Cowork sessions**: `CLAUDE_PLUGIN_ROOT` reaches hooks, not your
+shell, and the plugin-cache glob above does not know the Desktop app's plugin
+path. When the session-start orientation line printed `sources at <path>/skills/<name>/SKILL.md`,
+`APV_HOME` is that `<path>` — export it **quoted** before the block above
+(`export APV_HOME="/Users/…/Application Support/Claude/…/plugin_…"`; the path
+contains a space), and quote `"$APV"` in every command that follows.
 
 - `DATA_DIR` = `$APV_DATA_DIR` if set (absolute, or relative to repo root), else `.apv-config.toml` `[storage] data_dir`, else `.apv/`. (This repo's own dogfood log pins the pre-rename `.agent-plan-tracker/` through that config — it is not the default.)
 - Events file: `$DATA_DIR/events.jsonl`. Never create it implicitly — if it doesn't exist, stop and ask the operator (the project may not be initialised).
@@ -115,7 +130,7 @@ fi
 **No implementation work may be recorded against a `draft` entity.** Before emitting `entity.progressed` **or `entity.completed`** (both record implementation work — a draft must not be progressed *or* sealed closed unreviewed), check the entity's current derived state:
 
 ```bash
-sqlite3 "$DATA_DIR/cache.sqlite" "SELECT derived_state FROM entities WHERE entity_id='<id>';"
+printf '%s' "SELECT derived_state FROM entities WHERE entity_id='<id>';" | python3 "$APV/scripts/audit-run.py" -
 ```
 
 (If the cache is stale, rebuild via `python3 "$APV/scripts/cache-build.py"`, or scan the entity's event history in the log tail.)
@@ -156,7 +171,7 @@ with open(EVENTS_PATH, "a") as f:
 2. Sanity-check derived states for the entities your block touched — closures show `closed`, new untriaged items show `draft`:
 
 ```bash
-sqlite3 "$DATA_DIR/cache.sqlite" "SELECT entity_id, derived_state FROM entities WHERE entity_id IN ('<id1>','<id2>');"
+printf '%s' "SELECT entity_id, derived_state FROM entities WHERE entity_id IN ('<id1>','<id2>');" | python3 "$APV/scripts/audit-run.py" -
 ```
 
 3. Write the capture timestamp — **the very last action**, consumed by the capture-guard pre-commit hook (gitignored local state):
