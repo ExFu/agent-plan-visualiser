@@ -29,19 +29,23 @@ run_step() {
 # gate-check.sh makes. (The old `cd "$(dirname "$0")/../.."` assumed the
 # toolchain was vendored one level under a repo root, true only in dogfood.)
 TOOLCHAIN="$(cd "$(dirname "$0")/.." && pwd)"
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$REPO_ROOT" || exit 2
 
-# Data dir via apvlib (APV_DATA_DIR -> .apv-config.toml -> .apv/), matching
-# what the Python steps resolve for themselves.
-DATA_DIR="$(python3 - "$TOOLCHAIN/scripts" "$REPO_ROOT" <<'PYEOF'
+# Repo root and data dir via apvlib (root: git toplevel -> nearest
+# .apv-config.toml -> toolchain parent; data: APV_DATA_DIR -> config ->
+# .apv/), so this wrapper and the Python steps agree on where the project
+# is — including a synced folder with no git (M7-git-less-scopes).
+RESOLVED="$(python3 - "$TOOLCHAIN/scripts" <<'PYEOF'
 import sys
-from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import apvlib
-print(apvlib.apv_data_dir(Path(sys.argv[2])))
+root = apvlib.repo_root()
+print(root)
+print(apvlib.apv_data_dir(root))
 PYEOF
-)" || { echo "repack-validate: could not resolve the data dir" >&2; exit 2; }
+)" || { echo "repack-validate: could not resolve the repo root / data dir" >&2; exit 2; }
+REPO_ROOT="$(printf '%s\n' "$RESOLVED" | sed -n 1p)"
+DATA_DIR="$(printf '%s\n' "$RESOLVED" | sed -n 2p)"
+cd "$REPO_ROOT" || exit 2
 
 run_step "validate events.jsonl"          bash "$TOOLCHAIN/scripts/validate-events.sh"           || exit 1
 run_step "validate plan frontmatter"      bash "$TOOLCHAIN/scripts/validate-plan-frontmatter.sh" || exit 1

@@ -81,7 +81,14 @@ def init_db(conn):
 
 
 def resolve_blame():
-    """Returns dict {line_no: (commit_ref, author, iso_date, summary)} or empty on error."""
+    """Returns dict {line_no: (commit_ref, author, iso_date, summary)} or empty on error.
+
+    Outside a git work tree (a synced folder, M7-git-less-scopes) there is
+    nothing to blame: return {} without invoking git, so the run's stderr
+    carries no `fatal: not a git repository` — commit_ref stays NULL exactly
+    as it does on any other blame failure."""
+    if not apvlib.in_git_work_tree(EVENTS.parent):
+        return {}
     try:
         out = subprocess.check_output(
             ["git", "blame", "--line-porcelain", str(EVENTS)],

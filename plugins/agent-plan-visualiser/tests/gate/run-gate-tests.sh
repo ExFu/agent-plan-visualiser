@@ -5,7 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")" || exit 2
 GATE="../../scripts/gate-composite.py"
-REPO_ROOT="$(cd ../../.. && pwd)"
+REPO_ROOT="$(cd ../../../.. && pwd)"  # tests/gate -> tests -> agent-plan-visualiser -> plugins -> repo root
 FAIL=0
 
 # Fixture caches are derived — rebuild from scratch every run so a stale

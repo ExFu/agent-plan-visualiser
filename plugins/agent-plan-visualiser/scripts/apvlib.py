@@ -85,13 +85,21 @@ def apv_config(repo_root: Path, config_path=None) -> dict:
 
 
 def repo_root() -> Path:
-    """The repo being OPERATED ON: the enclosing repo of the cwd, falling
-    back to the toolchain's own repo (the vendored/dogfood case). The
-    toolchain may live in the plugin cache, far from any tracked repo —
-    a `parents[2]` default there points data resolution at the wrong tree
-    (the same trap gate-check's repo-root default fixed in M4). Toolchain
-    CONTENT (schemas, view) is never resolved through this — that stays
-    relative to the script's own location."""
+    """The project being OPERATED ON, resolved in three rungs:
+
+    1. the enclosing git repo of the cwd (`git rev-parse --show-toplevel`);
+    2. else the nearest ancestor of the cwd (cwd included) that holds
+       `.apv-config.toml` — the config lives at the project root by rule,
+       so it is the root marker when there is no git (a synced folder,
+       T3-synced-folder-runtime §2.2 / M7 §2.2);
+    3. else the toolchain's own repo (the vendored/dogfood case).
+
+    The toolchain may live in the plugin cache, far from any tracked
+    project — rung 3 there points data resolution at the wrong tree (the
+    same trap gate-check's repo-root default fixed in M4), which is why
+    rung 2 sits before it. Toolchain CONTENT (schemas, view) is never
+    resolved through this — that stays relative to the script's own
+    location."""
     import subprocess
     try:
         out = subprocess.run(
@@ -102,7 +110,29 @@ def repo_root() -> Path:
             return Path(out.stdout.strip())
     except OSError:
         pass
+    cwd = Path.cwd().resolve()
+    for candidate in (cwd, *cwd.parents):
+        if (candidate / ".apv-config.toml").is_file():
+            return candidate
     return Path(__file__).resolve().parents[2]
+
+
+def in_git_work_tree(path) -> bool:
+    """True when `path` (or its nearest existing ancestor) is inside a git
+    work tree. Decided from the PATH, not the cwd: callers ask about the
+    data dir, which may sit far from where the script was invoked."""
+    import subprocess
+    p = Path(path).resolve()
+    while not p.exists() and p != p.parent:
+        p = p.parent
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(p), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True,
+        )
+        return out.returncode == 0 and out.stdout.strip() == "true"
+    except OSError:
+        return False
 
 
 # Headless extractor isolation (backfill.py + extract-commit.py). Two real-run

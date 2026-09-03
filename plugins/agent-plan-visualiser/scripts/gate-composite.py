@@ -54,7 +54,6 @@ from pathlib import Path
 import apvlib
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # --- Ontology constants. MIRROR cache-build.py — keep the two in sync. ---
 STATE_FROM_EVENT = {
@@ -783,7 +782,12 @@ def main():
     ap = argparse.ArgumentParser(
         description="Integrity composite: is this event log a trustworthy record?"
     )
-    ap.add_argument("--repo-root", type=Path, default=DEFAULT_REPO_ROOT)
+    # Default is the project being operated on (apvlib.repo_root: git
+    # toplevel → nearest .apv-config.toml → toolchain parent), resolved at
+    # invocation so the cwd decides. The old script-relative constant sent a
+    # flagless run from any non-dogfood project to `<toolchain>/../.apv`
+    # (T3-synced-folder-runtime §2.2). gate-check.sh still passes --repo-root.
+    ap.add_argument("--repo-root", type=Path, default=None)
     ap.add_argument("--config", type=Path, default=None,
                     help="path to .apv-config.toml (default: <repo-root>/.apv-config.toml; "
                          "explicit path must exist)")
@@ -797,7 +801,7 @@ def main():
     # Resolve every path to absolute up front: data_dir is re-exported as
     # APV_DATA_DIR into the cache-build subprocess (different cwd), where a
     # relative path would silently resolve against the wrong base.
-    repo_root = args.repo_root.resolve()
+    repo_root = (args.repo_root or apvlib.repo_root()).resolve()
     for name in ("config", "data_dir", "planning_dir"):
         v = getattr(args, name)
         if v is not None:
