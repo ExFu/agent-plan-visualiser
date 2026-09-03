@@ -141,6 +141,18 @@ data_dir = "$DATA_DIR"
 # the tracked project sits in a sub-folder of the repo (monorepo case) —
 # the data dir stays at the repo root; only the plan corpus moves.
 # planning_dir = "planning"
+# Where the derived files (cache.sqlite, projection.json) go. Default: beside
+# the log in a git repo; ~/.cache/apv/<scope>-<hash>/ when the data dir is not
+# in a git work tree (a synced folder never receives SQLite). APV_CACHE_DIR
+# overrides both. Never a machine-specific path in a shared folder's config.
+# cache_dir = ".apv-cache"
+
+# [planning]
+# Files under a planning root that are not plans. Default: the ExFu folder
+# descriptor and a readme. Two in-tree routes need no config: a `.apv-ignore`
+# marker file excludes a sub-folder; `apv: ignore` in a file's frontmatter
+# excludes that file. Everything else in a planning root must validate.
+# non_plan_files = ["agent.md", "readme.md"]
 
 # Multiple sub-projects in one repo (T3-multi-project +
 # T3-project-attribution): register each project's planning root and the

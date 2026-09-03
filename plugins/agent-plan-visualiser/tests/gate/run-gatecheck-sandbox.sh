@@ -12,6 +12,9 @@ WT_ROOT="$(cd ../../../.. && pwd)"
 GATE_CHECK="$WT_ROOT/plugins/agent-plan-visualiser/scripts/gate-check.sh"
 INSTALL="$WT_ROOT/plugins/agent-plan-visualiser/scripts/install-gate.sh"
 FAIL=0
+# Isolated cache home: ref-mode gate runs must leave NOTHING here (their
+# derived cache stays beside the temp copy of the log, T3-synced-folder-runtime).
+export XDG_CACHE_HOME="$(mktemp -d)"
 
 check() { # check <desc> <test-expr...>
   local desc="$1"; shift
@@ -239,6 +242,9 @@ git checkout -q main
 run git merge wip2
 check "clean ff merge exits 0"          [ "$CODE" -eq 0 ]
 check "main at wip2 tip"                [ "$(git rev-parse refs/heads/main)" = "$(git rev-parse wip2)" ]
+
+check "ref-mode gate runs leave no cache dirs in the cache home" [ -z "$(ls -A "$XDG_CACHE_HOME" 2>/dev/null)" ]
+rm -rf "$XDG_CACHE_HOME"
 
 echo
 if [ "$FAIL" -eq 0 ]; then

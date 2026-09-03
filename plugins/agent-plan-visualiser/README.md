@@ -92,6 +92,21 @@ defined ontology (entities, lifecycle, decisions-as-arc-metadata, blockers,
 verification, relationships), sealed by the commit message. The full design
 rationale ships in `philosophies/`.
 
+## Where derived files live
+
+`events.jsonl` (the record) and `summary.md` (the human digest) always sit
+in the data dir. The derived machine files — `cache.sqlite`, its journal and
+`projection.json` — sit beside them in a git repository, and **outside the
+folder** when the data dir is not inside a git work tree (a Dropbox-synced
+ExFu scope, say): `${XDG_CACHE_HOME:-~/.cache}/apv/<scope>-<hash>/`, created
+on demand. Some synced mounts cannot lock SQLite, and two machines rebuilding
+the same file produce conflicted copies; the record must never be exposed to
+either. `repack-validate.sh` prints the resolved `cache dir:` on every run.
+Override with `APV_CACHE_DIR` or `[storage] cache_dir`; declare a folder
+git-less with `[storage] no_git = true` to force the out-of-tree default even
+inside someone's checkout. If the cache home cannot be created, the temp dir
+is used and a line on stderr says so — the data dir is never the fallback.
+
 ## Requirements
 
 `bash`, `git`, `python3` (3.11+; stdlib only for the gate, cache and audits;

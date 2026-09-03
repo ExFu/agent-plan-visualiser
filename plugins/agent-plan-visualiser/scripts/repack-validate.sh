@@ -39,17 +39,41 @@ import sys
 sys.path.insert(0, sys.argv[1])
 import apvlib
 root = apvlib.repo_root()
+data = apvlib.apv_data_dir(root)
 print(root)
-print(apvlib.apv_data_dir(root))
+print(data)
+print(apvlib.apv_cache_dir(data, root))
 PYEOF
 )" || { echo "repack-validate: could not resolve the repo root / data dir" >&2; exit 2; }
 REPO_ROOT="$(printf '%s\n' "$RESOLVED" | sed -n 1p)"
 DATA_DIR="$(printf '%s\n' "$RESOLVED" | sed -n 2p)"
+CACHE_DIR="$(printf '%s\n' "$RESOLVED" | sed -n 3p)"
 cd "$REPO_ROOT" || exit 2
+# Derived files (cache.sqlite, projection.json) live here — beside the log in
+# a git repo, outside the synced folder otherwise (apvlib.apv_cache_dir).
+echo "cache dir: $CACHE_DIR"
+
+# When derived files live outside the data dir, anything derived that is
+# still beside events.jsonl is stale: a journal or .tmp from a build that
+# failed mid-write into the synced folder (the failure M7 relocates away
+# from), or a cache/projection from before relocation — which a scope-local
+# dashboard builder could read by mistake. Report; never fail; the operator
+# deletes them.
+warn_leftovers() {
+  [ "$CACHE_DIR" != "$DATA_DIR" ] || return 0
+  for leftover in cache.sqlite-journal cache.sqlite.tmp; do
+    [ -e "$DATA_DIR/$leftover" ] && echo "${YELLOW}WARN leftover $leftover beside events.jsonl — from a failed build; safe to delete${RESET}"
+  done
+  for leftover in cache.sqlite projection.json; do
+    [ -e "$DATA_DIR/$leftover" ] && echo "${YELLOW}WARN stale $leftover beside events.jsonl — derived files now live in $CACHE_DIR; safe to delete${RESET}"
+  done
+  return 0
+}
 
 run_step "validate events.jsonl"          bash "$TOOLCHAIN/scripts/validate-events.sh"           || exit 1
 run_step "validate plan frontmatter"      bash "$TOOLCHAIN/scripts/validate-plan-frontmatter.sh" || exit 1
 run_step "rebuild SQLite cache"           python3 "$TOOLCHAIN/scripts/cache-build.py"            || exit 1
+warn_leftovers
 run_step "emit projection.json"           python3 "$TOOLCHAIN/scripts/projection-emit.py"        || exit 1
 run_step "emit summary.md"                python3 "$TOOLCHAIN/scripts/summary-emit.py"           || exit 1
 # Audits run through Python's sqlite3 module (audit-run.py) — the CLI is not

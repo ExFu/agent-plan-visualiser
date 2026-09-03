@@ -8,6 +8,7 @@
 """
 import datetime
 import json
+import os
 import sqlite3
 import subprocess
 from pathlib import Path
@@ -129,7 +130,14 @@ def resolve_blame():
 
 def main():
     events = load_events()
-    conn = sqlite3.connect(CACHE)
+    # Build into a sibling .tmp and os.replace() it into place: a failed build
+    # leaves cache.sqlite.tmp, never a hot -journal beside the log, and readers
+    # never see a half-written cache (T3-synced-folder-runtime §2.4).
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CACHE.with_name(CACHE.name + ".tmp")
+    if tmp.exists():
+        tmp.unlink()
+    conn = sqlite3.connect(tmp)
     init_db(conn)
     blame = resolve_blame()
 
@@ -525,6 +533,7 @@ def main():
                   "summaries")
     }
     conn.close()
+    os.replace(tmp, CACHE)
     print(f"cache built: {counts}")
 
 

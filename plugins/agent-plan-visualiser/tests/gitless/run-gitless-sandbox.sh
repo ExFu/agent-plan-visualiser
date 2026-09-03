@@ -32,7 +32,9 @@ check_present() { # check_present <desc> <grep-pattern> — must match $OUT
 }
 run() { OUT="$("$@" 2>&1)"; CODE=$?; }
 # Run <cmd...> from $T with the git-less environment: no APV_* overrides.
-in_t() { ( cd "$T" && env -u APV_DATA_DIR -u APV_PLANNING_DIR -u APV_CACHE_DIR "$@" ); }
+# XDG_CACHE_HOME is pointed at a sibling of the sandbox so the per-machine
+# cache default is inspectable and never touches the real ~/.cache.
+in_t() { ( cd "$T" && env -u APV_DATA_DIR -u APV_PLANNING_DIR -u APV_CACHE_DIR XDG_CACHE_HOME="$T-xdg" "$@" ); }
 
 T="$(cd "$(mktemp -d)" && pwd -P)"   # physical path: apvlib resolves symlinks (/var -> /private/var on macOS)
 if git -C "$T" rev-parse --show-toplevel >/dev/null 2>&1; then
@@ -89,7 +91,7 @@ run in_t env PATH="$NOSQL_PATH" python3 "$APV/scripts/audit-run.py" "$APV/script
 check "audit file runs (exit 0)" [ "$CODE" -eq 0 ]
 check_present "column header printed, dot-commands stripped" "entity_id"
 check_absent "no .headers/.mode leakage" "^\.\(headers\|mode\)"
-run bash -c "cd '$T' && printf 'SELECT COUNT(*) AS n FROM events;' | env PATH='$NOSQL_PATH' python3 '$APV/scripts/audit-run.py' -"
+run bash -c "cd '$T' && printf 'SELECT COUNT(*) AS n FROM events;' | env PATH='$NOSQL_PATH' XDG_CACHE_HOME='$T-xdg' python3 '$APV/scripts/audit-run.py' -"
 check "stdin SQL runs" [ "$CODE" -eq 0 ]
 check_present "row value printed" "^10$"
 run bash -c "cd '$T' && python3 '$APV/scripts/audit-run.py' --cache '$T/nowhere.sqlite' '$APV/scripts/audit-orphans.sql'"
@@ -103,9 +105,68 @@ check_present "all eight steps passed" "All 8 steps passed"
 check_present "agent.md skipped" "SKIP .*agent.md"
 check_absent "no 'sqlite3: command not found'" "sqlite3: command not found"
 
+# --- §2.4 derived files leave the synced folder ----------------------------
+echo "== derived files relocate out of the data dir when there is no git"
+run in_t env PATH="$NOSQL_PATH" bash "$APV/scripts/repack-validate.sh"
+check "repack-validate exits 0" [ "$CODE" -eq 0 ]
+check_present "cache dir is printed" "^cache dir: "
+CACHE_DIR="$(sed -n 's/^cache dir: //p' <<<"$OUT" | head -n 1)"
+check "data dir holds only the record and the human summary" \
+  [ "$(ls -A "$T/.apv" | sort | tr '\n' ' ')" = "events.jsonl schema-version.txt summary.md " ]
+check "cache.sqlite landed in the cache dir" [ -f "$CACHE_DIR/cache.sqlite" ]
+check "projection.json landed in the cache dir" [ -f "$CACHE_DIR/projection.json" ]
+case "$CACHE_DIR" in "$T"/*) echo "  FAIL: cache dir is inside the synced folder ($CACHE_DIR)"; FAIL=1 ;; *) echo "  ok: cache dir is outside the synced folder" ;; esac
+case "$CACHE_DIR" in "$T-xdg/apv/"*) echo "  ok: default is <XDG_CACHE_HOME>/apv/<scope>-<hash>" ;; *) echo "  FAIL: unexpected default cache dir $CACHE_DIR"; FAIL=1 ;; esac
+run in_t python3 "$APV/scripts/gate-composite.py"
+check "gate-composite still passes (same cache dir)" [ "$CODE" -eq 0 ]
+
+echo "== a leftover journal beside events.jsonl is warned about, not fatal"
+: > "$T/.apv/cache.sqlite-journal"
+run in_t env PATH="$NOSQL_PATH" bash "$APV/scripts/repack-validate.sh"
+check "repack-validate exits 0" [ "$CODE" -eq 0 ]
+check_present "journal warning printed" "WARN leftover cache.sqlite-journal"
+rm -f "$T/.apv/cache.sqlite-journal"
+: > "$T/.apv/cache.sqlite"; : > "$T/.apv/projection.json"
+run in_t env PATH="$NOSQL_PATH" bash "$APV/scripts/repack-validate.sh"
+check "repack-validate exits 0 with stale derived files present" [ "$CODE" -eq 0 ]
+check_present "stale cache warned" "WARN stale cache.sqlite beside events.jsonl"
+check_present "stale projection warned" "WARN stale projection.json beside events.jsonl"
+rm -f "$T/.apv/cache.sqlite" "$T/.apv/projection.json"
+
+echo "== unwritable cache home falls back to the temp dir and says so"
+run in_t env PATH="$NOSQL_PATH" XDG_CACHE_HOME=/dev/null/apv bash "$APV/scripts/repack-validate.sh"
+check "repack-validate exits 0" [ "$CODE" -eq 0 ]
+check_present "fallback announced" "not writable; using"
+TMP_BASE="$(python3 -c 'import tempfile; print(tempfile.gettempdir())')"
+check_present "cache went under the temp dir" "^cache dir: $TMP_BASE/apv/"
+check "data dir still clean" [ ! -e "$T/.apv/cache.sqlite" ]
+
+echo "== APV_CACHE_DIR overrides the default"
+run in_t env PATH="$NOSQL_PATH" APV_CACHE_DIR="$T-cache" bash "$APV/scripts/repack-validate.sh"
+check "repack-validate exits 0" [ "$CODE" -eq 0 ]
+check "override honoured" [ -f "$T-cache/cache.sqlite" ]
+check_present "override printed" "^cache dir: $T-cache"
+rm -rf "$T-cache"
+
+echo "== a declared git-less folder inside someone's git checkout still keeps derived files out"
+G="$(cd "$(mktemp -d)" && pwd -P)"; git -C "$G" init -q
+mkdir -p "$G/.apv"; cp -R fixture/planning "$G/planning"; cp fixture/events.jsonl fixture/schema-version.txt "$G/.apv/"
+printf '[storage]\ndata_dir = ".apv"\nplanning_dir = "planning"\nno_git = true\n' > "$G/.apv-config.toml"
+run bash -c "cd '$G' && env -u APV_DATA_DIR -u APV_PLANNING_DIR -u APV_CACHE_DIR XDG_CACHE_HOME='$T-xdg' bash '$APV/scripts/repack-validate.sh'"
+check "repack-validate exits 0 in the git checkout" [ "$CODE" -eq 0 ]
+check "no_git = true keeps cache.sqlite out of the data dir" [ ! -e "$G/.apv/cache.sqlite" ]
+rm -rf "$G"
+
+echo "== a plan-named file without frontmatter still stops the pipeline"
+printf '# not a plan yet\n' > "$T/planning/T3-broken.md"
+run in_t env PATH="$NOSQL_PATH" bash "$APV/scripts/repack-validate.sh"
+check "repack-validate exits 1" [ "$CODE" -eq 1 ]
+check_present "fails at the validator step" "FAIL: validate plan frontmatter"
+rm -f "$T/planning/T3-broken.md"
+
 echo
 if [ "$FAIL" -eq 0 ]; then
-  rm -rf "$T"
+  rm -rf "$T" "$T-xdg"
   echo "ALL PASS"
 else
   echo "FAILURES (sandbox kept at $T)"

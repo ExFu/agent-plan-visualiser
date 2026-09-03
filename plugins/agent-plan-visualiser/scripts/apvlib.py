@@ -225,11 +225,63 @@ def apv_planning_dir(repo_root: Path, config_path=None) -> Path:
 # events.jsonl on every run (T2-storage §3.1 trust hierarchy). Every consumer
 # resolves their location through these three functions, never by hand.
 
+def _cache_leaf(data_dir: Path) -> str:
+    """Stable per-project id for the per-machine cache: the scope's folder
+    name (human-findable) + 12 hex of sha256 over the resolved absolute data
+    dir (unique per machine path — two machines syncing the same folder each
+    get their own)."""
+    import hashlib
+    resolved = Path(data_dir).resolve()
+    digest = hashlib.sha256(str(resolved).encode("utf-8")).hexdigest()[:12]
+    return f"{resolved.parent.name or 'apv'}-{digest}"
+
+
 def apv_cache_dir(data_dir, repo_root=None, config_path=None) -> Path:
     """The directory holding the derived cache files for `data_dir`.
-    §2.3 stub: the data dir itself (today's layout). §2.4 adds the
-    relocation rule for data dirs outside a git work tree."""
-    return Path(data_dir)
+
+    Precedence (mirrors apv_data_dir):
+      1. APV_CACHE_DIR env var (absolute, or relative to repo_root);
+      2. `.apv-config.toml` `[storage] cache_dir` (same);
+      3. else, when `[storage] no_git = true` is declared OR the data dir is
+         not inside a git work tree (decided from the DATA DIR's location,
+         not the cwd, so subprocesses agree): the per-machine default
+         `${XDG_CACHE_HOME:-~/.cache}/apv/<scope>-<hash>/`, created on
+         demand; if that cannot be created, `<tempdir>/apv/<scope>-<hash>/`
+         with one stderr line saying so. Never the data dir: a synced
+         folder must not receive SQLite files (M7 §2.1);
+      4. else (a git repo): the data dir itself — unchanged layout, including
+         the dogfood repo's committed cache.sqlite.
+    """
+    import sys
+    import tempfile
+    data_dir = Path(data_dir)
+    root = Path(repo_root) if repo_root is not None else data_dir.parent
+
+    override = os.environ.get("APV_CACHE_DIR")
+    if override:
+        p = Path(override)
+        return p if p.is_absolute() else root / p
+    storage = apv_config(root, config_path).get("storage") or {}
+    cfg_dir = storage.get("cache_dir")
+    if cfg_dir:
+        p = Path(cfg_dir)
+        return p if p.is_absolute() else root / p
+
+    declared_no_git = storage.get("no_git") is True
+    if not declared_no_git and in_git_work_tree(data_dir):
+        return data_dir
+
+    leaf = _cache_leaf(data_dir)
+    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    preferred = Path(base) / "apv" / leaf
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        return preferred
+    except OSError:
+        fallback = Path(tempfile.gettempdir()) / "apv" / leaf
+        fallback.mkdir(parents=True, exist_ok=True)  # raises if even this fails
+        print(f"apv: cache dir {preferred} not writable; using {fallback}", file=sys.stderr)
+        return fallback
 
 
 def apv_cache_path(data_dir, repo_root=None, config_path=None) -> Path:
