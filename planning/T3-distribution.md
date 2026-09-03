@@ -147,3 +147,14 @@ Patch bump: two files deleted from the shipped tree, nothing on the capture, gat
 **Supersedes, append-only:** [[T3-cross-client-install]]'s "command/skill honesty" ruling (the two commands retitled as explicit Claude-Code-only slash aliases). The aliases are gone because the platform now provides the alias itself; the doctrine — substance lives in the skill, checks assert on the skill — is unchanged and is in fact what made the deletion free. `CLAUDE.md`'s orientation block wording ("`/apv-capture` is only its Claude-Code slash alias and may be absent in Cowork/Desktop") stays true of the skill's slash form and is not edited.
 
 **Residual, outside this repo (operator leg):** the marketplace's `scripts/release` sits on its unpushed branch `claude/plugin-version-detection-b2fe42`; the 0.8.2 pin is committed there, and that branch landing on the marketplace's main is the other agent's call.
+
+## 14. Release 0.8.3 (2026-09-03) — author identity is exfu.ai. **No re-attach required.**
+
+Patch bump: manifest metadata only, nothing on the capture, gate or extraction paths. `[requires] apv_min_version` stays `0.6.4`.
+
+**What the cut carries**
+
+- **chore:** `plugin.json` `author.name` is `exfu.ai` (was `Alastair Brayne`), by operator ruling 2026-09-03 applied across every ExFu plugin and the `exfu-marketplace` catalogue's `owner` and per-entry `author` in the same sweep. The brand is the author of record on every install surface; the person stays in the LICENSE, which is ownership rather than authorship and is not touched.
+- **chore (in passing):** `scripts/build-bundle.sh` writes the same name into the bundle marketplace's `owner`, so the dist bundle and the catalogue agree.
+
+**Why a cut at all.** The marketplace's release flow (`scripts/release`) refuses to move a pin unless `plugin.json`'s version has changed, because the CLI caches by version and a metadata-only commit would otherwise never reach CLI installs. A patch is the honest size for the change.

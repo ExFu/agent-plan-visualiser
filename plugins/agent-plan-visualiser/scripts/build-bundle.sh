@@ -57,7 +57,7 @@ mkdir -p "$MARKET/.claude-plugin"
 cat > "$MARKET/.claude-plugin/marketplace.json" <<JSON
 {
   "name": "exfu",
-  "owner": { "name": "Alastair Brayne" },
+  "owner": { "name": "exfu.ai" },
   "plugins": [
     {
       "name": "exfu-agent-plan-visualiser",
