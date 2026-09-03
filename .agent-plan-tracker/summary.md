@@ -1,6 +1,6 @@
-# Project state — generated 2026-08-20T13:22:11Z
+# Project state — generated 2026-09-03T15:20:20Z
 
-**Total events:** 746  ·  **Draft:** 21  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
+**Total events:** 754  ·  **Draft:** 24  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -45,8 +45,11 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 37 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 144 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 38 commit(s) ago)
+- `M7-git-less-scopes` (authored 2026-09-03, 0 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 145 commit(s) ago)
+- `T3-git-less-init` (authored 2026-09-03, 0 commit(s) ago)
+- `T3-synced-folder-runtime` (authored 2026-09-03, 0 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -58,28 +61,31 @@
 ## Draft
 
 - **inbox-item**
-  - `2026-05-23.autopilot-misuse-meta-observation` (89d untriaged)
-  - `2026-05-23.cheatsheet-initial-content` (89d untriaged)
-  - `2026-05-23.cowork-vs-code-altitude-guidance` (89d untriaged)
-  - `2026-05-23.extraction-prompt-template-skeleton` (89d untriaged)
-  - `2026-05-23.html-view-visual-style` (89d untriaged)
-  - `2026-05-23.mapping-note-agent-design` (89d untriaged)
-  - `2026-05-23.plugin-naming-alternatives` (89d untriaged)
-  - `2026-05-23.side-quest-formalisation` (89d untriaged)
-  - `2026-05-23.snapshot-trigger-config` (89d untriaged)
-  - `2026-05-23.verification-overhaul-candidate-model` (89d untriaged)
-  - `2026-06-10.view-hardcodes-dogfood-data-dir` (71d untriaged)
-  - `2026-07-07.dist-sandbox-test-reference-stale` (44d untriaged)
-  - `2026-07-21.methodology-name-pending` (30d untriaged)
-  - `2026-07-23.exfu-plugin-project-scoped-elsewhere` (28d untriaged)
-  - `2026-07-23.stale-hooks-after-plugin-upgrade` (28d untriaged)
-  - `2026-08-10.exfu-marketplace-rename-residuals` (10d untriaged)
-  - `2026-08-10.legacy-command-files-shadowed-by-skills` (10d untriaged)
-  - `2026-08-10.reinit-shims-after-bin-move` (10d untriaged)
-  - `2026-08-10.session-orient-block-drift-nag` (10d untriaged)
+  - `2026-05-23.autopilot-misuse-meta-observation` (103d untriaged)
+  - `2026-05-23.cheatsheet-initial-content` (103d untriaged)
+  - `2026-05-23.cowork-vs-code-altitude-guidance` (103d untriaged)
+  - `2026-05-23.extraction-prompt-template-skeleton` (103d untriaged)
+  - `2026-05-23.html-view-visual-style` (103d untriaged)
+  - `2026-05-23.mapping-note-agent-design` (103d untriaged)
+  - `2026-05-23.plugin-naming-alternatives` (103d untriaged)
+  - `2026-05-23.side-quest-formalisation` (103d untriaged)
+  - `2026-05-23.snapshot-trigger-config` (103d untriaged)
+  - `2026-05-23.verification-overhaul-candidate-model` (103d untriaged)
+  - `2026-06-10.view-hardcodes-dogfood-data-dir` (85d untriaged)
+  - `2026-07-07.dist-sandbox-test-reference-stale` (58d untriaged)
+  - `2026-07-21.methodology-name-pending` (44d untriaged)
+  - `2026-07-23.exfu-plugin-project-scoped-elsewhere` (42d untriaged)
+  - `2026-07-23.stale-hooks-after-plugin-upgrade` (42d untriaged)
+  - `2026-08-10.exfu-marketplace-rename-residuals` (24d untriaged)
+  - `2026-08-10.legacy-command-files-shadowed-by-skills` (24d untriaged)
+  - `2026-08-10.reinit-shims-after-bin-move` (24d untriaged)
+  - `2026-08-10.session-orient-block-drift-nag` (24d untriaged)
 - **plan**
   - `KT0-knowledge-substrate`
+  - `M7-git-less-scopes`
   - `T2-ingest`
+  - `T3-git-less-init`
+  - `T3-synced-folder-runtime`
 
 ## Blocked
 
@@ -118,6 +124,7 @@ _No flapping closures._
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
+- **M7-git-less-scopes**: 0/2 T3 complete (0%); 0 live
 
 ---
-_99 entities · 127 relationships · 45 decisions._
+_102 entities · 132 relationships · 46 decisions._
