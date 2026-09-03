@@ -176,3 +176,48 @@ Live check (operator, after acceptance and build, before the addendum is sent): 
 - **Q3 — validator rule (ruled 2026-09-03, recorded here because the first draft chose otherwise).** The first draft skipped files whose name did not match the plan-id pattern and whose frontmatter declared no `id` — fail-open, and it baked the current plan shape into the validator. The operator steered to the fail-closed form in §2.1: scope is the configured planning folders, everything inside is a plan, a named non-plan list (default `agent.md`, `readme.md`) is the only carve-out. The request's own Q3 (rule vs ignore list) is thereby answered "list, with a default that is right for ExFu scopes". Closed.
 - **Q4 — the sub-folder notice.** §2.1 prints a one-line `NOTE` for any planning sub-folder lacking `.apv-ignore`. It never fails the run; it exists so agents discover the marker. The dogfood repo's own `planning/scratch/` will print it until a marker is added there. Confirm the notice is wanted, or rule silence for unmarked sub-folders. Lean: keep the notice.
 - **Q2 — `no_git` config key.** §2.4 reads an optional `[storage] no_git = true` so a declared git-less folder that happens to sit inside someone's git checkout still keeps derived files out of tree. Confirm the key name and that T3-git-less-init writes it. Lean: yes, `no_git`.
+
+## 7. Build notes (2026-09-03)
+
+Built and landed on `claude/git-less-scopes` in five sealed commits, one per build plus the plan drafting, all TDD (each sandbox case observed red before the code that turned it green).
+
+**Order.** §2.2 (root resolution) went first, before §2.1: the validator's config-driven tests run from a git-less temp folder and need the config-file root rung to find `[planning]`. Value order in the plan was a suggestion; dependency order won.
+
+**What landed, by build.**
+
+- §2.2 — `apvlib.repo_root()` rung 2 (nearest `.apv-config.toml`), `apvlib.in_git_work_tree(path)`, blame skipped outside git, `gate-composite.py --repo-root` default = `apvlib.repo_root()` (the script-relative constant is gone), `repack-validate.sh` resolves root and data dir through one apvlib call. Fixture `tests/gitless/fixture/`, sandbox `tests/gitless/run-gitless-sandbox.sh`.
+- §2.1 — fail-closed validator over every registered planning root with the three carve-outs in `apvlib.plan_files()`; `check_drift` shares it; `tests/validator/run-validator-tests.sh` (13 cases); gate fixture gains `agent.md`.
+- §2.3 — `apv_cache_dir/apv_cache_path/apv_projection_path`; `scripts/audit-run.py`; all eight assembly sites repointed; `serve.py` routes `/data/projection.json` to the resolved path; no `sqlite3` CLI anywhere on a live surface (README, cheatsheet, worked example, apv-capture §4/§6.2, exfu-planning-apv-integration).
+- §2.4 — relocation rule with `no_git` and the temp fallback; `cache-build.py` writes `.tmp` then `os.replace`; `repack-validate.sh` prints `cache dir:`; warnings for a leftover journal/`.tmp` **and** for a stale `cache.sqlite`/`projection.json` still beside the log; README "Where derived files live"; apv-capture §0 space-safe glob + Desktop/Cowork quoted `APV_HOME` guidance (Q1 answered as the lean: guidance, no Desktop glob rung); `using-agent-plan-visualiser` documents the layout and the three non-plan routes; apv-init's config template documents `cache_dir` and `[planning]`.
+
+**Unplanned, found by the tests.**
+
+- `gate-check.sh` ref mode extracts the log into a temp dir and ran the composite with `--data-dir "$TMP"`; under the new rule every gate run would have left a `~/.cache/apv/T-<hash>/` behind (25 appeared during one suite run). Pinned with `APV_CACHE_DIR="$TMP"`; the gatecheck sandbox now asserts an empty isolated cache home.
+- `tests/gate/run-gate-tests.sh` computed `REPO_ROOT` one directory short since the 2026-08-10 `plugins/` nesting, so its "real log" case failed on `main` too. Fixed.
+- macOS bash 3.2 treats an empty array as unbound under `set -u`; the two ad-hoc scripts use the `${arr[@]+"${arr[@]}"}` idiom.
+- Stale derived files: after relocation the scope's old `.apv/cache.sqlite` and `.apv/projection.json` stay behind and a scope-local dashboard builder would read the stale projection. Warned, not deleted (the scope's file to remove).
+
+**Evidence.** Every suite ALL PASS: gitless (32 checks), validator (13 cases), gate fixtures, portability, gatecheck, apv-merge, init, dist, toolchain-paths audit; dogfood `repack-validate` 8/8 with `cache dir: .agent-plan-tracker` (in place). Live, from `/Users/al/Dropbox/ExFu Library/scopes/therapist-tool/` with no `APV_*` exports and no CLI shim: 8/8, `cache dir: ~/.cache/apv/therapist-tool-c6382aeac398`, `agent.md` skipped, leftover-journal warning fired, `gate-composite.py` PASS with the same 11 warnings as the field run. Only `summary.md` changed in the scope.
+
+**Not done here.** The version bump rides T3-distribution's release convention (separate `release(...)` commit). This is a behaviour change on two axes (derived-file location, CLI dependency dropped): suggest **0.8.0**. The scope can adopt the addendum below only once that release is installed on both machines; until then `$APV` must point at a checkout of this branch.
+
+**Q2 / Q4 as built.** `no_git = true` is read (Q2, lean confirmed by the sandbox case "declared git-less folder inside a git checkout"). The unmarked sub-folder NOTE is kept (Q4).
+
+### 7.1 Addendum for `scopes/therapist-tool/ontology/apv-tracking.md` (the scope applies this; APV does not edit the scope)
+
+> **Addendum (2026-09-03, APV ≥ 0.8.0).** Deviation 3 is simplified. The toolchain now finds this folder's root by its `.apv-config.toml` when there is no git, reads the config's `[gate]` and `[storage]` sections, and needs no `sqlite3` command. Step 3 becomes:
+>
+> ```bash
+> cd "<scope root>"
+> bash "$APV/scripts/repack-validate.sh"
+> python3 "$APV/scripts/gate-composite.py"
+> python3 visualisations/apv/build-static-dashboard.py --minify
+> ```
+>
+> The `APV_DATA_DIR`/`APV_PLANNING_DIR` exports are no longer needed. The line "`fatal: not a git repository` is expected" is withdrawn; the run prints no such line. Python still needs `pyyaml` and `jsonschema`; the `sqlite3` command is not required. On Desktop or Cowork, set `APV_HOME` to the plugin path the session-start line reports, **quoted** (it contains a space).
+>
+> **Deviation 7 amendment.** `cache.sqlite`, its journal and `projection.json` no longer live in `.apv/`. They are written to a per-machine cache directory outside the synced folder (`~/.cache/apv/therapist-tool-<hash>/`; `repack-validate.sh` prints it as `cache dir:`). `events.jsonl`, `schema-version.txt` and `summary.md` stay in `.apv/`; `dashboard.html` stays in `visualisations/apv/`. The old `.apv/cache.sqlite`, `.apv/cache.sqlite-journal` and `.apv/projection.json` are stale: delete them once (the run warns until you do).
+>
+> **`build-static-dashboard.py`.** It read `.apv/projection.json`. Change `DATA / "projection.json"` to the resolver: `sys.path.insert(0, str(apv / "scripts")); import apvlib; projection = apvlib.apv_projection_path(apvlib.apv_data_dir(ROOT), ROOT)` (after `find_apv()`), and read the events file from `.apv/events.jsonl` as before. Optionally accept `--projection <path>` for a hand-supplied file. Run it after `repack-validate.sh`, as before.
+>
+> **Non-plan files under `planning/`.** `planning/agent.md` is skipped by default (`[planning] non_plan_files`, default `agent.md`, `readme.md`). A sub-folder is excluded by an empty `.apv-ignore` file inside it; a single note excludes itself with `apv: ignore` in its frontmatter. Anything else under `planning/` must be a valid plan or the run stops.

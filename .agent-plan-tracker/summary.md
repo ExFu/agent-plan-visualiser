@@ -1,6 +1,6 @@
-# Project state — generated 2026-09-03T16:29:29Z
+# Project state — generated 2026-09-03T16:30:44Z
 
-**Total events:** 777  ·  **Draft:** 21  ·  **Live:** 15  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
+**Total events:** 780  ·  **Draft:** 21  ·  **Live:** 14  ·  **Dormant:** 0  ·  **Closed:** 67  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -31,7 +31,6 @@
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
-  - `T3-synced-folder-runtime` (13 events): verification.tested → entity.progressed → verification.tested
 
 ### By milestone
 
@@ -50,13 +49,12 @@
 
 - **M7-git-less-scopes**
   - `T3-git-less-init`
-  - `T3-synced-folder-runtime`
 
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 45 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 152 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 46 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 153 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -128,7 +126,7 @@ _No flapping closures._
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
-- **M7-git-less-scopes**: 0/2 T3 complete (0%); 2 live
+- **M7-git-less-scopes**: 1/2 T3 complete (50%); 1 live
 
 ---
 _102 entities · 132 relationships · 47 decisions._
