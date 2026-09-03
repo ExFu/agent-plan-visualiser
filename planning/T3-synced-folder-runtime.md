@@ -24,27 +24,34 @@ Three verified defects stop `repack-validate.sh` on a git-less synced folder (as
 
 Four builds, in the order that gives the earliest value. Each is independently landable and independently captured.
 
-### 2.1 Validator: validate plans, skip non-plans, still fail broken plans
+### 2.1 Validator: every file in a planning folder is a plan, except a named list of non-plan files
 
 File: `plugins/agent-plan-visualiser/scripts/validate-plan-frontmatter.sh` (Python heredoc, loop at `for path in sorted(glob.glob(...))`).
 
-Rule (assessment §4 Q3; the request's Q3 is answered "no ignore list"):
+Scope is unchanged: the validator looks only inside the planning folder(s) resolved through the config (`[storage] planning_dir`, default `planning/`; registered `[projects.<name>] planning_dir` roots). It never scans the rest of the tree.
 
-- Read the plan-id pattern from the schema already loaded: `schema["properties"]["id"]["pattern"]` (today `^([A-Z]?T[0-3]|M[0-9]+(\.[0-9]+)?)-[a-z0-9][a-z0-9-]*$`). Never hardcode it a second time.
-- For each `*.md`: `is_plan_name = re.match(pattern, stem)`; `declares_id = frontmatter parsed and "id" in fm`.
-- If neither holds: print `SKIP <path>: not a plan (name is not a plan id and no frontmatter id)` and `continue` **without** incrementing `checked`.
-- Otherwise the existing checks run unchanged (no frontmatter → FAIL; YAML error → FAIL; filename ≠ id → FAIL; schema → FAIL).
-- Final line stays `all N plan files valid` where N counts validated files only; the existing "nothing validated" guard therefore still trips on a dir holding only `agent.md`.
+Rule (revised 2026-09-03 on the operator's steer; supersedes the shape-based rule first drafted — see Q3):
 
-Companion fix, same rule: `plugins/agent-plan-visualiser/scripts/gate-composite.py`, `check_drift`, the loop `for md in sorted(root_dir.glob("*.md"))`. Before the duplicate-id check, skip a file whose stem does not match the pattern **and** whose `parse_frontmatter(md)` has no `id`. Reason: `agent.md` present in two registered planning roots is otherwise reported as `plan 'agent' present in planning roots ... duplicate plan id`. Read the pattern from `$APV/schemas/0.2.0/plan-frontmatter.schema.json` via the existing `SCRIPT_DIR.parent / "schemas"` convention.
+- **Fail-closed.** Every `*.md` in a planning folder is a plan and must validate exactly as today (no frontmatter → FAIL; YAML error → FAIL; filename ≠ id → FAIL; schema → FAIL). The validator learns nothing about what a plan id looks like beyond what the schema already enforces.
+- **Except a named list of non-plan files**, matched on basename, case-insensitively. Source: `.apv-config.toml` `[planning] non_plan_files = [...]`; default when the key is absent: `["agent.md", "readme.md"]` — the ExFu folder-type descriptor (a fixed ExFu convention, so the default is already correct for any ExFu scope and Kat's agent never sets config) and a folder readme. Listed files print `SKIP <path>: listed non-plan file` and are not counted in `checked`; the existing "nothing validated" guard therefore still trips on a dir holding only `agent.md`.
+- Anything else that is not a plan fails loudly, as today. A stray note in `planning/` is a defect to fix or to list, never something the validator guesses about.
 
-Test: new `plugins/agent-plan-visualiser/tests/validator/run-validator-tests.sh` (same `check`/`FAIL` shape as `tests/gate/run-gate-tests.sh`). Cases, each in a fresh `mktemp -d`, run as `bash ../../scripts/validate-plan-frontmatter.sh ../../schemas/0.2.0/plan-frontmatter.schema.json "$DIR"`:
+Helper in `plugins/agent-plan-visualiser/scripts/apvlib.py`: `apv_non_plan_files(repo_root, config_path=None) -> set[str]` (lower-cased basenames; fail-loud on a non-list value, matching `apv_projects`) and `is_plan_file(path, non_plan_files) -> bool`. Both consumers below read it; `.apv-config.toml`'s template in `apv-init.sh` gains a commented `[planning]` block showing the default.
 
-1. `agent.md` (no frontmatter) + `T1-top-level.md` + `T2-alpha.md` (valid) → exit 0; output contains `SKIP` for `agent.md` and `all 2 plan files valid`.
+Multi-root: the validator today reads only `apv_planning_dir` and ignores registered sub-project roots, while `gate-composite.py`'s drift check walks all of `apv_planning_roots`. Iterate `apv_planning_roots` in the validator too (each root labelled in the output), so "the configured planning folders" means the same set to both tools.
+
+Companion fix, same helper: `plugins/agent-plan-visualiser/scripts/gate-composite.py`, `check_drift`, the loop `for md in sorted(root_dir.glob("*.md"))`. Skip listed non-plan files before the duplicate-id check. Reason: `agent.md` present in two registered planning roots is otherwise reported as `plan 'agent' present in planning roots ... duplicate plan id`.
+
+Test: new `plugins/agent-plan-visualiser/tests/validator/run-validator-tests.sh` (same `check`/`FAIL` shape as `tests/gate/run-gate-tests.sh`). Cases, each in a fresh `mktemp -d` containing a `.apv-config.toml` with `[storage] planning_dir = "planning"` unless stated, run as `cd "$DIR" && bash "$APV/scripts/validate-plan-frontmatter.sh"`:
+
+1. `agent.md` (no frontmatter) + `T1-top-level.md` + `T2-alpha.md` (valid) → exit 0; output contains `SKIP .../agent.md: listed non-plan file` and `all 2 plan files valid`.
 2. Case 1 plus `T3-broken.md` with no frontmatter → exit 1; output contains `FAIL .../T3-broken.md: no YAML frontmatter`.
 3. `agent.md` only → exit 1; stderr contains `nothing validated`.
-4. Case 1 plus `notes.md` whose frontmatter is `title: scratch` (no `id`) → exit 0, `SKIP` for `notes.md`.
-5. Case 1 plus `t3-foo.md` whose frontmatter declares `id: t3-foo` → exit 1 (schema pattern fails; the file claimed to be a plan).
+4. Case 1 plus `notes.md` (any content) → exit 1; output contains `FAIL .../notes.md` (fail-closed: not listed, not a plan).
+5. Case 4 with `[planning] non_plan_files = ["agent.md", "notes.md"]` in the config → exit 0; both skipped.
+6. Case 1 plus `README.md` → exit 0; skipped by the default list (case-insensitive).
+7. Config with `[planning] non_plan_files = "agent.md"` (a string, not a list) → exit 2 with the apvlib fail-loud message.
+8. Two roots via `[projects.sub] planning_dir = "sub/planning"`, each holding `agent.md` and one valid plan → exit 0; `all 2 plan files valid`; both roots named in the output.
 
 Gate side: add `agent.md` (no frontmatter) to `tests/gate/fixture-drift-planning/` and, in `tests/gate/run-gate-tests.sh`, `check_absent "agent.md is not a plan" "plan 'agent'"` after each `run_case` that inspects drift.
 
@@ -155,4 +162,5 @@ Live check (operator, after acceptance and build, before the addendum is sent): 
 ## 6. Open questions (HITL)
 
 - **Q1 — Desktop discovery rung.** Should the `apv-capture` §0 ladder (and the generated shim) also glob `~/Library/Application Support/Claude/local-agent-mode-sessions/*/*/rpm/plugin_*/` filtered by `.claude-plugin/plugin.json` name, or is the quoted-`APV_HOME` guidance in §2.4 enough? Lean: guidance here; the glob rung, if wanted, lands in T3-git-less-init with the shim.
+- **Q3 — validator rule (ruled 2026-09-03, recorded here because the first draft chose otherwise).** The first draft skipped files whose name did not match the plan-id pattern and whose frontmatter declared no `id` — fail-open, and it baked the current plan shape into the validator. The operator steered to the fail-closed form in §2.1: scope is the configured planning folders, everything inside is a plan, a named non-plan list (default `agent.md`, `readme.md`) is the only carve-out. The request's own Q3 (rule vs ignore list) is thereby answered "list, with a default that is right for ExFu scopes". Closed.
 - **Q2 — `no_git` config key.** §2.4 reads an optional `[storage] no_git = true` so a declared git-less folder that happens to sit inside someone's git checkout still keeps derived files out of tree. Confirm the key name and that T3-git-less-init writes it. Lean: yes, `no_git`.
