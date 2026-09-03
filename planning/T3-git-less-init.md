@@ -4,12 +4,12 @@ plan_kind: thematic
 tier: 3
 t2_parent: T2-packaging
 milestone: M7-git-less-scopes
-status: draft
+status: active
 ---
 
 # T3-git-less-init — `apv init --no-git` attaches a folder that has no repository
 
-**Status**: Draft (authored 2026-09-03). Awaiting operator acceptance.
+**Status**: Accepted 2026-09-03 by the operator (authored 2026-09-03; revised twice pre-acceptance on the validator rule). Open questions carry stated leans, applied as working defaults until ruled otherwise.
 **Sits at**: T2-packaging theme (init and orientation surfaces; T3-project-init-flow precedent, M4-fresh-install §2.2 "init is a user-triggered, idempotent command"), M7-git-less-scopes milestone. Second of the two M7 T3s; depends on `apvlib.apv_cache_dir` and the config-file root finding from T3-synced-folder-runtime.
 
 Every path is relative to the repo root; `$APV` is the toolchain home.

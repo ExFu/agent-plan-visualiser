@@ -2,12 +2,12 @@
 id: M7-git-less-scopes
 plan_kind: milestone
 milestone_index: 7
-status: draft
+status: active
 ---
 
 # M7-git-less-scopes — APV is first-class on a synced folder with no git
 
-**Status**: Draft (authored 2026-09-03 from the therapist-tool work request, `planning/scratch/Work Request -- APV on synced folders -- 3 Sep 2026.md`, and the assessment filed beside it). Awaiting operator acceptance.
+**Status**: Accepted 2026-09-03 by the operator (authored 2026-09-03 from the therapist-tool work request, `planning/scratch/Work Request -- APV on synced folders -- 3 Sep 2026.md`, and the assessment filed beside it; revised twice pre-acceptance on the validator rule). Open questions carry stated leans, applied as working defaults until ruled otherwise.
 **Sits at**: Seventh milestone on the sequence axis. Primary themes: T2-storage (where derived files live, how the project root is found) and T2-packaging (how a folder is attached). Follows M6-exfu-integration, which made APV the owner of its ExFu integration; this milestone makes the ExFu library's own storage shape a supported environment.
 
 ---

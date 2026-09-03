@@ -1,6 +1,6 @@
-# Project state — generated 2026-09-03T15:55:56Z
+# Project state — generated 2026-09-03T16:04:54Z
 
-**Total events:** 761  ·  **Draft:** 24  ·  **Live:** 12  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
+**Total events:** 765  ·  **Draft:** 21  ·  **Live:** 15  ·  **Dormant:** 0  ·  **Closed:** 66  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -20,15 +20,18 @@
 - **(milestone)**
   - `M4-fresh-install` (8 events): entity.progressed → entity.progressed → verification.tested
   - `M5-backfill` (16 events): verification.tested → entity.progressed → verification.tested
+  - `M7-git-less-scopes` (3 events): entity.created → relationship.spawns → entity.accepted
 
 - **T2-ontology**
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-packaging**
   - `T3-distribution` (68 events): entity.progressed → verification.tested → verification.deferred
+  - `T3-git-less-init` (5 events): entity.extended → entity.extended → entity.accepted
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
+  - `T3-synced-folder-runtime` (5 events): entity.extended → entity.extended → entity.accepted
 
 ### By milestone
 
@@ -38,18 +41,22 @@
 - **(self: M5-backfill)**
   - `M5-backfill`
 
+- **(self: M7-git-less-scopes)**
+  - `M7-git-less-scopes`
+
 - **M4-fresh-install**
   - `T3-distribution`
   - `T3-retrospective-project-annotation`
 
+- **M7-git-less-scopes**
+  - `T3-git-less-init`
+  - `T3-synced-folder-runtime`
+
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 40 commit(s) ago)
-- `M7-git-less-scopes` (authored 2026-09-03, 2 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 147 commit(s) ago)
-- `T3-git-less-init` (authored 2026-09-03, 2 commit(s) ago)
-- `T3-synced-folder-runtime` (authored 2026-09-03, 2 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 41 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 148 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -82,10 +89,7 @@
   - `2026-08-10.session-orient-block-drift-nag` (24d untriaged)
 - **plan**
   - `KT0-knowledge-substrate`
-  - `M7-git-less-scopes`
   - `T2-ingest`
-  - `T3-git-less-init`
-  - `T3-synced-folder-runtime`
 
 ## Blocked
 
@@ -124,7 +128,7 @@ _No flapping closures._
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
 - **M6-exfu-integration**: 1/1 T3 complete (100%); 0 live
-- **M7-git-less-scopes**: 0/2 T3 complete (0%); 0 live
+- **M7-git-less-scopes**: 0/2 T3 complete (0%); 2 live
 
 ---
 _102 entities · 132 relationships · 47 decisions._

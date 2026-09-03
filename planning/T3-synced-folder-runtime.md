@@ -4,12 +4,12 @@ plan_kind: thematic
 tier: 3
 t2_parent: T2-storage
 milestone: M7-git-less-scopes
-status: draft
+status: active
 ---
 
 # T3-synced-folder-runtime — the pipeline runs clean from a synced folder with no git
 
-**Status**: Draft (authored 2026-09-03). Awaiting operator acceptance.
+**Status**: Accepted 2026-09-03 by the operator (authored 2026-09-03; revised twice pre-acceptance on the validator rule). Open questions carry stated leans, applied as working defaults until ruled otherwise.
 **Sits at**: T2-storage theme (the derived-file layer and where it lives, T2-storage §3.1 and §3.7), M7-git-less-scopes milestone. First of the two M7 T3s; T3-git-less-init depends on the resolver built here.
 
 Source material: `planning/scratch/Work Request -- APV on synced folders -- 3 Sep 2026.md` and `planning/scratch/Assessment -- APV on synced folders -- 3 Sep 2026.agent.md` (the verified findings this brief is cut from). Every path below is relative to the repo root unless absolute; `$APV` is the toolchain home `plugins/agent-plan-visualiser` (in the dogfood repo) or the installed plugin root.
