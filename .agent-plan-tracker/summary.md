@@ -1,6 +1,6 @@
-# Project state — generated 2026-09-03T16:57:36Z
+# Project state — generated 2026-09-03T16:58:35Z
 
-**Total events:** 785  ·  **Draft:** 21  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 68  ·  **Orphaned:** 0
+**Total events:** 789  ·  **Draft:** 21  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 68  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -26,7 +26,7 @@
   - `T3-retrospective-project-annotation` (6 events): entity.accepted → entity.progressed → verification.tested
 
 - **T2-packaging**
-  - `T3-distribution` (68 events): entity.progressed → verification.tested → verification.deferred
+  - `T3-distribution` (71 events): entity.extended → entity.progressed → verification.tested
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
@@ -49,8 +49,8 @@
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 47 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 154 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 48 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 155 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -58,7 +58,6 @@
 
 **Deferred verifications** (operator legs to come back to):
 - `T3-claude-md-block-healing` (deferred 2026-08-10): The other two attached repos are separate repositories; healing their working trees is not this branch's to commit.
-- `T3-distribution` (deferred 2026-08-10): Final Cowork confirmation needs the operator: push this repo's main, re-add the one-entry probe marketplace in Cowork — the add should now succeed and exfu-agent-plan-visualiser appear. Then restore the full five-plugin manifest (revert the probe commit 284ba0c in exfu-marketplace), push, and re-add; expect fetchAccountScopedRemotePlugins 14 from 3 marketplaces. This resolves-and-renews the two prior open deferrals on this plan, whose question (why does Cowork drop the plugin) is now answered.
 
 ## Draft
 
