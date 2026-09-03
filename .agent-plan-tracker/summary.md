@@ -1,4 +1,4 @@
-# Project state — generated 2026-09-03T17:25:55Z
+# Project state — generated 2026-09-03T17:26:19Z
 
 **Total events:** 803  ·  **Draft:** 21  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 69  ·  **Orphaned:** 0
 
