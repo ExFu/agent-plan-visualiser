@@ -1,6 +1,6 @@
-# Project state — generated 2026-09-03T21:52:13Z
+# Project state — generated 2026-09-09T16:23:57Z
 
-**Total events:** 812  ·  **Draft:** 21  ·  **Live:** 13  ·  **Dormant:** 0  ·  **Closed:** 69  ·  **Orphaned:** 0
+**Total events:** 816  ·  **Draft:** 21  ·  **Live:** 14  ·  **Dormant:** 0  ·  **Closed:** 69  ·  **Orphaned:** 0
 
 ## Live work
 
@@ -27,6 +27,7 @@
 
 - **T2-packaging**
   - `T3-distribution` (83 events): entity.extended → entity.progressed → verification.tested
+  - `T3-runtime-checker` (3 events): entity.created → relationship.spawns → entity.accepted
 
 - **T2-storage**
   - `T3-multi-project` (6 events): entity.progressed → verification.tested → entity.extended
@@ -45,12 +46,13 @@
 - **M4-fresh-install**
   - `T3-distribution`
   - `T3-retrospective-project-annotation`
+  - `T3-runtime-checker`
 
 ## Awaiting operator
 
 **Acceptance ceremonies pending** (draft plans — the draft gate blocks implementation against them):
-- `KT0-knowledge-substrate` (authored 2026-07-21, 55 commit(s) ago)
-- `T2-ingest` (authored 2026-05-23, 162 commit(s) ago)
+- `KT0-knowledge-substrate` (authored 2026-07-21, 56 commit(s) ago)
+- `T2-ingest` (authored 2026-05-23, 163 commit(s) ago)
 
 **Closure ceremonies pending** (all scheduled T3s closed; milestone still live):
 - `M5-backfill`
@@ -62,25 +64,25 @@
 ## Draft
 
 - **inbox-item**
-  - `2026-05-23.autopilot-misuse-meta-observation` (103d untriaged)
-  - `2026-05-23.cheatsheet-initial-content` (103d untriaged)
-  - `2026-05-23.cowork-vs-code-altitude-guidance` (103d untriaged)
-  - `2026-05-23.extraction-prompt-template-skeleton` (103d untriaged)
-  - `2026-05-23.html-view-visual-style` (103d untriaged)
-  - `2026-05-23.mapping-note-agent-design` (103d untriaged)
-  - `2026-05-23.plugin-naming-alternatives` (103d untriaged)
-  - `2026-05-23.side-quest-formalisation` (103d untriaged)
-  - `2026-05-23.snapshot-trigger-config` (103d untriaged)
-  - `2026-05-23.verification-overhaul-candidate-model` (103d untriaged)
-  - `2026-06-10.view-hardcodes-dogfood-data-dir` (85d untriaged)
-  - `2026-07-07.dist-sandbox-test-reference-stale` (58d untriaged)
-  - `2026-07-21.methodology-name-pending` (44d untriaged)
-  - `2026-07-23.exfu-plugin-project-scoped-elsewhere` (42d untriaged)
-  - `2026-07-23.stale-hooks-after-plugin-upgrade` (42d untriaged)
-  - `2026-08-10.exfu-marketplace-rename-residuals` (24d untriaged)
-  - `2026-08-10.legacy-command-files-shadowed-by-skills` (24d untriaged)
-  - `2026-08-10.reinit-shims-after-bin-move` (24d untriaged)
-  - `2026-08-10.session-orient-block-drift-nag` (24d untriaged)
+  - `2026-05-23.autopilot-misuse-meta-observation` (109d untriaged)
+  - `2026-05-23.cheatsheet-initial-content` (109d untriaged)
+  - `2026-05-23.cowork-vs-code-altitude-guidance` (109d untriaged)
+  - `2026-05-23.extraction-prompt-template-skeleton` (109d untriaged)
+  - `2026-05-23.html-view-visual-style` (109d untriaged)
+  - `2026-05-23.mapping-note-agent-design` (109d untriaged)
+  - `2026-05-23.plugin-naming-alternatives` (109d untriaged)
+  - `2026-05-23.side-quest-formalisation` (109d untriaged)
+  - `2026-05-23.snapshot-trigger-config` (109d untriaged)
+  - `2026-05-23.verification-overhaul-candidate-model` (109d untriaged)
+  - `2026-06-10.view-hardcodes-dogfood-data-dir` (91d untriaged)
+  - `2026-07-07.dist-sandbox-test-reference-stale` (64d untriaged)
+  - `2026-07-21.methodology-name-pending` (50d untriaged)
+  - `2026-07-23.exfu-plugin-project-scoped-elsewhere` (48d untriaged)
+  - `2026-07-23.stale-hooks-after-plugin-upgrade` (48d untriaged)
+  - `2026-08-10.exfu-marketplace-rename-residuals` (30d untriaged)
+  - `2026-08-10.legacy-command-files-shadowed-by-skills` (30d untriaged)
+  - `2026-08-10.reinit-shims-after-bin-move` (30d untriaged)
+  - `2026-08-10.session-orient-block-drift-nag` (30d untriaged)
 - **plan**
   - `KT0-knowledge-substrate`
   - `T2-ingest`
@@ -117,7 +119,7 @@ _No flapping closures._
 - **M1.2-relationship-ssot**: 1/1 T3 complete (100%); 0 live
 - **M2-auto-extract**: 5/5 T3 complete (100%); 0 live
 - **M3-clean-gate**: 3/3 T3 complete (100%); 0 live
-- **M4-fresh-install**: 8/10 T3 complete (80%); 2 live
+- **M4-fresh-install**: 8/11 T3 complete (72%); 3 live
 - **M5-backfill**: 5/5 T3 complete (100%); 0 live
 - **M5.1-operator-attention**: 2/2 T3 complete (100%); 0 live
 - **M6-dashboard**: 3/3 T3 complete (100%); 0 live
@@ -125,4 +127,4 @@ _No flapping closures._
 - **M7-git-less-scopes**: 2/2 T3 complete (100%); 0 live
 
 ---
-_103 entities · 132 relationships · 49 decisions._
+_104 entities · 134 relationships · 49 decisions._
