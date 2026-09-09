@@ -158,3 +158,24 @@ Patch bump: manifest metadata only, nothing on the capture, gate or extraction p
 - **chore (in passing):** `scripts/build-bundle.sh` writes the same name into the bundle marketplace's `owner`, so the dist bundle and the catalogue agree.
 
 **Why a cut at all.** The marketplace's release flow (`scripts/release`) refuses to move a pin unless `plugin.json`'s version has changed, because the CLI caches by version and a metadata-only commit would otherwise never reach CLI installs. A patch is the honest size for the change.
+
+## Release 0.9.0 — compact checker and portable Python (2026-09-09)
+
+Operator authorized merging, updating the marketplace catalogue and pushing both
+repositories. This release includes the completed T3-runtime-checker work:
+capability-checked Python selection and APV_PYTHON propagation, batch validation
+(issue #1), useful venv remediation and legacy-cache warnings (issue #2), compact
+`apv check` reports, and the optional `apv-checker` agent. Capture and Git actions
+stay in the main conversation. Native Claude fixture pass/fail behavior is verified.
+
+Release review caught a command/skill name collision introduced with apv-check.
+The redundant command is removed: the skill provides the slash interface itself,
+as ruled in release 0.8.2 above. A regression now guards the entire shipped slash
+namespace. Public install examples use the current exfu-marketplace identity.
+The minimum required version remains unchanged; there is no schema migration or
+new hook adapter, so an existing attached project does not need re-initialization.
+
+Publication order: validate and capture this cut, gate/fast-forward main, push the
+plugin repository, then use the marketplace's scripts/release to pin this exact
+commit. Run its catalogue checks before pushing the marketplace. The catalogue
+pin, not a plugin-repository push alone, makes the release available to users.

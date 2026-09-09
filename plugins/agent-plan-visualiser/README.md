@@ -33,10 +33,10 @@ PyYAML, so it is not necessarily sufficient for the full pipeline.
 # 1. Add the exfu marketplace (once per client — Claude Code and Cowork alike),
 #    then install the plugin from it:
 /plugin marketplace add https://github.com/ExFu/exfu-marketplace
-/plugin install exfu-agent-plan-visualiser@exfu
+/plugin install exfu-agent-plan-visualiser@exfu-marketplace
 #    Offline/dev alternative — build a local single-plugin marketplace instead:
 #    bash plugins/agent-plan-visualiser/scripts/build-bundle.sh   # -> dist/exfu-marketplace/
-#    /plugin marketplace add <path>/exfu-marketplace && /plugin install exfu-agent-plan-visualiser@exfu
+#    /plugin marketplace add <path>/exfu-marketplace && /plugin install exfu-agent-plan-visualiser@exfu-marketplace
 
 # 2. Attach a project (fresh or existing repo — attaches from now):
 /apv-init          # seeds .apv/, writes config, installs the git hooks
@@ -127,7 +127,7 @@ Output is compact and includes the path to a detailed temporary JSON report.
 Reports contain local diagnostics and may be removed by normal temporary-file
 cleanup. A verdict applies only to the checked inputs; rerun after changes.
 
-The `apv-check` skill (and `/apv-check` command) can invoke the optional
+The `apv-check` skill (also available as `/apv-check`) can invoke the optional
 `apv-checker` agent on clients supporting Claude plugin agents. It keeps raw
 output and failure investigation in a separate context and returns a brief result.
 Other clients use the same command directly. This preserves main-context space;

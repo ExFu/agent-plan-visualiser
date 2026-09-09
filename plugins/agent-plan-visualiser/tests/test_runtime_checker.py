@@ -23,6 +23,11 @@ spec.loader.exec_module(runtime)
 
 
 class RuntimeCheckerTests(unittest.TestCase):
+    def test_no_command_skill_name_collisions(self):
+        commands = {p.stem for p in (PLUGIN / 'commands').glob('*.md')}
+        skills = {p.parent.name for p in (PLUGIN / 'skills').glob('*/SKILL.md')}
+        self.assertFalse(commands & skills, f'Slash namespace collisions: {commands & skills}')
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='apv tests ')
         self.root = Path(self.tmp.name)

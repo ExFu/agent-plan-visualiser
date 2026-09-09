@@ -11,7 +11,7 @@ happened; the gap between the two is signal.
 
 ```text
 /plugin marketplace add ExFu/exfu-marketplace
-/plugin install exfu-agent-plan-visualiser@exfu
+/plugin install exfu-agent-plan-visualiser@exfu-marketplace
 ```
 
 Then attach a project with `/apv-init`.
