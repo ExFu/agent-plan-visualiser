@@ -23,6 +23,8 @@ summary, runs audits, then checks integrity and Git seal correspondence (integri
 only in a non-Git scope). It writes derived files and a temporary diagnostic report;
 it never writes canonical events or a capture timestamp. Use `--gate-only` for
 the merge boundary, or `--ref <commit>` to check a committed Git ref without refresh.
+Gate-only skips the full refresh pipeline, but advisory gate checks may rebuild
+a stale cache; it is not a guarantee of read-only execution.
 Exit 0 = pass, 1 = failed check, 2 = environment/usage error or changed inputs.
 The JSON response includes an input digest, steps, warning count and report path.
 Reports live in the machine's temporary directory and may be cleaned by the OS.

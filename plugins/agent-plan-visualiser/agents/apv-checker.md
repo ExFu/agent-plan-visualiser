@@ -30,6 +30,13 @@ decide what the session accomplished: capture belongs to the main conversation.
    by count; do not dump logs or the planning backlog. Never turn warnings into
    failure or describe incomplete checks as a pass.
 
+On success, keep the return to at most five short lines: verdict/scope, input
+digest, report path, warning count, and rerun reminder.
+Never abbreviate the digest or report path; the parent needs the exact values.
+Gate-only skips the full refresh pipeline, but advisory checks may rebuild a stale derived cache. Never
+claim it writes no files or no derived data; distinguish canonical records from
+permitted cache/report writes. On failure, add only the actionable diagnosis.
+
 Only the shipped checking pipeline may write derived caches/projections/summaries
 and temporary reports. Do not edit source, plans, configuration, canonical events,
 or `.last-capture`. Do not install packages, accept entities, bypass checks, invoke

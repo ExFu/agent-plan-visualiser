@@ -87,3 +87,24 @@ and could not be refreshed". The fixture's canonical event log was unchanged
 and no capture timestamp was created. Approval is no longer the blocker; the
 Claude CLI needs interactive reauthentication (`claude auth login`). Native
 agent execution remains unverified and this plan remains live.
+
+## Native-agent verification completed
+
+After the operator reauthenticated Claude, the explicitly approved native
+`exfu-agent-plan-visualiser:apv-checker` loaded through `--plugin-dir` and ran
+successfully. A valid disposable Git-less fixture passed. A second run covered
+both valid and deliberately invalid fixtures: the agent returned PASS and FAIL
+respectively, locating the missing `actor` at event-log line 10. Independent
+inspection of the reports confirmed exit codes 0/1 and the schema diagnostic.
+Fixture events, plan files, schema marker and configuration were byte-for-byte
+unchanged; neither fixture gained a capture timestamp. There were no tool
+permission denials. The agent distinguished skipped advisory checks from a clean
+warning result when the invalid record also prevented the advisory cache build.
+
+The first successful run described gate-only too strongly as not writing derived
+files. Agent/skill instructions now explicitly allow the gate's lazy cache rebuild;
+the second run reported that boundary correctly. Success reports are constrained
+to five short lines, and exact digests/report paths must not be abbreviated.
+
+Native execution is verified; the earlier approval and OAuth blockers are resolved.
+This execution plan is complete. Marketplace publication remains outside scope.
