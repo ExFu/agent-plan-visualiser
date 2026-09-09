@@ -10,8 +10,13 @@ import datetime
 import json
 import os
 import sqlite3
+import sys
 import subprocess
 from pathlib import Path
+
+from apv_runtime import ensure_python
+if __name__ == "__main__":
+    ensure_python((), optional=('yaml',))
 
 import apvlib
 
@@ -321,8 +326,13 @@ def main():
             except _yaml.YAMLError:
                 pass
     except ImportError:
-        # pyyaml not available; skip fallback. Cache still builds; routing may be poorer.
-        pass
+        skipped = sum(1 for (et, eid), e in entities.items()
+                      if et == "plan" and not e["attrs"]
+                      and any((r / f"{eid}.md").is_file() for _, r in PLANNING_ROOTS))
+        if skipped:
+            print(f"WARN: PyYAML unavailable; skipped legacy frontmatter for {skipped} plan(s). "
+                  "Projection metadata may be incomplete. Select a Python with PyYAML via APV_PYTHON.",
+                  file=sys.stderr)
 
     for (et, eid), e in entities.items():
         origins = e.get("origins") or {"captured"}

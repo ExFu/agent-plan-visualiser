@@ -19,6 +19,7 @@
 set -euo pipefail
 SELF="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${BASH_SOURCE[0]}")"
 TOOLCHAIN="$(dirname "$(dirname "$SELF")")"
+source "$TOOLCHAIN/scripts/python-runtime.sh"
 
 usage() {
   cat <<'USAGE'
@@ -27,6 +28,7 @@ usage: apv [command] [args]
   serve [--port N] [--host H]   view server (default when no command given)
   init [apv-init flags]         attach or repair the current repo
   backfill [backfill flags]     mine pre-adoption git history into the log
+  check [--gate-only] [--json]   validate, refresh and gate; compact report
   refresh                       rebuild cache + projection + summary
   help                          this text
 USAGE
@@ -34,6 +36,13 @@ USAGE
 
 CMD="${1:-serve}"
 if [ $# -gt 0 ]; then shift; fi
+case "$CMD" in
+  help|-h|--help) usage; exit 0 ;;
+  check) exec python3 "$TOOLCHAIN/scripts/check.py" "$@" ;;
+  init) apv_resolve_python || exit 2 ;;
+  backfill) apv_resolve_python jsonschema || exit 2 ;;
+  *) apv_resolve_python jsonschema yaml || exit 2 ;;
+esac
 
 # The derived chain (cache -> projection -> summary) — everything the view
 # reads beyond the raw log. Derived state is rebuildable by definition, so
@@ -41,9 +50,9 @@ if [ $# -gt 0 ]; then shift; fi
 # this runs (field report 2026-07-21: ./apv in a backfilled-only repo served
 # a 404 projection).
 refresh_pipeline() {
-  python3 "$TOOLCHAIN/scripts/cache-build.py" \
-    && python3 "$TOOLCHAIN/scripts/projection-emit.py" \
-    && python3 "$TOOLCHAIN/scripts/summary-emit.py"
+  "$APV_PYTHON" "$TOOLCHAIN/scripts/cache-build.py" \
+    && "$APV_PYTHON" "$TOOLCHAIN/scripts/projection-emit.py" \
+    && "$APV_PYTHON" "$TOOLCHAIN/scripts/summary-emit.py"
 }
 
 case "$CMD" in
@@ -61,13 +70,13 @@ case "$CMD" in
     # cost ruling 2026-07-03).
     export APV_EXTRACT_MODEL="${APV_EXTRACT_MODEL:-sonnet}"
     for a in "$@"; do
-      case "$a" in --project-path*) exec python3 "$TOOLCHAIN/scripts/backfill/backfill.py" "$@" ;; esac
+      case "$a" in --project-path*) exec "$APV_PYTHON" "$TOOLCHAIN/scripts/backfill/backfill.py" "$@" ;; esac
     done
     ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
       echo "apv backfill: not inside a git repository (or pass --project-path)" >&2
       exit 2
     }
-    exec python3 "$TOOLCHAIN/scripts/backfill/backfill.py" --project-path "$ROOT" "$@"
+    exec "$APV_PYTHON" "$TOOLCHAIN/scripts/backfill/backfill.py" --project-path "$ROOT" "$@"
     ;;
   refresh)
     refresh_pipeline

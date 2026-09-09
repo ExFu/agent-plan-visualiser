@@ -18,8 +18,9 @@ run_step() {
     PASS+=("$label")
     echo "${GREEN}    OK${RESET}"
   else
+    local status=$?
     echo "${RED}    FAIL: $label${RESET}"
-    return 1
+    return "$status"
   fi
 }
 
@@ -29,12 +30,14 @@ run_step() {
 # gate-check.sh makes. (The old `cd "$(dirname "$0")/../.."` assumed the
 # toolchain was vendored one level under a repo root, true only in dogfood.)
 TOOLCHAIN="$(cd "$(dirname "$0")/.." && pwd)"
+source "$TOOLCHAIN/scripts/python-runtime.sh"
+apv_resolve_python jsonschema yaml || exit 2
 
 # Repo root and data dir via apvlib (root: git toplevel -> nearest
 # .apv-config.toml -> toolchain parent; data: APV_DATA_DIR -> config ->
 # .apv/), so this wrapper and the Python steps agree on where the project
 # is — including a synced folder with no git (M7-git-less-scopes).
-RESOLVED="$(python3 - "$TOOLCHAIN/scripts" <<'PYEOF'
+RESOLVED="$("$APV_PYTHON" - "$TOOLCHAIN/scripts" <<'PYEOF'
 import sys
 sys.path.insert(0, sys.argv[1])
 import apvlib
@@ -70,17 +73,17 @@ warn_leftovers() {
   return 0
 }
 
-run_step "validate events.jsonl"          bash "$TOOLCHAIN/scripts/validate-events.sh"           || exit 1
-run_step "validate plan frontmatter"      bash "$TOOLCHAIN/scripts/validate-plan-frontmatter.sh" || exit 1
-run_step "rebuild SQLite cache"           python3 "$TOOLCHAIN/scripts/cache-build.py"            || exit 1
+run_step "validate events.jsonl"          bash "$TOOLCHAIN/scripts/validate-events.sh"           || exit $?
+run_step "validate plan frontmatter"      bash "$TOOLCHAIN/scripts/validate-plan-frontmatter.sh" || exit $?
+run_step "rebuild SQLite cache"           "$APV_PYTHON" "$TOOLCHAIN/scripts/cache-build.py"            || exit $?
 warn_leftovers
-run_step "emit projection.json"           python3 "$TOOLCHAIN/scripts/projection-emit.py"        || exit 1
-run_step "emit summary.md"                python3 "$TOOLCHAIN/scripts/summary-emit.py"           || exit 1
+run_step "emit projection.json"           "$APV_PYTHON" "$TOOLCHAIN/scripts/projection-emit.py"        || exit $?
+run_step "emit summary.md"                "$APV_PYTHON" "$TOOLCHAIN/scripts/summary-emit.py"           || exit $?
 # Audits run through Python's sqlite3 module (audit-run.py) — the CLI is not
 # a dependency; the cache path resolves the same way the build steps did.
-run_step "audit-stalled"                  python3 "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-stalled.sql"                  || exit 1
-run_step "audit-fulcrum-without-decision" python3 "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-fulcrum-without-decision.sql" || exit 1
-run_step "audit-orphans"                  python3 "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-orphans.sql"                  || exit 1
+run_step "audit-stalled"                  "$APV_PYTHON" "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-stalled.sql"                  || exit $?
+run_step "audit-fulcrum-without-decision" "$APV_PYTHON" "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-fulcrum-without-decision.sql" || exit $?
+run_step "audit-orphans"                  "$APV_PYTHON" "$TOOLCHAIN/scripts/audit-run.py" "$TOOLCHAIN/scripts/audit-orphans.sql"                  || exit $?
 
 echo
 echo "${GREEN}All ${#PASS[@]} steps passed.${RESET}"

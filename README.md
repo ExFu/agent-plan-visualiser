@@ -17,10 +17,12 @@ happened; the gap between the two is signal.
 Then attach a project with `/apv-init`.
 
 **Before you install**, note APV needs `python3` (3.11+), `sqlite3`, and the
-`jsonschema` Python package — the extractor fails closed without it:
+`jsonschema` and PyYAML Python packages — the extractor fails closed without it:
 
 ```bash
-python3 -m pip install --user jsonschema
+python3 -m venv "$HOME/.apv-venv"
+"$HOME/.apv-venv/bin/python" -m pip install pyyaml jsonschema
+export APV_PYTHON="$HOME/.apv-venv/bin/python"
 ```
 
 Full quickstart, requirements, and command reference:

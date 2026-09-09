@@ -42,6 +42,10 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
+from apv_runtime import ensure_python, dependency_help
+if __name__ == "__main__":
+    ensure_python(('jsonschema',))
+
 import apvlib  # noqa: E402
 
 DIFF_CAP = 80_000          # chars; beyond this we halt (no sub-agent recursion in the first cut)
@@ -376,7 +380,7 @@ def schema_validate(events: list):
         raise AmbiguityHalt(
             f"jsonschema not installed for {sys.executable} — the extractor "
             "fails closed rather than appending unvalidated events. "
-            f"Run: {sys.executable} -m pip install --user jsonschema")
+            + dependency_help(("jsonschema",), sys.executable))
     schema = json.loads(schema_path.read_text())
     for e in events:
         validate(instance=e, schema=schema)

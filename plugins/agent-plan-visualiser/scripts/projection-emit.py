@@ -9,6 +9,10 @@ import re
 import sqlite3
 from pathlib import Path
 
+from apv_runtime import ensure_python
+if __name__ == "__main__":
+    ensure_python(())
+
 import apvlib
 
 REPO_ROOT = apvlib.repo_root()

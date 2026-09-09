@@ -51,6 +51,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+from apv_runtime import ensure_python
+if __name__ == "__main__":
+    ensure_python(('jsonschema',))
+
 import apvlib
 
 SCRIPT_DIR = Path(__file__).resolve().parent

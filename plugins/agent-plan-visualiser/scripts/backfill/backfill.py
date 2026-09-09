@@ -58,6 +58,10 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
+from apv_runtime import ensure_python, dependency_help
+if __name__ == "__main__":
+    ensure_python(('jsonschema',))
+
 import apvlib  # noqa: E402
 
 DEFAULT_PROMPT = Path(__file__).resolve().parent / "extract-commit-prompt.md"
@@ -478,7 +482,7 @@ def schema_validate(events: list[dict]):
         raise AmbiguityHalt(
             f"jsonschema not installed for {sys.executable} — backfill fails "
             "closed rather than appending unvalidated events. "
-            f"Run: {sys.executable} -m pip install --user jsonschema")
+            + dependency_help(("jsonschema",), sys.executable))
     schema = json.loads(SCHEMA_PATH.read_text())
     for e in events:
         validate(instance=e, schema=schema)

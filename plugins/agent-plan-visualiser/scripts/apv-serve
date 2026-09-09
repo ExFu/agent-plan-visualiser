@@ -11,4 +11,6 @@
 set -euo pipefail
 SELF="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${BASH_SOURCE[0]}")"
 TOOLCHAIN="$(dirname "$(dirname "$SELF")")"
-exec python3 "$TOOLCHAIN/scripts/serve.py" "$@"
+source "$TOOLCHAIN/scripts/python-runtime.sh"
+apv_resolve_python jsonschema yaml || exit 2
+exec "$APV_PYTHON" "$TOOLCHAIN/scripts/serve.py" "$@"

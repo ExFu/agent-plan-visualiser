@@ -50,3 +50,29 @@ record any unexecuted leg honestly.
 No automatic installs, machine-specific committed interpreter paths, autonomous
 record repair, changes to acceptance policy, or unrelated gate/cache redesign.
 No marketplace publication in this task.
+
+## Implementation and verification — 2026-09-09
+
+Delivered the shared stdlib bootstrap/resolver, capability-checked APV_PYTHON
+selection and propagation, venv remediation, batch JSONL validator, legacy-cache
+warning, compact check command, direct skill/command and optional checker agent.
+Capture and merge skills delegate only checking, never record authorship or Git
+operations. Check reports bind results to input digests; --ref resolves to a
+commit SHA, and concurrent input changes return an error. Derived outputs are
+excluded from that digest.
+
+All 13 focused runtime/checker regressions passed. Existing validator, gate
+composite, gate-hook, extractor, backfill, init, Git-less, portability and
+distribution sandbox suites passed. Plugin manifest validation and the agent
+structure validator passed (the latter has advisory prose heuristics). The
+tracked-file toolchain-path audit passed. A 251-event local comparison measured
+0.698s for the old Python fallback and 0.593s for the new batch validator; this
+machine lacks check-jsonschema, so the reporter's per-event CLI timing was not
+reproduced. A 1000-event regression proves that the CLI is never invoked.
+
+The live Claude plugin-agent smoke test remains unexecuted. Automatic approval
+review rejected the attempted invocation because it could send local plugin and
+fixture contents to Claude's service without specific user authorization. No
+workaround was attempted. Keep this plan live until that native execution leg
+has been approved and verified. Implementation is committed for review; no
+marketplace release is part of this task.

@@ -27,6 +27,11 @@ abandoned work nor misses open threads.
 
 ## 2. The moments and their skills
 
+- **`apv-check`** — compact validation and integrity checking, with detailed local
+  reports. The optional `apv-checker` plugin agent isolates diagnostics; the same
+  script works directly when a client has no native agents. Capture and decisions
+  remain in the main conversation. See `skills/apv-check/SKILL.md`.
+
 - **`/apv-init`** — once per repo: attach it (seed the data dir, write
   config, install the git hooks). Idempotent; re-run to audit and repair.
   A plain synced folder with no repository attaches with `--no-git`

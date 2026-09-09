@@ -14,10 +14,12 @@
 set -euo pipefail
 # Schema = toolchain content, resolved beside this script (see validate-events.sh).
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/python-runtime.sh"
+apv_resolve_python jsonschema yaml || exit 2
 SCHEMA="${1:-$SCRIPT_DIR/../schemas/0.2.0/plan-frontmatter.schema.json}"
 PLANS_DIR="${2:-}"
 
-python3 - "$SCRIPT_DIR" "$SCHEMA" "$PLANS_DIR" <<'PYEOF'
+"$APV_PYTHON" - "$SCRIPT_DIR" "$SCHEMA" "$PLANS_DIR" <<'PYEOF'
 import sys, os, json, re
 from pathlib import Path
 script_dir, schema_path, plans_dir = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -34,11 +36,8 @@ try:
 except ImportError:
     _MISSING.append("jsonschema")
 if _MISSING:
-    sys.stderr.write(
-        f"Missing Python deps for {sys.executable}: {', '.join(_MISSING)}\n"
-        f"Run: {sys.executable} -m pip install --user {' '.join(_MISSING)}\n"
-        f"(Plain 'pip install ...' may install to a different Python — use the exact command above.)\n"
-    )
+    from apv_runtime import dependency_help
+    sys.stderr.write(dependency_help(_MISSING, sys.executable))
     sys.exit(2)
 
 with open(schema_path) as f:

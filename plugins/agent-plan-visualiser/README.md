@@ -9,18 +9,23 @@ actually happened; the gap between the two is signal.
 
 ## Before you start
 
-APV runs on `bash`, `git` and `python3` (3.11+; its stdlib `sqlite3` module
-covers the cache and audits — no `sqlite3` CLI needed) — all standard on
-macOS and Linux. It also needs the `jsonschema` Python package: the extractor
-validates every event before appending it, and **fails closed** if the package
-is missing, so install it before step 2:
+APV needs Bash, Git (for Git-backed projects), Python 3.11+, `jsonschema` and
+PyYAML. Python's built-in SQLite support handles the cache; no SQLite CLI is needed.
+A virtual environment works with externally managed Python installations:
 
 ```bash
-python3 -m pip install --user jsonschema
+python3 -m venv "$HOME/.apv-venv"
+"$HOME/.apv-venv/bin/python" -m pip install pyyaml jsonschema
+export APV_PYTHON="$HOME/.apv-venv/bin/python"
 ```
 
-(`check-jsonschema` on `PATH` works as an alternative. Without either, `/apv-init`
-succeeds but your first tracked commit halts with an explanatory error.)
+APV never installs packages automatically. `APV_PYTHON` is an explicit interpreter
+path (not a command with arguments); an unsuitable override fails with instructions.
+Otherwise it tries the current Python/PATH python3, `~/.apv-venv/bin/python`, then
+an absolute Python shebang from `check-jsonschema`. Candidates must support the
+operation's dependencies. Shell pipelines pass the selection to their children;
+direct Python entry points also honor it. A check-jsonschema environment may lack
+PyYAML, so it is not necessarily sufficient for the full pipeline.
 
 ## Quickstart
 
@@ -109,11 +114,33 @@ git-less with `[storage] no_git = true` to force the out-of-tree default even
 inside someone's checkout. If the cache home cannot be created, the temp dir
 is used and a line on stderr says so — the data dir is never the fallback.
 
+## Checking without conversational noise
+
+Run `apv check` through your attached launcher, or
+`bash "$APV_HOME/scripts/apv" check --json` from the tracked project with APV_HOME
+set to the plugin's directory. The default validates events and plans, refreshes
+derived views, and runs the integrity/commit gate. `--gate-only` skips refresh;
+`--ref <commit>` checks a committed Git ref. Exit 0 is pass, 1 a failed check,
+2 an environment/usage error or concurrent input change.
+
+Output is compact and includes the path to a detailed temporary JSON report.
+Reports contain local diagnostics and may be removed by normal temporary-file
+cleanup. A verdict applies only to the checked inputs; rerun after changes.
+
+The `apv-check` skill (and `/apv-check` command) can invoke the optional
+`apv-checker` agent on clients supporting Claude plugin agents. It keeps raw
+output and failure investigation in a separate context and returns a brief result.
+Other clients use the same command directly. This preserves main-context space;
+it does not make model work token-free.
+
+The checker may rebuild derived files, but never captures work, edits the event
+log, accepts plans, stamps capture, commits, or merges. Those remain with the
+main agent. Git hooks enforce the gate independently of agent availability.
+
 ## Requirements
 
-`bash`, `git`, `python3` (3.11+; stdlib only for the gate, cache and audits;
-`jsonschema` — or `check-jsonschema` — for full pipeline validation). The
-`sqlite3` CLI is optional: handy for ad-hoc queries, required by nothing. See [Before you start](#before-you-start) for the install command.
+See [Before you start](#before-you-start). No `check-jsonschema` executable is
+required: event validation is batched in one Python process per schema group.
 
 ## License
 

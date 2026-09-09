@@ -45,6 +45,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/python-runtime.sh"
+apv_resolve_python jsonschema || exit 2
 # The repo being gated is the caller's repo, not the toolchain's home —
 # the toolchain may live in the plugin cache, far from any tracked repo.
 # Default to the enclosing repo of the cwd; --repo-root overrides.
@@ -71,7 +73,7 @@ done
 # to address the blob as <ref>:<relpath>). DATA_REL comes back empty when
 # the data dir sits outside the repo — the no-git deployment story, where
 # blob addressing is impossible.
-eval "$(python3 - "$SCRIPT_DIR" "$REPO_ROOT" "$CONFIG" <<'PYEOF'
+eval "$("$APV_PYTHON" - "$SCRIPT_DIR" "$REPO_ROOT" "$CONFIG" <<'PYEOF'
 import shlex, sys
 from pathlib import Path
 scripts, root, cfg = Path(sys.argv[1]), Path(sys.argv[2]).resolve(), sys.argv[3] or None
@@ -87,14 +89,14 @@ print("DATA_REL=" + shlex.quote(str(rel)))
 PYEOF
 )" || { echo "gate-check: could not resolve the data dir" >&2; exit 2; }
 
-COMPOSITE=(python3 "$SCRIPT_DIR/gate-composite.py" --repo-root "$REPO_ROOT")
+COMPOSITE=("$APV_PYTHON" "$SCRIPT_DIR/gate-composite.py" --repo-root "$REPO_ROOT")
 [ -n "$CONFIG" ] && COMPOSITE+=(--config "$CONFIG")
 
 # seal_check <log-path> <ref> <committed-line-count>
 # Lines beyond <committed-line-count> are the uncommitted tail (mid-flow);
 # pass the total line count (or any larger number) for strict mode.
 seal_check() {
-  python3 - "$1" "$2" "$3" "$REPO_ROOT" <<'PYEOF'
+  "$APV_PYTHON" - "$1" "$2" "$3" "$REPO_ROOT" <<'PYEOF'
 import json, subprocess, sys
 log, ref, committed, root = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
 try:

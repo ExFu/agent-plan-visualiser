@@ -29,6 +29,10 @@ import uuid
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+from apv_runtime import ensure_python
+if __name__ == "__main__":
+    ensure_python((), optional=('jsonschema',))
+
 import apvlib
 
 # The repo being served is the CALLER's repo (apvlib.repo_root — cwd's

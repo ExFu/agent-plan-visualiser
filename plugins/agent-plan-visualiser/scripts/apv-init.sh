@@ -48,6 +48,8 @@
 # Exit: 0 attached / repaired / nothing-to-do; 1 at least one component
 #       refused or failed; 2 usage or environment error.
 set -uo pipefail
+source "$(cd "$(dirname "$0")" && pwd)/python-runtime.sh"
+apv_resolve_python || exit 2
 
 AT="all"
 AT_EXPLICIT=0
@@ -298,7 +300,7 @@ else
 # same-named line the project added for its own reasons is not ours to touch.
 remove_ignore_pairs() {
   [ -f .gitignore ] || return 0
-  python3 - "$@" <<'PY'
+  "$APV_PYTHON" - "$@" <<'PY'
 import sys
 targets = set(sys.argv[1:])
 comment = "# agent-plan-visualiser local per-checkout state — never tracked"
@@ -584,7 +586,7 @@ case "$TOOLCHAIN_HOME" in
     PLUGIN_ID="$(basename "$(dirname "$TOOLCHAIN_HOME")")@$(basename "$(dirname "$(dirname "$TOOLCHAIN_HOME")")")"
     INSTALLED_JSON="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json"
     USER_SCOPE=0
-    if [ -f "$INSTALLED_JSON" ] && python3 - "$INSTALLED_JSON" "$PLUGIN_ID" <<'PY'
+    if [ -f "$INSTALLED_JSON" ] && "$APV_PYTHON" - "$INSTALLED_JSON" "$PLUGIN_ID" <<'PY'
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
@@ -598,7 +600,7 @@ PY
       report ok "plugin enablement" "$PLUGIN_ID is user-scope — loads in every session, worktrees included"
     else
       SETTINGS=".claude/settings.json"
-      WROTE="$(python3 - "$SETTINGS" "$PLUGIN_ID" <<'PY'
+      WROTE="$("$APV_PYTHON" - "$SETTINGS" "$PLUGIN_ID" <<'PY'
 import json, os, sys
 path, pid = sys.argv[1], sys.argv[2]
 data = {}
@@ -756,7 +758,7 @@ if [ -f CLAUDE.md ] && grep -qF "$APV_MD_MARKER" CLAUDE.md; then
   # bash 3.2 parser that ships on macOS. Apostrophes in the heredoc below
   # do the same — keep the Python comments free of them.
   CANON_BLOCK="$(claude_md_block)"
-  HEAL="$(python3 - "$CANON_BLOCK" CLAUDE.md "$APV_MD_MARKER" "$APV_MD_END_MARKER" "$ACCEPT_CLAUDE_MD" <<'PY'
+  HEAL="$("$APV_PYTHON" - "$CANON_BLOCK" CLAUDE.md "$APV_MD_MARKER" "$APV_MD_END_MARKER" "$ACCEPT_CLAUDE_MD" <<'PY'
 import os, sys, tempfile
 
 canonical, path, start, end, accept = sys.argv[1:6]

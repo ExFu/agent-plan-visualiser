@@ -165,7 +165,12 @@ with open(EVENTS_PATH, "a") as f:
 
 ## 6. Validate, then timestamp
 
-1. `bash "$APV/scripts/repack-validate.sh"` (§0 resolves `$APV`) — must pass end-to-end (honours `APV_DATA_DIR`).
+1. Follow the sibling `apv-check/SKILL.md`: run `bash "$APV/scripts/apv" check --json`
+   (or delegate only that check to the available `apv-checker` agent). This includes
+   the full repack pipeline and integrity gate. Wait for PASS before proceeding.
+   Keep capture authorship, repairs, state checks, timestamp and commit in this
+   main conversation. Do not change inputs while the checker runs. Clients without
+   plugin agents run the same command directly; raw diagnostics stay in its report.
 
    (Editing the toolchain's own scripts or shipped docs? `$APV/tests/audit-toolchain-paths.sh` catches paths that resolve only in APV's dogfood checkout — the class that once made this very step unrunnable for every plugin-cache install. Deliberately not wired into the gate; run it by hand when you touch those surfaces, ignore it otherwise.) A failure means your block is malformed: fix by appending nothing further until you understand it; ask the operator if unclear. (Pre-seal you may correct an uncommitted block only by consulting the operator — the default remains append-only.)
 2. Sanity-check derived states for the entities your block touched — closures show `closed`, new untriaged items show `draft`:

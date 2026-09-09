@@ -12,7 +12,7 @@ A textual conflict on `events.jsonl` is the single most tempting moment for anyo
 ## 0. Preconditions
 
 - Branch work is committed and captured (/apv-capture): the log ends in a seal, nothing staged.
-- `bash "$APV/scripts/gate-check.sh"` is green on the branch **as it stands** — repair first; never carry defects into a reconciliation.
+- `bash "$APV/scripts/apv" check --gate-only --json` is green on the branch **as it stands** — repair first; never carry defects into a reconciliation.
 - `$APV` (the toolchain home) and `DATA_DIR` both resolve as /apv-capture §0 — the toolchain lives in the plugin cache on a normal install, so never address its scripts by a bare relative path. `DATA_REL` below is the data dir's repo-relative path (default `.apv`). Snippets assume the repo root as cwd.
 
 ## 1. Pick the lightest sufficient integration
@@ -70,8 +70,12 @@ A **clean** merge — no conflict — is the opposite case: git creates the merg
 ## 5. Gate, then land
 
 ```bash
-bash "$APV/scripts/gate-check.sh"
+bash "$APV/scripts/apv" check --gate-only --json
 ```
+
+The sibling `apv-check/SKILL.md` can delegate this check to `apv-checker` when
+available; reconciliation, capture and Git operations remain with the main agent.
+Wait for the result, and rerun if inputs change.
 
 Run it **after** the merge commit, from the branch: both parents are now reachable, so every seal resolves (mid-merge, main's seals would look orphaned). Green only:
 
@@ -91,7 +95,7 @@ The same doctrine, condensed — for humans resolving by hand:
 2. Rebuild the file: main's version first, whole; then your branch's new lines (everything past the merge-base's line count in *your* version). Touch nothing else.
 3. Read both tails. Same entity closed on one side and worked on the other → decide explicitly; record the ruling as `entity.reopened` + `decision` appended after (shapes: /apv-capture §2).
 4. Append a `commit.recorded` seal matching your merge commit message exactly; `date +%s > "$DATA_REL/.last-capture"`; conclude the commit.
-5. `bash "$APV/scripts/gate-check.sh"` — fix until green, then `git checkout main && git merge --ff-only <branch>`.
+5. `bash "$APV/scripts/apv" check --gate-only --json` — fix until green, then `git checkout main && git merge --ff-only <branch>`.
 
 ## 7. What NOT to do
 
