@@ -76,3 +76,14 @@ fixture contents to Claude's service without specific user authorization. No
 workaround was attempted. Keep this plan live until that native execution leg
 has been approved and verified. Implementation is committed for review; no
 marketplace release is part of this task.
+
+## Native-agent verification attempt — user approved
+
+The operator explicitly approved the previously blocked Claude invocation. The
+approved smoke test was attempted against a disposable Git-less fixture using
+`--plugin-dir` and `--agent exfu-agent-plan-visualiser:apv-checker`. Claude exited
+1 before executing the workflow: "Failed to authenticate: OAuth session expired
+and could not be refreshed". The fixture's canonical event log was unchanged
+and no capture timestamp was created. Approval is no longer the blocker; the
+Claude CLI needs interactive reauthentication (`claude auth login`). Native
+agent execution remains unverified and this plan remains live.
