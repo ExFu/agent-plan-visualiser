@@ -45,11 +45,29 @@ if [ -n "$REQ_MIN" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$CLAUDE_PLUGIN
   fi
 fi
 
+# Peer convention (T3-humane-summaries): when exfu-humane-agents is installed
+# alongside, say so, so the first capture of the session writes its summaries
+# under that convention rather than the built-in fallback. Discovery only —
+# manifests cannot declare dependencies. Best-effort and SILENT on any gap:
+# the plugin root's sibling dirs (Desktop/Cowork: rpm/plugin_*/; CLI cache:
+# <marketplace>/<plugin>/<version>/) are scanned with the same one-key sed.
+PEER=""
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  for m in "$(dirname "$CLAUDE_PLUGIN_ROOT")"/*/.claude-plugin/plugin.json \
+           "$(dirname "$(dirname "$CLAUDE_PLUGIN_ROOT")")"/*/*/.claude-plugin/plugin.json; do
+    [ -f "$m" ] || continue
+    if sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$m" 2>/dev/null | grep -qx "exfu-humane-agents"; then
+      PEER=" The exfu-humane-agents plugin is installed alongside: write every capture summary under its exfu-summarising skill (apv-capture §0.5)."
+      break
+    fi
+  done
+fi
+
 # Skills ship plugin-namespaced; say so, and when the plugin root is known
 # (hooks receive CLAUDE_PLUGIN_ROOT) give the literal source path too, so
 # even a session whose skill listing is truncated — or a subagent — can
 # read the SKILL.md directly instead of concluding the skill is missing.
 SKILL_HINT="the skills are plugin-namespaced (exfu-agent-plan-visualiser:apv-capture etc.)"
 [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && SKILL_HINT="$SKILL_HINT, sources at $CLAUDE_PLUGIN_ROOT/skills/<name>/SKILL.md"
-echo "apv: this project is tracked by agent-plan-visualiser — the append-only event log at $DATA_DIR/events.jsonl is the source of truth for planning state. Run /apv-capture after each logical unit of work, immediately before every commit (the pre-commit guard rejects uncaptured commits); land branches on main via /apv-merge; $SKILL_HINT. For how the tracking works, see the using-agent-plan-visualiser skill."
+echo "apv: this project is tracked by agent-plan-visualiser — the append-only event log at $DATA_DIR/events.jsonl is the source of truth for planning state. Run /apv-capture after each logical unit of work, immediately before every commit (the pre-commit guard rejects uncaptured commits); land branches on main via /apv-merge; $SKILL_HINT. For how the tracking works, see the using-agent-plan-visualiser skill.$PEER"
 exit 0

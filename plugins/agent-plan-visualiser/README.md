@@ -72,8 +72,15 @@ is available, the session didn't load the plugin (usually a checkout without
   Claude session (editors, CI, collaborators) are extracted by `claude -p`
   at commit time — sealed like any capture, write-side rules enforced in
   code, ambiguity blocks the commit to `needs-review/`.
+- **Peer convention** — capture summaries are written for humans, not
+  agents (the typed fields already serve agents). When the sibling
+  `exfu-humane-agents` plugin is installed, `apv-capture` writes every
+  summary under its `exfu-summarising` skill; otherwise a built-in fallback
+  applies. Discovery only, never a hard dependency — install the peer for
+  better summaries.
 - **Hooks** — a SessionStart one-liner orients any session in a tracked
-  repo (`hooks/hooks.json`); the git hooks (capture-guard, gate adapters,
+  repo (`hooks/hooks.json`), naming the humane-agents peer when it is
+  installed alongside; the git hooks (capture-guard, gate adapters,
   optional extractor pair) are installed per-repo by `/apv-init`.
 - **Scripts** — the pipeline (`repack-validate.sh`), the boundary gate
   (`gate-check.sh`), audits, timelines, the view server, the bundle

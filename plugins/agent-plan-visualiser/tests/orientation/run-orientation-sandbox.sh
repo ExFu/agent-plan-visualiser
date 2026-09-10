@@ -78,6 +78,22 @@ run env CLAUDE_PROJECT_DIR="$SANDBOX/half-attached" sh "$ORIENT"
 check "exit 0"                          [ "$CODE" -eq 0 ]
 check "no output"                       [ -z "$OUT" ]
 
+# --- Case 5b: peer convention detection (T3-humane-summaries) ---------------
+echo "== peer: exfu-humane-agents sibling detected via plugin root"
+mkdir -p "$SANDBOX/mp/exfu-agent-plan-visualiser/9.9.9" "$SANDBOX/mp/exfu-humane-agents/0.2.0/.claude-plugin"
+echo '{"name":"exfu-humane-agents","version":"0.2.0"}' > "$SANDBOX/mp/exfu-humane-agents/0.2.0/.claude-plugin/plugin.json"
+run env CLAUDE_PROJECT_DIR="$SANDBOX/tracked-default" CLAUDE_PLUGIN_ROOT="$SANDBOX/mp/exfu-agent-plan-visualiser/9.9.9" sh "$ORIENT"
+check "peer named (cli cache layout)"   grep -q "exfu-humane-agents plugin is installed alongside" <<<"$OUT"
+check "points at exfu-summarising"      grep -q "exfu-summarising" <<<"$OUT"
+check "still one line"                  [ "$(wc -l <<<"$OUT")" -eq 1 ]
+mkdir -p "$SANDBOX/App Support/rpm/plugin_A" "$SANDBOX/App Support/rpm/plugin_B/.claude-plugin"
+echo '{"name":"exfu-humane-agents"}' > "$SANDBOX/App Support/rpm/plugin_B/.claude-plugin/plugin.json"
+run env CLAUDE_PROJECT_DIR="$SANDBOX/tracked-default" CLAUDE_PLUGIN_ROOT="$SANDBOX/App Support/rpm/plugin_A" sh "$ORIENT"
+check "peer named (desktop layout, spaced path)" grep -q "installed alongside" <<<"$OUT"
+mkdir -p "$SANDBOX/lonely/mp/exfu-agent-plan-visualiser/9.9.9"
+run env CLAUDE_PROJECT_DIR="$SANDBOX/tracked-default" CLAUDE_PLUGIN_ROOT="$SANDBOX/lonely/mp/exfu-agent-plan-visualiser/9.9.9" sh "$ORIENT"
+check "no peer -> silent about it"      bash -c '! grep -q "installed alongside" <<<"$1"' _ "$OUT"
+
 # --- Case 6: plugin wiring smoke checks --------------------------------------
 echo "== hooks.json + skill lint"
 run python3 -c "

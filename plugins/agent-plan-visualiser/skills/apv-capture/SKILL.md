@@ -45,6 +45,17 @@ contains a space), and quote `"$APV"` in every command that follows.
 - Events file: `$DATA_DIR/events.jsonl`. Never create it implicitly — if it doesn't exist, stop and ask the operator (the project may not be initialised).
 - Emit events at `schema_version: "0.3.0"` (two later-epoch exceptions — see §2 and §5). Precise field shapes: `$APV/schemas/0.3.0/events.schema.json` (and `plan-frontmatter.schema.json` for plan attributes).
 
+### 0.5 Peer convention: humane summaries
+
+Every event is already the *agent's* record — typed fields carry the exact IDs, paths, commands and results. The `summary` string is the *human's* record, and it is written for a different reader: time-poor, jargon-blind, possibly ADHD. Do not make one string serve both.
+
+Before writing your first summary of the session, check whether the `exfu-humane-agents` plugin is loaded: its skills appear in your skill list as `exfu-humane-agents:exfu-summarising` (and `exfu-humane-agents:exfu-reporting`). The skill list is the portable test — it works in Claude Code, Cowork and Desktop alike; `claude plugin list` does not exist on every surface and the plugin-cache glob misses Desktop's plugin path.
+
+- **Present** → invoke `exfu-humane-agents:exfu-summarising` and write every `summary`, `decision.text`, and `blocker` `note` under its rules. Its convention governs; the fallback below is superseded.
+- **Absent** → apply this minimal fallback, unchanged in spirit: lead with the outcome, not the entity or scope; say *why* it was done, *how* in one breath, and *what* is different now; short sentences, everyday words; no plan IDs, tool names or acronyms in the summary (they live in the typed fields); one to three sentences; anything unfinished or risky stated plainly. Never say "done" for work that isn't.
+
+The peer is discovery-plus-fallback by design: plugin manifests cannot declare dependencies, so capture must work without it, and adopting projects are free to install it for better summaries. The same rule applies to any human-facing prose the sibling skills produce (`apv-merge` operator surfaces, `exfu-planning-apv-integration` verdict summaries).
+
 ## 1. When to run
 
 - After completing a logical unit of work, **immediately before `git commit`** — capture is the last act before committing.
@@ -149,7 +160,7 @@ Every event:
 - `actor` — who did/decided the work (handle, e.g. `"al"`). Acceptance events carry the accepting operator.
 - `confidence` — `explicit` (stated in plan/commit/conversation) or `derived` (inferred).
 - `schema_version` — `"0.3.0"` (epoch exceptions: `verification.deferred` → `"0.5.0"`, `project.assigned` → `"0.6.0"` — each event stamps the epoch that introduced it).
-- `attributes` — per-type extras (§2). Always include a human-useful `summary` on lifecycle events.
+- `attributes` — per-type extras (§2). Always include a human-useful `summary` on lifecycle events — written under §0.5 (the humane-summaries peer convention, or its fallback).
 
 **Mechanics**: append with python3 + `json.dumps` (default separators, default ensure_ascii), one object per line, key order `event_id, type, actor, confidence, schema_version, entity_type, entity_id, attributes`:
 
@@ -201,9 +212,9 @@ Then commit. The git commit's first line must match your seal's `message_first_l
 Work done: extended plan `T3-foo` (accepted, live) and completed it after a green test run. Block:
 
 ```json
-{"event_id": "<uuid4>", "type": "entity.extended", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"summary": "Resolved open question 2 (chose X over Y) while implementing."}}
+{"event_id": "<uuid4>", "type": "entity.extended", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"summary": "Settled the open question about which approach to take: X, because it keeps old entries unchanged. Written into the plan while implementing."}}
 {"event_id": "<uuid4>", "type": "verification.tested", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"test_type": "smoke", "command": "bash scripts/run-checks.sh", "result": "pass", "summary": "All checks green after the change."}}
-{"event_id": "<uuid4>", "type": "entity.completed", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"summary": "T3-foo delivered: X implemented, checks green."}}
+{"event_id": "<uuid4>", "type": "entity.completed", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "entity_type": "plan", "entity_id": "T3-foo", "attributes": {"summary": "The feature is in and every check passes. Nothing left open on this plan."}}
 {"event_id": "<uuid4>", "type": "commit.recorded", "actor": "al", "confidence": "explicit", "schema_version": "0.3.0", "attributes": {"author": "al", "date": "2026-06-09", "message_first_line": "feat(T3-foo): implement X; checks green"}}
 ```
 
